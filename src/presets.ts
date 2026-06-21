@@ -124,10 +124,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * named "flow") can never false-positive. This replaces the previous per-name
  * regex, which counted occurrences anywhere in the document.
  *
- * Limitation (acceptable for hand-authored bundled data): two keys that are
- * byte-different but JSON-equal via escapes — e.g. "flow" vs "flow" — are
- * treated as distinct here. Such aliasing does not occur in the maintained
- * `presets.json`; catching it would require full unescaping during the scan.
+ * Each completed top-level key token is JSON-decoded (via `JSON.parse` on the
+ * reconstructed string literal) before comparison, so escape-equivalent keys —
+ * e.g. "flow" and "flow" — are correctly recognized as the SAME id, matching
+ * how `JSON.parse` would later collapse them.
  */
 function assertNoDuplicateIds(rawText: string): void {
   const seen = new Set<string>();
@@ -148,7 +148,17 @@ function assertNoDuplicateIds(rawText: string): void {
         escaped = true;
       } else if (ch === '"') {
         inString = false;
-        if (depth === 1) pendingKey = token; // candidate top-level key
+        if (depth === 1) {
+          // Decode the raw token through JSON so escape-equivalent keys
+          // ("flow" vs "flow") compare equal — matching JSON.parse's own
+          // collapsing. Fall back to the raw token if the literal is malformed
+          // (the main parse will surface the real error).
+          try {
+            pendingKey = JSON.parse(`"${token}"`) as string;
+          } catch {
+            pendingKey = token;
+          }
+        }
       } else {
         token += ch;
       }

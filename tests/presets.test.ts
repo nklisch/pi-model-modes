@@ -109,6 +109,15 @@ describe("duplicate-id fail-fast (raw-text detection)", () => {
     expect(Object.keys(reg).sort()).toEqual(["agency", "other"]);
   });
 
+  it("catches an escape-equivalent duplicate key (\"flow\" vs \"fl\\u006fw\")", () => {
+    // JSON.parse collapses these to the same key "flow"; the scanner JSON-decodes
+    // each top-level key token, so it recognizes them as the SAME id and throws.
+    const json =
+      '{ "flow": { "base": "pi", "agency": "autonomous", "quality": "pragmatic", "scope": "adjacent", "modifiers": [] },' +
+      '  "fl\\u006fw": { "base": "pi", "agency": "surgical", "quality": "rigorous", "scope": "narrow", "modifiers": [] } }';
+    expect(() => loadPresets({ json })).toThrow(/duplicate preset id "flow"/);
+  });
+
   it("does NOT false-positive when a preset name appears inside a string VALUE", () => {
     // A modifier literally named like a preset id must not be mistaken for a
     // second top-level key (string-state-aware scan).
