@@ -185,6 +185,22 @@ describe("discoverBaseOverlays — manifest order + fail-fast", () => {
     );
     expect(() => discoverBaseOverlays()).toThrow(/missing overlay/i);
   });
+
+  it("throws when an overlay entry escapes the fragment root via ../", () => {
+    const root = freshRoot();
+    // A real file exists OUTSIDE the root; the manifest must not be able to
+    // reach it through a `../` escape.
+    write(root, "../escapee.md", "SECRET");
+    write(root, "base.json", JSON.stringify({ overlays: ["../escapee.md"] }));
+    expect(() => discoverBaseOverlays()).toThrow(/escapes the fragment root/i);
+  });
+
+  it("throws when an overlay entry resolves to a directory, not a file", () => {
+    const root = freshRoot();
+    mkdirSync(join(root, "base/notafile.md"), { recursive: true }); // a DIR named like a file
+    write(root, "base.json", JSON.stringify({ overlays: ["base/notafile.md"] }));
+    expect(() => discoverBaseOverlays()).toThrow(/is not a file/i);
+  });
 });
 
 describe("loadFragment — trimming + mtime invalidation", () => {

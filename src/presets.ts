@@ -116,24 +116,73 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * silently keeps the last value for a repeated key, so duplicate-id detection
  * MUST run on the raw text before the parse collapses them.
  *
- * Mechanism (kept deliberately simple — presets.json is tiny bundled data and
- * ids are simple identifiers): for each canonical preset name, count how many
- * times it appears as a top-level key, i.e. as a quoted string immediately
- * followed by a colon. We match `"<name>"\s*:` rather than streaming-parse the
- * whole document; a stricter parser is overkill for this file. If a name shows
- * up more than once, throw naming the duplicate.
+ * Mechanism: a single depth- and string-aware pass. We only register a key when
+ * its closing quote is read at object depth 1 (the top-level preset map) and it
+ * is immediately followed (across whitespace) by a `:`. Tracking string state
+ * means a `:` or `"` inside a value string is never mistaken for structure, and
+ * the depth gate means a NESTED key sharing a preset name (e.g. a field literally
+ * named "flow") can never false-positive. This replaces the previous per-name
+ * regex, which counted occurrences anywhere in the document.
  *
- * `names` is the set of canonical keys from the parsed object (so we only scan
- * for real preset ids, never substrings inside nested values).
+ * Limitation (acceptable for hand-authored bundled data): two keys that are
+ * byte-different but JSON-equal via escapes — e.g. "flow" vs "flow" — are
+ * treated as distinct here. Such aliasing does not occur in the maintained
+ * `presets.json`; catching it would require full unescaping during the scan.
  */
-function assertNoDuplicateIds(rawText: string, names: string[]): void {
-  for (const name of names) {
-    // Escape regex metacharacters in the id before building the matcher.
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const matcher = new RegExp(`"${escaped}"\\s*:`, "g");
-    const occurrences = (rawText.match(matcher) ?? []).length;
-    if (occurrences > 1) {
-      throw new Error(`duplicate preset id "${name}" in presets.json`);
+function assertNoDuplicateIds(rawText: string): void {
+  const seen = new Set<string>();
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let token = ""; // contents of the in-progress string literal
+  let pendingKey: string | undefined; // last string completed at depth 1, awaiting ':'
+
+  for (let i = 0; i < rawText.length; i++) {
+    const ch = rawText[i];
+    if (inString) {
+      if (escaped) {
+        token += ch;
+        escaped = false;
+      } else if (ch === "\\") {
+        token += ch;
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+        if (depth === 1) pendingKey = token; // candidate top-level key
+      } else {
+        token += ch;
+      }
+      continue;
+    }
+    switch (ch) {
+      case '"':
+        inString = true;
+        token = "";
+        break;
+      case "{":
+      case "[":
+        depth++;
+        pendingKey = undefined;
+        break;
+      case "}":
+      case "]":
+        depth--;
+        pendingKey = undefined;
+        break;
+      case ":":
+        if (depth === 1 && pendingKey !== undefined) {
+          if (seen.has(pendingKey)) {
+            throw new Error(`duplicate preset id "${pendingKey}" in presets.json`);
+          }
+          seen.add(pendingKey);
+        }
+        pendingKey = undefined;
+        break;
+      case ",":
+        pendingKey = undefined;
+        break;
+      // whitespace and other structural chars: keep pendingKey across the gap
+      // between a key's closing quote and its ':'.
     }
   }
 }
@@ -185,8 +234,8 @@ function parseRegistry(rawText: string): PresetRegistry {
   if (!isPlainObject(parsed)) {
     throw new Error("presets.json must be a top-level object of name -> preset");
   }
+  assertNoDuplicateIds(rawText);
   const names = Object.keys(parsed);
-  assertNoDuplicateIds(rawText, names);
 
   const registry: Record<string, Preset> = {};
   for (const name of names) {

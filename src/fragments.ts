@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 /**
  * Fragment loader — convention-directory discovery + stat/mtime-invalidated
@@ -120,13 +120,31 @@ export function discoverBaseOverlays(): string[] {
     );
   }
 
+  const normRoot = resolve(root);
   return (overlays as string[]).map((entry) => {
-    const abs = join(root, entry);
-    try {
-      statSync(abs);
-    } catch {
+    const abs = resolve(normRoot, entry);
+    // Path containment: an overlay must resolve INSIDE the fragment root. base.json
+    // is package data, but a `../` escape is still a defect worth a clear error
+    // rather than a silent out-of-root read.
+    if (abs !== normRoot && !abs.startsWith(normRoot + sep)) {
       throw new Error(
-        `base.json references missing overlay: ${abs} (entry "${entry}")`,
+        `base.json overlay escapes the fragment root: ${abs} (entry "${entry}")`,
+      );
+    }
+    let st;
+    try {
+      st = statSync(abs);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new Error(
+          `base.json references missing overlay: ${abs} (entry "${entry}")`,
+        );
+      }
+      throw err; // permission/other I/O errors surface as-is, not mislabeled
+    }
+    if (!st.isFile()) {
+      throw new Error(
+        `base.json overlay is not a file: ${abs} (entry "${entry}")`,
       );
     }
     return abs;

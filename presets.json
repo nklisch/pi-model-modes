@@ -1,7 +1,7 @@
 {
   "default": {
     "base": "pi",
-    "agency": "collaborative",
+    "agency": "autonomous",
     "quality": "pragmatic",
     "scope": "adjacent",
     "modifiers": []
@@ -11,6 +11,6 @@
     "agency": "autonomous",
     "quality": "pragmatic",
     "scope": "adjacent",
-    "modifiers": ["flow"]
+    "modifiers": ["tdd"]
   }
 }

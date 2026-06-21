@@ -39,7 +39,7 @@ describe("getPreset — lookup (hit) returns the exact preset", () => {
       agency: "autonomous",
       quality: "pragmatic",
       scope: "adjacent",
-      modifiers: ["flow"],
+      modifiers: ["tdd"],
     });
   });
 });
@@ -51,7 +51,7 @@ describe("atomic expansion — a preset carries all five components at once", ()
     // Selecting a preset yields every axis at once — no partial selection.
     expect(preset).toEqual({
       base: "pi",
-      agency: "collaborative",
+      agency: "autonomous",
       quality: "pragmatic",
       scope: "adjacent",
       modifiers: [],
@@ -94,6 +94,29 @@ describe("duplicate-id fail-fast (raw-text detection)", () => {
     expect(() => loadPresets({ json })).toThrow(
       /duplicate preset id "flow"/,
     );
+  });
+
+  it("does NOT false-positive when a preset name also appears as a NESTED key", () => {
+    // "agency" is a nested field key inside every preset. A naive whole-document
+    // scan for the top-level key "agency" would miscount it as a duplicate; the
+    // depth-aware scan must register keys only at object depth 1.
+    const json = `{
+      "agency": { "base": "pi", "agency": "autonomous", "quality": "pragmatic", "scope": "adjacent", "modifiers": [] },
+      "other":  { "base": "pi", "agency": "autonomous", "quality": "pragmatic", "scope": "adjacent", "modifiers": [] }
+    }`;
+    expect(() => loadPresets({ json })).not.toThrow();
+    const reg = loadPresets({ json });
+    expect(Object.keys(reg).sort()).toEqual(["agency", "other"]);
+  });
+
+  it("does NOT false-positive when a preset name appears inside a string VALUE", () => {
+    // A modifier literally named like a preset id must not be mistaken for a
+    // second top-level key (string-state-aware scan).
+    const json = `{
+      "flow":  { "base": "pi", "agency": "autonomous", "quality": "pragmatic", "scope": "adjacent", "modifiers": ["flow"] },
+      "other": { "base": "pi", "agency": "autonomous", "quality": "pragmatic", "scope": "adjacent", "modifiers": [] }
+    }`;
+    expect(() => loadPresets({ json })).not.toThrow();
   });
 });
 
