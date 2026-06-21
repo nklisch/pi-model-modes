@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths
 kind: epic
-stage: implementing
+stage: done
 tags: []
 parent: null
 depends_on: [epic-mode-composition]
@@ -115,3 +115,31 @@ distinct-tier effective-mode layer. The shared effective-mode source/formatter
 (needed by `/mode` no-arg, the cycle start, and the `/mode:inspect` preset-name
 line) lives in this layer. Doc roll-forward split: config-default owns config +
 precedence; keybinding owns Ctrl+M docs; mode-command owns command-output semantics.
+
+## Epic completion
+
+All three child features are `done`. Modes are now user-selectable through the
+three paths that converge on the resolver's effective-mode state:
+
+- `config-default` — plugin-owned config (`pi-model-modes.json`, global + project
+  merge) + the two-tier resolver state (override > default > unset; `/mode off`
+  falls back to the default) + `session_start` seeding + SPEC/ARCHITECTURE
+  roll-forward (plugin config supersedes the closed-`Settings` assumption).
+- `mode-command` — the `/mode` family: no-arg lists the effective mode + presets;
+  `<preset>` sets the override; `off` falls back to the default; unknown → graceful
+  error with the prior override intact.
+- `keybinding-cycle` — Ctrl+M forward / Ctrl+Shift+M backward cycling the sorted
+  preset catalog relative to the effective mode; the SPEC Ctrl+M open question is
+  closed.
+
+**Behavior delivered:** session override > config default > unset precedence, with
+ephemeral overrides and a durable config default; user-rebindable cycling. Each
+child was cross-model codex-reviewed. **Verification:** typecheck clean; 217 tests
+green.
+
+## Epic review record
+
+**Verdict: Approve.** All children done and reviewed (codex cross-model). The
+effective-mode state layer (the codex-advised default/override tiering) ties the
+three paths together; foundation docs roll forward to plugin-owned config. Advanced
+implementing → done.
