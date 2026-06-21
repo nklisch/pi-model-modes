@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-agency-axis
 kind: feature
-stage: drafting
+stage: review
 tags: [prose]
 parent: epic-fragment-library
 depends_on: []
@@ -45,3 +45,32 @@ cache. No-code-surface ([prose]).
   framing.
 - **Base overlays are thin tone-setters** (one short paragraph; no tool/identity/
   context restatement) — applies to base-overlays.
+
+## Authoring notes
+
+Landed the full set of four agency-axis fragments, each one focused behavioral
+brief (short heading + a few bullets) describing the agency disposition:
+
+- `prompts/axis/agency/autonomous.md` — full autonomy; act on best judgment, fix
+  adjacent breakage, report after the fact.
+- `prompts/axis/agency/collaborative.md` — thinking partner; plan-before-change,
+  present trade-offs, share reasoning, summarize.
+- `prompts/axis/agency/surgical.md` — exactly what was asked; no adjacent fixes,
+  minimal blast radius, verify in isolation.
+- `prompts/axis/agency/partner.md` — pair of equals; commit on craft, defer on
+  direction, keep mental models in sync, surface assumptions.
+
+**Source adapted:** ported from `../claude-code-modes/prompts/axis/agency/*.md`.
+Stripped Claude-Code-specific framing (the "Agency: X" heading prefix, "Claude
+Code"/self-references, CC tool-list mechanics) and fit pi's transform-not-replace
+model — these are additive briefs spliced into pi's existing prompt, so they do
+not restate tools/identity/context pi already owns. Matched the voice/length of
+the prior minimal `autonomous.md` starter (overwritten with the full version).
+No dynamic text or timestamps — the splice stays byte-stable. Filenames equal the
+resolver value names (autonomous/collaborative/surgical/partner).
+
+**Verification:** `npm test` green (199 passed / 16 files). The
+`tests/fragments.test.ts` starter-set sanity block was reconciled (concurrently
+with sibling content features) so the agency axis now asserts its full
+four-value, filename-sorted set; the cross-axis count and per-path
+non-empty/trimmed invariants remain intact.
