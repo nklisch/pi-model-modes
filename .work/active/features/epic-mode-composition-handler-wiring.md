@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-handler-wiring
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-mode-resolver, epic-mode-composition-deterministic-splice]
@@ -224,3 +224,42 @@ identity). Build a fixture prompts tree + an explicit `ResolvedMode` via
   they keep passing unchanged.
 - **Inspect throwing on a vanished fragment** (mitigated): try/catch → graceful
   invalid-mode line.
+
+## Implementation notes
+
+All 5 units landed exactly per the design; no deviations.
+
+- **Unit 1 (`src/handler.ts`):** imports `resolveActiveModePlan` (`./resolver.js`)
+  + `assembleSystemPrompt` (`./assemble.js`); dropped the now-unused
+  `NO_MODE_SIGNATURE` import. Resolves `const plan = resolveActiveModePlan()`
+  BEFORE the cache check, keys on `plan.signature`, and on MISS routes the
+  two-path splice on `plan.mode === undefined` (unset → legacy single-`\n`
+  identity-only; active → `assembleSystemPrompt`). JSDoc updated to describe the
+  two-path MISS + mode-signature keying.
+- **Unit 2 (`src/commands.ts`):** `formatModeSummary(mode)` (undefined→"unset";
+  else `base:X • agency:Y • quality:Z • scope:W` + ` • +mod` per modifier);
+  `renderModeInspect(snapshot, model, mode, modeError?)` with the
+  `(unresolvable — …)` Mode line; `formatChangeDetail` mode-switched case now
+  runs from/to through the existing `shortHex` (empty `""` → "unset"); the
+  inspect handler resolves the mode in a try/catch and passes mode + modeError.
+- **Unit 3 (`tests/commands.test.ts`):** all 13 `renderModeInspect` call sites
+  pass an explicit `mode` arg (`undefined` → still "Mode: unset"). Added a
+  composed-mode summary test, an invalid-mode (`modeError`) test, and a
+  mode-switched 64-char-signature shortening test.
+- **Unit 4 (`tests/handler-mode.test.ts`, new):** temp-fixture prompts tree
+  (base.json + chill overlay + one fragment per axis + a tdd modifier), explicit
+  `ResolvedMode` via `setActiveMode`, full reset (cache+resolver+fragment+presets)
+  in `beforeEach`. Five smoke cases: active-mode MISS byte shape, active key ≠
+  unset key, switching → different bytes, `clearActiveMode` → identity-only
+  single-`\n`, identity="" + active mode → fragments + base (no identity).
+- **Unit 5 (`docs/ARCHITECTURE.md`):** enforcement table Clean-base →
+  `assemble.ts`, Cache stability → `assemble.ts` + `cache.ts`, dropped the "no
+  assemble.ts yet" parenthetical; fragment-cache invalidation row corrected to
+  stat/mtime (edits apply next turn).
+
+**Verification:** `npm run typecheck` clean. `npm test` green — **172 passed**
+(164 baseline + 8 new: 3 commands + 5 handler-mode). The existing
+`noop`/`clean-base`/`handler` test files are **byte-unchanged** (empty
+`git diff`) and pass unchanged, proving the unset byte contract (Invariant 3) is
+preserved. No real bugs surfaced; the dep contracts (resolver/assemble/cache)
+held as specified.

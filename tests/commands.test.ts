@@ -14,6 +14,7 @@ import {
   computeCacheKey,
 } from "../src/cache.js";
 import type { CacheKeyInputs, ChangeSignalEntry } from "../src/cache.js";
+import type { ResolvedMode } from "../src/presets.js";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { makeContext, makeEvent, makeModel, makePi } from "./harness.js";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
@@ -43,7 +44,7 @@ describe("renderModeInspect — render core", () => {
     const snap = getChangeSignal();
     expect(snap.lastEntry?.reason).toBe("model-switched");
 
-    const out = renderModeInspect(snap, glm46);
+    const out = renderModeInspect(snap, glm46, undefined);
     const lines = out.split("\n");
     expect(lines[0]).toBe("Mode: unset");
     expect(lines[1]).toBe("Identity: You are GLM-4.6 from Zhipu AI.");
@@ -59,7 +60,7 @@ describe("renderModeInspect — render core", () => {
     const snap = getChangeSignal();
     expect(snap.lastEntry?.reason).toBe("initial");
 
-    const out = renderModeInspect(snap, makeModel({ name: "GLM-4.6", provider: "zai" }));
+    const out = renderModeInspect(snap, makeModel({ name: "GLM-4.6", provider: "zai" }), undefined);
     expect(out).toContain(
       "Effective prompt last changed: this turn — reason: initial",
     );
@@ -68,7 +69,7 @@ describe("renderModeInspect — render core", () => {
   });
 
   it("renders an empty ring (no turn yet) as 'never' with no cache key", () => {
-    const out = renderModeInspect(getChangeSignal(), makeModel({ name: "GLM-4.6", provider: "zai" }));
+    const out = renderModeInspect(getChangeSignal(), makeModel({ name: "GLM-4.6", provider: "zai" }), undefined);
     expect(out).toContain(
       "Effective prompt last changed: never (no turn has run yet)",
     );
@@ -77,14 +78,14 @@ describe("renderModeInspect — render core", () => {
 
   it("renders `Cache key: (none)` when currentKey is undefined", () => {
     const snap = { currentTurn: 0, currentKey: undefined, entries: [], lastEntry: undefined };
-    expect(renderModeInspect(snap, makeModel({ name: "GLM-4.6", provider: "zai" }))).toContain(
+    expect(renderModeInspect(snap, makeModel({ name: "GLM-4.6", provider: "zai" }), undefined)).toContain(
       "Cache key: (none)",
     );
   });
 
   it("renders `Identity: (no model)` when the model is undefined", () => {
     runTurn("base prompt");
-    expect(renderModeInspect(getChangeSignal(), undefined)).toContain(
+    expect(renderModeInspect(getChangeSignal(), undefined, undefined)).toContain(
       "Identity: (no model)",
     );
   });
@@ -92,7 +93,7 @@ describe("renderModeInspect — render core", () => {
   it("renders the literal deriveIdentityLine for the identity field", () => {
     runTurn("base prompt");
     const model = makeModel({ name: "Claude Opus", provider: "anthropic" });
-    expect(renderModeInspect(getChangeSignal(), model)).toContain(
+    expect(renderModeInspect(getChangeSignal(), model, undefined)).toContain(
       `Identity: ${deriveIdentityLine(model)}`,
     );
   });
@@ -117,19 +118,19 @@ describe("renderModeInspect — render core", () => {
     const model = makeModel({ name: "GLM-4.6", provider: "zai" });
 
     it("'this turn' when the last change is this turn (ago 0)", () => {
-      expect(renderModeInspect(snapAgo(3, 3), model)).toContain(
+      expect(renderModeInspect(snapAgo(3, 3), model, undefined)).toContain(
         "Effective prompt last changed: this turn — reason: initial",
       );
     });
 
     it("'1 turn ago' (singular) when ago is 1", () => {
-      expect(renderModeInspect(snapAgo(4, 3), model)).toContain(
+      expect(renderModeInspect(snapAgo(4, 3), model, undefined)).toContain(
         "Effective prompt last changed: 1 turn ago — reason: initial",
       );
     });
 
     it("'N turns ago' (plural) when ago is greater than 1", () => {
-      expect(renderModeInspect(snapAgo(7, 3), model)).toContain(
+      expect(renderModeInspect(snapAgo(7, 3), model, undefined)).toContain(
         "Effective prompt last changed: 4 turns ago — reason: initial",
       );
     });
@@ -141,12 +142,12 @@ describe("renderModeInspect — render core", () => {
     it("truncates a 64-char hex key to first4...last4", () => {
       const key = "0123456789abcdef".repeat(4); // 64 chars
       const snap = { currentTurn: 1, currentKey: key, entries: [], lastEntry: undefined };
-      expect(renderModeInspect(snap, model)).toContain("Cache key: 0123...cdef");
+      expect(renderModeInspect(snap, model, undefined)).toContain("Cache key: 0123...cdef");
     });
 
     it("shows a short (<12 char) key whole", () => {
       const snap = { currentTurn: 1, currentKey: "abcdef", entries: [], lastEntry: undefined };
-      expect(renderModeInspect(snap, model)).toContain("Cache key: abcdef");
+      expect(renderModeInspect(snap, model, undefined)).toContain("Cache key: abcdef");
     });
   });
 
@@ -163,7 +164,7 @@ describe("renderModeInspect — render core", () => {
     const toHash = entry.detail.baseHash.to;
     const expected = `(base ${fromHash.slice(0, 4)}...${fromHash.slice(-4)} → ${toHash.slice(0, 4)}...${toHash.slice(-4)})`;
 
-    const out = renderModeInspect(snap, model);
+    const out = renderModeInspect(snap, model, undefined);
     expect(out).toContain("reason: base changed");
     expect(out).toContain(expected);
     expect(out).not.toContain("undefined");
@@ -188,9 +189,59 @@ describe("renderModeInspect — render core", () => {
 
     const snap = getChangeSignal();
     expect(snap.lastEntry?.reason).toBe("mode-switched");
-    expect(renderModeInspect(snap, makeModel({ name: "GLM-4.6", provider: "zai" }))).toContain(
+    expect(renderModeInspect(snap, makeModel({ name: "GLM-4.6", provider: "zai" }), undefined)).toContain(
       "(unset → flow)",
     );
+  });
+
+  it("renders the composed mode summary on the Mode line for a resolved mode", () => {
+    const model = makeModel({ name: "GLM-4.6", provider: "zai" });
+    const mode: ResolvedMode = {
+      base: "chill",
+      agency: "autonomous",
+      quality: "pragmatic",
+      scope: "adjacent",
+      modifiers: ["flow", "tdd"],
+    };
+    const snap = { currentTurn: 1, currentKey: "abcdef", entries: [], lastEntry: undefined };
+    const out = renderModeInspect(snap, model, mode);
+    expect(out.split("\n")[0]).toBe(
+      "Mode: base:chill • agency:autonomous • quality:pragmatic • scope:adjacent • +flow • +tdd",
+    );
+  });
+
+  it("renders `Mode: (unresolvable — …)` when modeError is set", () => {
+    const model = makeModel({ name: "GLM-4.6", provider: "zai" });
+    const snap = { currentTurn: 1, currentKey: "abcdef", entries: [], lastEntry: undefined };
+    // modeError takes precedence over any mode value.
+    const out = renderModeInspect(snap, model, undefined, 'mode agency "ghost" has no fragment file');
+    expect(out.split("\n")[0]).toBe(
+      'Mode: (unresolvable — mode agency "ghost" has no fragment file)',
+    );
+  });
+
+  it("shortens 64-char mode signatures in the mode-switched detail", () => {
+    // A mode-switched ring entry whose from/to are real 64-char hashes: the
+    // rendered detail must be the shortened first4...last4 form, not the hash.
+    const from = "a".repeat(60) + "1234"; // 64 chars, distinct tail
+    const to = "b".repeat(60) + "5678"; // 64 chars, distinct tail
+    const entry: ChangeSignalEntry = {
+      turn: 2,
+      previousKey: "k1",
+      newKey: "k2",
+      reason: "mode-switched",
+      detail: {
+        modelId: { from: "glm-4.6", to: "glm-4.6" },
+        modelProvider: { from: "zai", to: "zai" },
+        modeSignature: { from, to },
+        baseHash: { from: "h", to: "h" },
+      },
+    };
+    const snap = { currentTurn: 2, currentKey: "k2", entries: [entry], lastEntry: entry };
+    const out = renderModeInspect(snap, makeModel({ name: "GLM-4.6", provider: "zai" }), undefined);
+    expect(out).toContain("(aaaa...1234 → bbbb...5678)");
+    expect(out).not.toContain(from); // the full hash never appears
+    expect(out).not.toContain(to);
   });
 });
 

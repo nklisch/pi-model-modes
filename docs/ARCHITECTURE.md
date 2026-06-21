@@ -121,7 +121,7 @@ Two caches, distinct in purpose:
 | Cache | Scope | Key | Invalidation |
 |-------|-------|-----|--------------|
 | **Per-turn result cache** | one entry | `hash(model, mode, piBase)` | any input changes |
-| **Fragment file cache** | one entry per file | file path | process restart (or `/reload`) |
+| **Fragment file cache** | one entry per file | file path | stat/mtime — a fragment edit re-reads on the next turn |
 
 The per-turn cache is the one that enforces SPEC Invariant 2. Its existence
 makes the change-detection signal free: whenever `lastKey` is replaced, the
@@ -140,8 +140,8 @@ Cache key: 9f3a...c1e2
 
 | Invariant (SPEC) | Enforced in | How |
 |------------------|-------------|-----|
-| Clean-base handling | `handler.ts` | the MISS splice always sources from `e.systemPrompt`, never from `lastResult` (no `assemble.ts` yet — `epic-mode-composition` introduces it with mode fragments and this row rolls forward to it then) |
-| Cache stability | `handler.ts` + `cache.ts` | no dynamic text; ordered concatenation only; key covers all inputs |
+| Clean-base handling | `assemble.ts` | the MISS splice always sources from `e.systemPrompt`, never from `lastResult` |
+| Cache stability | `assemble.ts` + `cache.ts` | no dynamic text; ordered concatenation only; key covers all inputs |
 | No-op when unset | `handler.ts` | identity always prepended; mode-unset injects NO mode fragments (identity still injects) |
 
 ## Key design properties

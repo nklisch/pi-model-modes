@@ -3,6 +3,8 @@ import type { Model } from "@earendil-works/pi-ai";
 import { deriveIdentityLine } from "./identity.js";
 import { getChangeSignal } from "./cache.js";
 import type { ChangeSignalSnapshot, ChangeSignalEntry, ChangeReason } from "./cache.js";
+import { resolveActiveModePlan } from "./resolver.js";
+import type { ResolvedMode } from "./presets.js";
 
 /**
  * `/mode:inspect` — the epic's one user-facing command surface.
@@ -23,10 +25,16 @@ export const MODE_INSPECT_COMMAND = "mode:inspect";
 /** `customType` tag for the emitted status message. */
 export const MODE_INSPECT_MESSAGE_TYPE = "mode-inspect";
 
-/** Mode summary for the `Mode:` line. v1 has no mode → always "unset".
- *  `epic-mode-composition` replaces the body with axis/modifier rendering. */
-export function formatModeSummary(): string {
-  return "unset";
+/** Mode summary for the `Mode:` line. `undefined` (no active mode) → "unset";
+ *  a resolved mode renders `base:X • agency:Y • quality:Z • scope:W` plus a
+ *  ` • +mod` suffix per modifier (preset-name prefix deferred to
+ *  `epic-switching-paths`). */
+export function formatModeSummary(mode: ResolvedMode | undefined): string {
+  if (mode === undefined) {
+    return "unset";
+  }
+  const axes = `base:${mode.base} • agency:${mode.agency} • quality:${mode.quality} • scope:${mode.scope}`;
+  return axes + mode.modifiers.map((m) => ` • +${m}`).join("");
 }
 
 const REASON_LABEL: Record<ChangeReason, string> = {
@@ -53,8 +61,10 @@ function formatChangeDetail(entry: ChangeSignalEntry): string {
       return `(${from} → ${to})`;
     }
     case "mode-switched": {
-      const from = entry.detail.modeSignature.from || "unset";
-      const to = entry.detail.modeSignature.to || "unset";
+      // Real composed signatures are 64-char hashes — shorten them (empty "" →
+      // "unset") so the detail line stays readable.
+      const from = entry.detail.modeSignature.from ? shortHex(entry.detail.modeSignature.from) : "unset";
+      const to = entry.detail.modeSignature.to ? shortHex(entry.detail.modeSignature.to) : "unset";
       return `(${from} → ${to})`;
     }
     case "base-changed": {
@@ -81,11 +91,16 @@ function formatLastChanged(snapshot: ChangeSignalSnapshot): string {
 export function renderModeInspect(
   snapshot: ChangeSignalSnapshot,
   model: Model<any> | undefined,
+  mode: ResolvedMode | undefined,
+  modeError?: string,
 ): string {
   const identity = model ? deriveIdentityLine(model) : "(no model)";
   const cacheKey = snapshot.currentKey ? shortHex(snapshot.currentKey) : "(none)";
+  const modeLine = modeError
+    ? `(unresolvable — ${modeError})`
+    : formatModeSummary(mode);
   return [
-    `Mode: ${formatModeSummary()}`,
+    `Mode: ${modeLine}`,
     `Identity: ${identity}`,
     formatLastChanged(snapshot),
     `Cache key: ${cacheKey}`,
@@ -99,7 +114,17 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
     description:
       "Show the effective prompt's identity, last-change reason, and cache key",
     handler: async (_args: string, ctx: ExtensionCommandContext): Promise<void> => {
-      const content = renderModeInspect(getChangeSignal(), ctx.model);
+      // Resolve the active mode (the resolved axes, NOT a raw preset string).
+      // A fragment that vanished after `setActiveMode` would throw here — catch
+      // it so the diagnostic command degrades to a graceful unresolvable line.
+      let mode: ResolvedMode | undefined;
+      let modeError: string | undefined;
+      try {
+        mode = resolveActiveModePlan().mode;
+      } catch (err) {
+        modeError = (err as Error).message;
+      }
+      const content = renderModeInspect(getChangeSignal(), ctx.model, mode, modeError);
       pi.sendMessage({
         customType: MODE_INSPECT_MESSAGE_TYPE,
         content,
