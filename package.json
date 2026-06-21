@@ -1,12 +1,18 @@
 {
   "name": "pi-model-modes",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "A pi extension that adapts the system prompt per model/mode.",
   "type": "module",
-  "keywords": ["pi-package"],
-  "engines": { "node": ">=22.19.0" },
+  "keywords": [
+    "pi-package"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "pi": {
-    "extensions": ["./extensions/index.ts"]
+    "extensions": [
+      "./extensions/index.ts"
+    ]
   },
   "files": [
     "extensions/",
