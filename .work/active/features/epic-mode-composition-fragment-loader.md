@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-fragment-loader
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-mode-composition
 depends_on: []
@@ -432,3 +432,20 @@ Landed as a single stride, exactly per the design body.
 
 **Verification**: `npm run typecheck` clean; `npm test` green — full suite **116 tests**
 (was 92; this feature adds 24 in `tests/fragments.test.ts`).
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), cross-model review via codex
+(peeragent, 2 rounds: implementation review + confirmation), all findings
+resolved.
+
+Round 1 surfaced: (a) BLOCKER — the shipped starter `presets.json` (sibling
+feature) referenced fragments this loader does not ship; resolved by making the
+starter presets coherent with the shipped set. (b) `base.json` overlay entries
+could escape the fragment root via `../` and `statSync` success did not prove a
+file; fixed with path-containment + `isFile()` + ENOENT-specific messaging (other
+I/O errors rethrown). Added `../`-escape and overlay-is-a-directory tests. The
+mtime cache, missing-vs-empty axis semantics, manifest-order base overlays, and
+package-relative root were confirmed correct. Symlink-escape nit rejected
+(out of scope — package-authored data). 139 tests green, typecheck clean.
+Advanced review → done.

@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-preset-table
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-mode-composition
 depends_on: []
@@ -484,3 +484,20 @@ string; scope: string; modifiers: string[] }` — exactly as specified.
 - `npm test` — full suite green: 10 files, 134 tests pass (presets.test.ts
   contributes 18; the remaining growth above the prior 92 is the sibling
   fragment-loader's parallel tests).
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), cross-model review via codex
+(peeragent, 2 rounds: implementation review + confirmation), all findings
+resolved.
+
+Round 1 surfaced: (a) the duplicate-id scanner was a naive per-name regex
+(false-positive on nested keys / string values). Round 2 surfaced: (b) it still
+missed escape-equivalent keys. Both fixed — replaced with a depth- and
+string-aware single-pass scanner that JSON-decodes each top-level key token;
+added nesting / string-value / escaped-key resistance tests. Shape validation,
+`PI_BASE` vs `NO_MODE_SIGNATURE`, and fail-fast lookup confirmed sound. Note: the
+starter `presets.json` BLOCKER (referenced fragments absent from the starter set)
+was a cross-feature coherence issue fixed under fragment-loader's shared commit —
+presets now reference only shipped fragments (autonomous/pragmatic/adjacent/tdd).
+139 tests green, typecheck clean. Advanced review → done.
