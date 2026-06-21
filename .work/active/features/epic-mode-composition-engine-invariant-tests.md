@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-engine-invariant-tests
 kind: feature
-stage: drafting
+stage: implementing
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-handler-wiring]
@@ -59,3 +59,95 @@ already owns mode-switch change-detection.
   each fragment across N turns with a mode set) — the inherited handoff obligation.
 - **clean-base upgrade lives HERE**, not in `handler-wiring` (from the epic's codex
   advisory): handler-wiring smoke-tests, this feature is the engine-level acceptance.
+
+## Design decisions (resolved during feature-design)
+
+Resolved under autopilot (scope `--all`). Implementation tier: OPUS. **Cross-model
+design advisory skipped** per policy (mechanical test design over the now-wired
+engine; the contracts are fixed). Codex reserved for the implementation review +
+the autopilot completion review.
+
+- **Upgrade `tests/clean-base.test.ts` IN PLACE** by ADDING a mode-active
+  Invariant-1 group; the existing identity-only (no-mode) group stays (it still
+  documents the unset case). The new group sets an active mode (fixture prompts +
+  `setActiveMode`) and asserts the FULL SPEC Invariant 1: across N consecutive
+  turns with the mode held constant, the assembled prompt contains **exactly one
+  identity line and exactly one copy of each selected fragment** (no doubling from
+  the cache), plus an `A→B→C→A` base-rotation that proves no cached-output leak
+  with a mode set (each return = identity + fragments + that turn's base).
+- **New `tests/engine-stability.test.ts`** for the two engine-level invariants the
+  mode makes testable:
+  - **Cache stability with a mode set** (Invariant 2's real workout): N
+    consecutive turns with model + mode + base all constant → the returned
+    `systemPrompt` is byte-identical across all N (one MISS then HITs; plus a
+    forced-MISS variant resetting the result cache each turn — but NOT the
+    resolver/fragment state — to prove the assembly itself is deterministic).
+  - **Deterministic ordering**: the assembled output places fragments in the fixed
+    SPEC order (identity → base overlay → agency → quality → scope → modifiers →
+    base) and that order is reproducible across turns and independent of discovery
+    iteration. Assert the relative index of each fragment's content in the output.
+- **Fixture-driven, full module reset.** Both files build a temp prompts tree
+  (`setFragmentRootForTesting`) and `beforeEach` reset cache + resolver + fragment
+  + presets so no state leaks (and so these never perturb the isolated
+  identity-only test files). Test-only production code: NONE.
+- **No child stories** — two cohesive test files.
+
+## Architectural choice
+
+Pure-unit tests driving the wired `handleBeforeAgentStart` through the harness
+with a fixture prompts tree + an explicit `ResolvedMode` set active. Byte-equality
+via `toBe`; fragment-count via counting line/substring occurrences. The
+complementary change-detection direction is already owned by `cache.ts`'s tests +
+the resolver's signature tests — this feature owns the no-change stability + the
+one-copy clean-base direction with a mode.
+
+## Implementation Units
+
+### Unit 1: upgrade `tests/clean-base.test.ts` (add the mode-active group)
+
+Keep the existing `describe(... Invariant 1 (no mutation + no cached-output leak,
+identity-prepended))`. ADD `describe("Invariant 1 — full form (mode set: exactly
+one identity + one copy of each fragment across N turns)")`:
+- `beforeEach`: reset cache+resolver+fragment+presets; build a fixture prompts
+  tree (base.json + base overlay + one fragment per axis + 1-2 modifiers, each with
+  a UNIQUE sentinel content string like `FRAG-agency-X`); `setFragmentRootForTesting`;
+  `setActiveMode(<explicit ResolvedMode over the fixture values>)`.
+- **One-copy across N turns**: run N=5 turns with the same model + base; for the
+  assembled output assert `count(identityLine) === 1` and, for each selected
+  fragment's sentinel content, `count(sentinel) === 1`. (Turn 1 MISS assembles;
+  turns 2..N HIT and must not stack.)
+- **No-leak A→B→C→A with a mode**: rotate the base; each return = `assemble(identity,
+  fragments, thatBase)`; assert each reflects its own base and still exactly one
+  copy of each fragment.
+- Helper `countOccurrences(haystack, needle)`.
+
+### Unit 2: new `tests/engine-stability.test.ts`
+
+- `beforeEach`: full reset + fixture tree + `setActiveMode`.
+- **Cache stability (HIT path)**: N=10 turns, identical model+mode+base → collect
+  `systemPrompt`; assert all `=== returns[0]`.
+- **Forced-MISS assembly determinism**: N iterations of `resetCacheForTesting()`
+  (result cache only — keep resolver/fragment state) then one turn; assert all
+  outputs identical (proves the splice + signature are deterministic with a mode).
+- **Deterministic ordering**: one turn; assert `indexOf(identity) < indexOf(base
+  overlay) < indexOf(agency) < indexOf(quality) < indexOf(scope) <
+  indexOf(modifier) < indexOf(pi base)` using the sentinel contents; re-run and
+  assert byte-identical (no iteration-order nondeterminism).
+- **Negative control**: changing the mode (different modifier set) → different
+  bytes (proves the stability assertions can observe a real change).
+
+## Implementation Order
+1. Unit 1 (clean-base upgrade), 2. Unit 2 (engine-stability). Run full suite.
+
+## Testing
+This feature IS tests. Verification = both files green + the whole suite green +
+typecheck clean. No production changes.
+
+## Risks
+- **Fixture/real-root interplay** (LOW): both files use a temp fixture root, never
+  the real `prompts/`, so they don't depend on the shipped starter set and can pick
+  multi-modifier combos freely. Full module reset prevents leak into the isolated
+  identity-only tests.
+- **Stability ≠ change-detection** (BY DESIGN): this feature owns the no-change
+  direction; the cache module's tests + the resolver signature tests own
+  change-detection. The negative control here only proves the assertions can fail.
