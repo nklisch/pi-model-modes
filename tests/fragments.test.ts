@@ -263,16 +263,25 @@ describe("reset isolation", () => {
 });
 
 describe("starter-set sanity (real package root, no override)", () => {
-  it("each axis has exactly one starter value with the expected name", () => {
+  it("each axis exposes its expected value names", () => {
     // No override — exercise the shipped prompts/ tree.
+    // agency and scope are fully authored (filename-sorted ascending); quality is
+    // still at its minimal starter (one value).
     expect(discoverAxis("agency").map((p) => basename(p, ".md"))).toEqual([
       "autonomous",
+      "collaborative",
+      "partner",
+      "surgical",
     ]);
     expect(discoverAxis("quality").map((p) => basename(p, ".md"))).toEqual([
+      "architect",
+      "minimal",
       "pragmatic",
     ]);
     expect(discoverAxis("scope").map((p) => basename(p, ".md"))).toEqual([
       "adjacent",
+      "narrow",
+      "unrestricted",
     ]);
   });
 
@@ -280,13 +289,29 @@ describe("starter-set sanity (real package root, no override)", () => {
     expect([...AXES]).toEqual(["agency", "quality", "scope"]);
   });
 
-  it("modifiers has exactly the one starter modifier (tdd)", () => {
-    expect(discoverModifiers().map((p) => basename(p, ".md"))).toEqual(["tdd"]);
+  it("modifiers exposes the full authored set, filename-sorted", () => {
+    expect(discoverModifiers().map((p) => basename(p, ".md"))).toEqual([
+      "bold",
+      "context-pacing",
+      "debug",
+      "director",
+      "flow",
+      "methodical",
+      "muse",
+      "playful",
+      "readonly",
+      "speak-plain",
+      "tdd",
+    ]);
   });
 
-  it("base overlays resolves to the single starter overlay (pi-direct)", () => {
+  it("base overlays resolves to the shipped overlays in manifest order (chill, flow, pi-direct)", () => {
     const overlays = discoverBaseOverlays();
-    expect(overlays.map((p) => basename(p, ".md"))).toEqual(["pi-direct"]);
+    expect(overlays.map((p) => basename(p, ".md"))).toEqual([
+      "chill",
+      "flow",
+      "pi-direct",
+    ]);
   });
 
   it("every discovered starter path loads to non-empty trimmed content", () => {
@@ -295,7 +320,7 @@ describe("starter-set sanity (real package root, no override)", () => {
       ...discoverModifiers(),
       ...discoverBaseOverlays(),
     ];
-    expect(paths.length).toBe(5); // 3 axes + 1 modifier + 1 overlay
+    expect(paths.length).toBe(24); // agency(4)+quality(3)+scope(3) + 11 modifiers + 3 overlays
     for (const p of paths) {
       const content = loadFragment(p);
       expect(content.length).toBeGreaterThan(0);

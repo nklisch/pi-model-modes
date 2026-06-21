@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-base-overlays
 kind: feature
-stage: drafting
+stage: review
 tags: [prose]
 parent: epic-fragment-library
 depends_on: []
@@ -45,3 +45,26 @@ cache. No-code-surface ([prose]).
   framing.
 - **Base overlays are thin tone-setters** (one short paragraph; no tool/identity/
   context restatement) — applies to base-overlays.
+
+## Authoring notes
+
+Shipped three base voice overlays, each a single short paragraph (thin
+tone-setter — no tool/identity/context restatement; pi owns those):
+
+- `prompts/base/chill.md` (`chill`) — calm, unhurried pacing; lower urgency.
+  Adapted from the essence of `../claude-code-modes/prompts/chill/core.md`,
+  stripped to its tone (steady confidence, fail-as-information, settledness).
+- `prompts/base/flow.md` (`flow`) — calm-plus-engaged, sustained focus. Adapted
+  from `../claude-code-modes/prompts/flow/core.md` (awake attention, complexity
+  as the part worth sinking into, calm appetite).
+- `prompts/base/pi-direct.md` (`pi-direct`) — kept the starter as the "direct"
+  tone (plain, lead-with-the-answer). Coherent thin overlay; retained.
+
+`prompts/base.json` updated to `{"overlays":["base/chill.md","base/flow.md",
+"base/pi-direct.md"]}`. Manifest order = splice order. The `PI_BASE` default
+("pi" = pi's own voice) stays a NO-file passthrough — not listed in base.json.
+
+No dynamic text/timestamps; the splice stays byte-stable. Reconciled the
+`tests/fragments.test.ts` starter-set sanity case: the stale single-`pi-direct`
+base-overlay assertion now asserts the shipped trio in manifest order (chill,
+flow, pi-direct). `npm test` green (199 passed).
