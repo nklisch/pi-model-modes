@@ -11,27 +11,23 @@ created: 2026-06-21
 updated: 2026-06-21
 ---
 
-# `/mode` autocomplete + quick-switch hint
+# `/mode` autocomplete
 
 ## Brief
 
-Make `/mode` discoverable. Two related UX improvements to the mode-switching
-surface, both small enough to share a feature:
+Make `/mode` arguments discoverable. As the user types after the `/mode`
+slash command, pi's autocomplete layer surfaces the available preset names
+(`default`, `flow`, `safe`, `create`, ...) plus the literal `off`, each with
+a one-line description, so the user can pick from a known list instead of
+recalling preset names or running `/mode` (no-arg) first.
 
-1. **Grey suggestion list when typing `/mode `.** As the user types after the
-   `/mode` slash command, pi's autocomplete layer surfaces the available
-   preset names (`default`, `flow`, `safe`, `create`, ...) plus the literal
-   `off`, each with a one-line description, so the user can pick from a known
-   list instead of recalling preset names or running `/mode` (no-arg) first.
-2. **Quick-switch hint in the `/mode` no-arg listing.** The display-only panel
-   `formatModeListing` emits today already enumerates presets; this adds a
-   single line telling the user `Ctrl+M` / `Shift+Ctrl+M` cycle through them,
-  so the keybinding is discoverable without reading the README.
+Today `/mode <name>` requires the user to know preset names by heart. This
+feature surfaces them inline so the fast path (typed preset selection) is as
+discoverable as the slow path (`/mode` no-arg → read → re-type).
 
-Today the cycle keybinding is registered but invisible until the user goes
-looking for it, and `/mode <name>` requires the user to know preset names by
-heart. Both friction points push users toward the slower `/mode` (no-arg) →
-read → re-type pattern. This feature makes the fast paths self-advertising.
+(The companion cycle-keybinding hint that originally lived here has moved to
+`feature-mode-footer-indicator` — the footer's persistent visibility is a
+better home than this command's no-arg listing.)
 
 ## Scope
 
@@ -43,15 +39,8 @@ In scope:
     sourced from `loadPresets()` and a small static description for `off`.
   - Filters by the partial token after `/mode ` (e.g. `/mode fl` → `flow`).
   - Delegates to the underlying provider for everything else.
-- **Hint line.** Extend `formatModeListing` (or the wrapper that emits the
-  listing message) to append one line like
-  `Cycle presets: Ctrl+M forward · Shift+Ctrl+M backward`. Source the actual
-  key names from the `CYCLE_FORWARD_KEY` / `CYCLE_BACKWARD_KEY` constants in
-  `src/keybinding.ts` so the hint stays in sync with the registered bindings
-  (and with any user rebind).
-- **Tests.** The render helper that produces the hint string is pure and
-  unit-testable; the autocomplete provider's `getSuggestions` filter logic is
-  pure given the preset list + cursor text, also unit-testable.
+- **Tests.** The autocomplete provider's `getSuggestions` filter logic is
+  pure given the preset list + cursor text, fully unit-testable.
 
 Out of scope:
 - Custom autocomplete for other commands (`/mode:inspect`, etc.) — only
@@ -69,9 +58,6 @@ already exist; this is a discoverability layer on top.
 
 ## Open questions (for feature-design to resolve)
 
-- **Where does the hint live in the listing?** Top (so the user sees the
-  fast path first) or bottom (after the preset enumeration, as a "by the
-  way")? Both are defensible.
 - **Autocomplete description sourcing.** Presets today are `{base, agency,
   quality, scope, modifiers}` — there's no human description field. The
   autocomplete item description can either be the composed axes summary

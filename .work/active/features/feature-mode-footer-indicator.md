@@ -28,29 +28,36 @@ active while typing. The system-prompt transform fires every turn — the user
 just can't see which transform is being applied. This feature closes that gap.
 
 The natural surface is `ctx.ui.setStatus("pi-model-modes", <summary>)` —
-pi's footer status slot. It updates on mode change and on session/model
-boundaries, and renders nothing when mode is unset (or in non-TUI modes:
-print/json/rpc degrade gracefully).
+pi's footer status slot.
+
+The footer also carries a **cycle-keybinding hint** —
+`Ctrl+M forward · Shift+Ctrl+M backward` (sourced from the
+`CYCLE_FORWARD_KEY` / `CYCLE_BACKWARD_KEY` constants in `src/keybinding.ts`,
+so it stays in sync with the registered binding and any user rebind). The
+footer is the right home for this hint: it's persistent, so the user sees the
+fast path every turn until it's muscle memory, rather than only when they
+happen to run the slow `/mode` no-arg path.
 
 ## Scope
 
 In scope:
-- A pure render helper that formats the effective mode into a one-line footer
-  string (mirrors `formatModeSummary` in `src/commands.ts`; may share or wrap
-  it).
-- A thin pi seam that pushes the formatted string to `ctx.ui.setStatus` at
-  the moments the effective mode can change:
+- **Mode indicator.** A pure render helper that formats the effective mode
+  into a one-line footer string (mirrors `formatModeSummary` in
+  `src/commands.ts`; may share or wrap it).
+- **Cycle-keybinding hint.** A short key-hint element sourcing its key names
+  from `CYCLE_FORWARD_KEY` / `CYCLE_BACKWARD_KEY` in `src/keybinding.ts`.
+- **Update triggers.** A thin pi seam that pushes the formatted footer string
+  to `ctx.ui.setStatus` at the moments the effective mode (or identity, if
+  shown — see Open questions) can change:
   - `before_agent_start` (per-turn refresh — also covers the cache-miss /
     change-signal path the handler already runs).
   - `session_start` (initial render + post-reseed reconciliation).
-  - `model_select` (identity component changes; the footer string includes
-    identity per `/mode:inspect` precedent — see Open question below).
+  - `model_select` (identity component changes).
   - Inside the `setActiveMode` / `clearActiveMode` paths the `/mode` command
     and the cycle keybinding already invoke, so the footer updates the moment
     a mode is selected rather than waiting for the next turn.
-- No-op behavior when `ctx.hasUI` is false (print/json modes) and when no
-  mode is active (clears the slot, or renders a faint "mode: unset" — see
-  Open question).
+- **Degradation.** No-op when `ctx.hasUI` is false (print/json modes) and a
+  graceful `(unresolvable)` marker when the active mode is broken.
 
 Out of scope:
 - A status-line *widget* (`ctx.ui.setWidget`) above the editor — the footer
@@ -74,10 +81,16 @@ state, it does not join the assembly path.
   but loses the axes when an explicit-override composition is active. Likely a
   short default with hover/inspect for detail, but the trade-off is a
   feature-design call.
+- **Footer layout.** One combined line (`mode: partner  |  ⌘M cycle`) vs two
+  slots vs an always-visible hint vs a hint that fades after first use. The
+  hint should be discoverable without crowding the indicator.
 - **Identity in the footer.** `/mode:inspect` shows the derived identity line;
   the footer probably shouldn't duplicate it (pi already shows the model
   elsewhere in the chrome). Confirm during design.
-- **Unset rendering.** Empty slot vs `mode: unset` vs subtle placeholder.
+- **Unset rendering.** Empty slot vs `mode: unset` vs subtle placeholder. When
+  mode is unset, the cycle hint arguably matters *more* (the user needs to
+  know they can switch) — so the hint may want to persist even when the
+  indicator itself is empty.
 - **When mode is unresolvable** (broken active mode — `modeError` path in
   `commands.ts`). The footer should degrade to a clear `(unresolvable)` marker
   rather than silently showing stale state.
