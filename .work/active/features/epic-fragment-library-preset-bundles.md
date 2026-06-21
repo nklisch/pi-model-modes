@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-preset-bundles
 kind: feature
-stage: drafting
+stage: implementing
 tags: []
 parent: epic-fragment-library
 depends_on: [epic-fragment-library-base-overlays, epic-fragment-library-agency-axis, epic-fragment-library-quality-axis, epic-fragment-library-scope-axis, epic-fragment-library-modifiers]
@@ -48,3 +48,82 @@ prose-author. It extends the existing starter `presets.json` (shipped by
 - **Curated 8 presets**; `refactor` → **`refactor-safe`** (tag-clash avoidance).
 - **Depends on the authored fragments** (presets must reference real files).
 - Acceptance: every preset `setActiveMode`-able against the bundled tree.
+
+## Design decisions (resolved during feature-design)
+
+Resolved under autopilot (scope `--all`). Implementation tier: OPUS. Routes via
+feature-design (data/catalog + validation surface, NOT prose). Codex reserved for
+the implementation review.
+
+- **Catalog = the curated 8 + a neutral `default` (9 total).** The epic locked the
+  curated 8 `{ create, explore, safe, refactor-safe, debug, flow, partner, muse }`
+  (with `refactor` → **`refactor-safe`** for the `[refactor]` tag-clash). We ALSO
+  keep a neutral `default` preset: it is the natural target for the config
+  `defaultMode` tier (config-default) and the starter `default` is referenced by
+  the landed preset-table + config tests. Keeping it is additive (not a
+  re-litigation of the curated dispositions) and avoids gratuitous cross-feature
+  test churn. Rationale logged.
+- **Concrete preset mappings** (each references only authored fragments — bases
+  `pi`/`chill`/`flow`; all axes; the 11 modifiers):
+  - `default`        — base:pi,   agency:autonomous,    quality:pragmatic, scope:adjacent,     modifiers:[]
+  - `create`         — base:flow, agency:autonomous,    quality:architect, scope:unrestricted, modifiers:[bold]
+  - `explore`        — base:flow, agency:autonomous,    quality:pragmatic, scope:unrestricted, modifiers:[muse]
+  - `safe`           — base:pi,   agency:surgical,      quality:pragmatic, scope:narrow,       modifiers:[readonly]
+  - `refactor-safe`  — base:pi,   agency:collaborative, quality:architect, scope:adjacent,     modifiers:[methodical]
+  - `debug`          — base:pi,   agency:autonomous,    quality:pragmatic, scope:adjacent,     modifiers:[debug]
+  - `flow`           — base:chill,agency:autonomous,    quality:pragmatic, scope:adjacent,     modifiers:[flow]  (SPEC-canonical example)
+  - `partner`        — base:pi,   agency:partner,       quality:architect, scope:adjacent,     modifiers:[]
+  - `muse`           — base:flow, agency:collaborative, quality:pragmatic, scope:unrestricted, modifiers:[muse, playful]
+- **Cross-feature test roll-forward** (rolling-foundation): `tests/presets.test.ts`
+  asserts the REAL `presets.json` via `getPreset("flow")` / `getPreset("default")`
+  and the available-names message — roll these forward to the curated catalog
+  (flow's values change to base:chill…; the keys list becomes the 9; the
+  unknown-preset message lists them). The SYNTHETIC `{ json }` fixture tests are
+  unaffected. Verify `tests/config.test.ts` (`defaultMode:"default"`) still passes
+  (the neutral `default` exists and resolves against its fixture tree).
+- **No child stories** — one data file + test roll-forward + a settability test.
+
+## Architectural choice
+Pure data authoring against the landed `preset-table` schema + `mode-resolver`'s
+set-time validation. No new code module — extend `presets.json`; the validation is
+already owned by `loadPresets` (shape) + the resolver (fragment existence). The new
+test is the **catalog-integration acceptance**: every shipped preset must
+`setActiveMode`-resolve against the REAL `prompts/` tree.
+
+## Implementation Units
+
+### Unit 1: `presets.json` — the curated catalog
+Replace the starter `{ default, flow }` with the 9 presets above (exact mappings).
+Each `{ base, agency, quality, scope, modifiers[] }`. Valid JSON object, no dup keys.
+
+### Unit 2: `tests/presets.test.ts` — roll forward real-file assertions
+- `getPreset("flow")` → the curated flow (`base:"chill"`, `agency:"autonomous"`,
+  `quality:"pragmatic"`, `scope:"adjacent"`, `modifiers:["flow"]`).
+- `getPreset("default")` → the neutral default mapping.
+- keys-list / available-names assertions → the 9 names.
+- Leave the synthetic-`{json}` shape/dup/validation tests unchanged.
+
+### Unit 3: `tests/preset-catalog.test.ts` (new) — settability acceptance
+The codex-required acceptance: with the REAL `prompts/` root (no override),
+`loadPresets()` then for EVERY preset name: `setActiveMode(name)` does NOT throw
+and `resolveActiveModePlan()` returns a plan whose `mode` matches and whose
+`fragments` resolve (every referenced base/axis/modifier exists). Reset
+resolver+presets+fragment caches in `beforeEach`. This is the load-bearing proof
+that the catalog references only authored fragments.
+
+## Acceptance criteria
+- [ ] `presets.json` ships the 9 presets with the exact mappings; valid JSON.
+- [ ] Every preset is `setActiveMode`-able against the real `prompts/` tree (no
+  missing/ambiguous-fragment error); `resolveActiveModePlan()` succeeds for each.
+- [ ] `flow` matches the SPEC-canonical example (base:chill + autonomous + adjacent
+  + modifier:flow).
+- [ ] `refactor-safe` (not `refactor`) — tag-clash avoided.
+- [ ] preset-table real-file tests rolled forward; synthetic tests unchanged;
+  config tests still pass.
+- [ ] typecheck clean; full suite green.
+
+## Risks
+- **Cross-feature test reconciliation** (managed): only the REAL-file assertions in
+  preset-table tests change; synthetic fixtures + config tests stay green (verify).
+- **A preset referencing a misspelled value** would fail the settability test
+  (Unit 3) — which is exactly its purpose (catch a broken catalog at build time).
