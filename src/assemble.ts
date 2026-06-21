@@ -28,7 +28,11 @@ export function assembleSystemPrompt(
 ): string {
   const parts: string[] = [];
   if (identity.length > 0) parts.push(identity);
-  for (const fragment of plan.fragments) parts.push(fragment.content);
+  for (const fragment of plan.fragments) {
+    // Drop empty fragment content too (a whitespace-only fragment file trims to
+    // "" in the loader) — consistent with identity/base, so no stray blank lines.
+    if (fragment.content.length > 0) parts.push(fragment.content);
+  }
   if (baseSystemPrompt.length > 0) parts.push(baseSystemPrompt);
   return parts.join("\n\n");
 }

@@ -92,6 +92,23 @@ describe("assembleSystemPrompt — empty-part handling", () => {
     const empty: ModePlan = { mode: undefined, signature: "s", fragments: [] };
     expect(assembleSystemPrompt("", empty, "BASE")).toBe("BASE");
   });
+
+  it("drops a fragment with empty content (no stray internal blank lines)", () => {
+    // A whitespace-only fragment file trims to "" in the loader; the splice must
+    // drop it like an empty identity/base, not emit a doubled blank line.
+    const plan: ModePlan = {
+      mode: undefined,
+      signature: "s",
+      fragments: [
+        frag("agency", "a", "AGENCY"),
+        frag("quality", "q", ""), // empty content
+        frag("scope", "s", "SCOPE"),
+      ],
+    };
+    expect(assembleSystemPrompt("ID", plan, "BASE")).toBe(
+      "ID\n\nAGENCY\n\nSCOPE\n\nBASE",
+    );
+  });
 });
 
 describe("assembleSystemPrompt — purity", () => {
