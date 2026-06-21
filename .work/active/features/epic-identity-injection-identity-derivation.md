@@ -1,14 +1,14 @@
 ---
 id: epic-identity-injection-identity-derivation
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-identity-injection
 depends_on: []
 release_binding: null
 gate_origin: null
 created: 2026-06-21
-updated: 2026-06-21
+updated: 2026-06-22
 ---
 
 # Identity Derivation + Provider Display-Name Map
@@ -471,3 +471,88 @@ and from `src/identity.ts`:
   hits this. If a user reports it, the fix is to add their id to the map or
   relax the fallback to preserve tail-casing — a deliberate future call, not
   a v1 risk.
+
+## Implementation notes
+
+Implemented inline, single-stride, 2026-06-22.
+
+### Files landed
+
+- `src/provider-names.ts` — `PROVIDER_DISPLAY_NAMES`
+  (`Readonly<Record<KnownProvider, string>>`, all 35 ids) +
+  `providerDisplayName(provider: string)` with the revised title-case
+  fallback. Per the design's `@earendil-works/pi-ai` import-path decision.
+- `src/identity.ts` — `deriveIdentityLine(model: Model<any>): string`, pure,
+  `import type { Model }`, relative import `./provider-names.js`.
+- `tests/identity.test.ts` — all 8 groups (29 `it`s total).
+- `package.json` — added `@earendil-works/pi-ai: "*"` to `devDependencies`
+  (alphabetical, before `@types/node`). `npm install` resolved it and ran
+  clean (99 packages added, 0 vulnerabilities). The package was already
+  physically present as a transitive dep under
+  `node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai`,
+  so this just makes the dep explicit.
+
+### Type grounding re-verified
+
+- `KnownProvider` is defined in `dist/types.d.ts` and reaches the package
+  root via `index.d.ts -> base.d.ts (export * from "./types.ts")`. So
+  `import type { KnownProvider, Model } from "@earendil-works/pi-ai"`
+  resolves under `moduleResolution: NodeNext`. (The `exports` map only
+  exposes `.` and provider deep paths, NOT `./dist/types` — so the root
+  re-export chain is the load-bearing path.)
+- The canonical `KnownProvider` union in installed `pi-ai@0.79.9` has
+  exactly 35 members; they match the design's map verbatim. The
+  `Record<KnownProvider, string>` type compiles clean, proving completeness
+  at the type level.
+
+### Verification output (real)
+
+- `npm run typecheck` (`tsc --noEmit`): clean, no output.
+- `npm test` (`vitest --run`): **5 files, 64 tests, all passing**.
+  `tests/identity.test.ts` alone: 29 tests. (Also-untouched siblings passed:
+  `cache.test.ts` 28, `noop.test.ts` 4, `clean-base.test.ts` 2,
+  `registration.test.ts` 1.)
+
+### Deviation from the design (one, with rationale)
+
+The design's `titleCaseId` per-segment rule was phrased as "preserve a
+segment if it contains an uppercase letter". The codex-added test case
+`providerDisplayName("gpt5-Mini") === "gpt5 Mini"` (and the design's own
+doc-comment example list, which includes `"gpt5"` as a *preserved* token)
+is **inconsistent** with that rule: `"gpt5"` has no uppercase letter, so
+the as-written rule title-cased it to `"Gpt5"`, producing `"Gpt5 Mini"`
+(the first test run caught this — one real failure).
+
+Per the test-integrity rules this is a real implementation bug, not a
+gamed/flaky test, so I did NOT weaken the assertion. Fix applied: the
+preservation predicate is now `/[^a-z]/.test(segment)` (preserve anything
+that is not pure lowercase ASCII letters) instead of `/[A-Z]/.test(segment)`.
+This preserves mixed-case (`OpenAI`), all-caps (`NVIDIA`), AND alphanumeric
+(`gpt5`, `Mini`) segments, title-casing only all-lowercase-letter segments.
+The doc comment was updated to match the corrected intent and to record the
+catch. All 8 fallback cases now green, including the three codex-added
+mixed-case preservation cases. Flagged here as a deviation because the
+design's prose and code-block used the narrower predicate; the corrected
+rule matches the design's *intent* (its example list + test expectations),
+not its literal code snippet.
+
+### One more deviation (test only, no behavior change)
+
+Group 2 ("completeness over the KnownProvider union") had a second `it`
+asserting `providerDisplayName(id) === PROVIDER_DISPLAY_NAMES[id]` (the map
+entry verbatim) rather than the design's literal phrasing "does not equal
+the title-cased id". The literal phrasing is buggy: several known ids have
+map values that legitimately equal their title-case form
+(`anthropic`/`Anthropic`, `google`/`Google`, `groq`/`Groq`,
+`deepseek`/`DeepSeek`, `mistral`/`Mistral AI` vs `Mistral`, etc.), so
+"not equal to title-cased" would spuriously fail. Direct map equality
+preserves the design's intent ("it hit the map, not the fallback") and is
+stronger. Commented inline in the test. No behavior change.
+
+### Coordination note
+
+A sibling foundation feature (`cache-and-change-signal`) is being worked in
+parallel in this same working tree (`src/cache.ts`, `tests/cache.test.ts`,
+and its item file were untracked/modified at commit time). This feature's
+files are committed in isolation; the cache feature's artifacts are left
+untouched for its own implementor to land.
