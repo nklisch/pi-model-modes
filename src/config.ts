@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { setDefaultMode } from "./resolver.js";
+import { setDefaultMode, clearDefaultMode } from "./resolver.js";
 
 /**
  * Plugin-owned configuration — the durable, file-backed source for the
@@ -88,14 +88,21 @@ export function loadPluginConfig(cwd: string): PluginConfig {
 }
 
 /**
- * Seed the DEFAULT mode tier from config. Loads the merged config and, when a
- * `defaultMode` is present, calls `setDefaultMode(defaultMode)`. An INVALID
- * default (unknown preset / missing fragment) is caught and warned — NEVER
- * rethrown — so `session_start` can never crash from a bad config value.
+ * Reconcile the DEFAULT mode tier to the CURRENT merged config. Idempotent and
+ * safe to call on every `session_start` (which fires on startup/reload/new/
+ * resume/fork): the default tier always ends up reflecting the config as it is
+ * NOW, never a stale value from a prior reseed.
+ *   - valid `defaultMode`   → `setDefaultMode(it)`
+ *   - no `defaultMode`      → `clearDefaultMode()` (no default configured)
+ *   - invalid `defaultMode` → warn + `clearDefaultMode()` (the configured default
+ *     is unusable; fall back to no-default rather than keeping a stale one)
+ * An INVALID default (unknown preset / missing fragment) is caught and warned —
+ * NEVER rethrown — so `session_start` can never crash from a bad config value.
  */
 export function applyDefaultFromConfig(cwd: string): void {
   const config = loadPluginConfig(cwd);
   if (config.defaultMode === undefined) {
+    clearDefaultMode();
     return;
   }
   try {
@@ -104,6 +111,7 @@ export function applyDefaultFromConfig(cwd: string): void {
     console.warn(
       `pi-model-modes: invalid config defaultMode "${config.defaultMode}" — skipping (${(cause as Error).message})`,
     );
+    clearDefaultMode();
   }
 }
 

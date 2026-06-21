@@ -197,4 +197,45 @@ describe("applyDefaultFromConfig — seeding", () => {
     expect(getEffectiveModeSource()).toBe("unset");
     expect(warn).toHaveBeenCalled();
   });
+
+  it("reconciles on reseed: a config with no defaultMode CLEARS a prior default (not stale)", () => {
+    // session_start fires repeatedly (reload/new/resume). A second seed whose
+    // config no longer names a defaultMode must clear the prior one, not leave
+    // it stale and effective.
+    buildFragments();
+    const d = freshDir();
+    const withDefault = join(d, "with.json");
+    const without = join(d, "without.json");
+    writeJson(withDefault, { defaultMode: "default" });
+    writeJson(without, {});
+
+    setConfigPathsForTesting({ global: withDefault, project: join(d, "missing.json") });
+    applyDefaultFromConfig("/unused");
+    expect(getDefaultMode()).toBe("default"); // seeded
+
+    // Reseed with a config that has no defaultMode → prior default cleared.
+    setConfigPathsForTesting({ global: without, project: join(d, "missing.json") });
+    applyDefaultFromConfig("/unused");
+    expect(getDefaultMode()).toBeUndefined();
+    expect(getEffectiveModeSource()).toBe("unset");
+  });
+
+  it("reconciles on reseed: an INVALID new defaultMode CLEARS a prior valid default", () => {
+    buildFragments();
+    const d = freshDir();
+    const good = join(d, "good.json");
+    const bad = join(d, "bad.json");
+    writeJson(good, { defaultMode: "default" });
+    writeJson(bad, { defaultMode: "no-such-preset" });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    setConfigPathsForTesting({ global: good, project: join(d, "missing.json") });
+    applyDefaultFromConfig("/unused");
+    expect(getDefaultMode()).toBe("default");
+
+    setConfigPathsForTesting({ global: bad, project: join(d, "missing.json") });
+    applyDefaultFromConfig("/unused");
+    expect(getDefaultMode()).toBeUndefined(); // stale prior default cleared, not retained
+    expect(warn).toHaveBeenCalled();
+  });
 });
