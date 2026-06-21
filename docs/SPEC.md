@@ -168,8 +168,9 @@ Assembly order within the splice is fixed and deterministic:
 ... pi's assembled e.systemPrompt (tools / guidelines / context / skills / date / cwd) ...
 ```
 
-Fragments are cached in module scope after first read; file I/O happens
-once per fragment per process.
+Fragments are cached in module scope keyed by file mtime: a `statSync` runs
+each access and the file is re-read only when its `mtimeMs` changes, so a fragment
+edit takes effect on the next turn (no `/reload`) while disk reads stay minimal.
 
 ## Switching paths
 

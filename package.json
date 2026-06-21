@@ -8,6 +8,14 @@
   "pi": {
     "extensions": ["./extensions/index.ts"]
   },
+  "files": [
+    "extensions/",
+    "src/",
+    "prompts/",
+    "presets.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "vitest --run",
     "typecheck": "tsc --noEmit"

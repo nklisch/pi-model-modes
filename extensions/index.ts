@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { registerModeCommand, registerModeInspectCommand } from "../src/commands.js";
 import { registerModeKeybindings } from "../src/keybinding.js";
-import { applyDefaultFromConfig } from "../src/config.js";
+import { applySessionStart } from "../src/config.js";
 
 /**
  * pi extension entry. The default export is the factory pi discovers and
@@ -22,9 +22,11 @@ import { applyDefaultFromConfig } from "../src/config.js";
  *   - `Ctrl+M` / `Shift+Ctrl+M` → registered via `registerModeKeybindings` (cycle
  *     the session override forward/backward through the sorted preset list;
  *     user-rebindable via `~/.pi/agent/keybindings.json`).
- *   - `session_start` → `applyDefaultFromConfig(ctx.cwd)` (seeds the DEFAULT
- *     mode tier from the plugin-owned config — global + project `pi-model-modes.json`
- *     merged — on every session reason: startup/reload/new/resume/fork).
+ *   - `session_start` → `applySessionStart(e.reason, ctx.cwd)` (reconciles the
+ *     DEFAULT mode tier from the plugin-owned config — global + project
+ *     `pi-model-modes.json` merged — and clears the EPHEMERAL session override on
+ *     a genuinely new session (`new`/`resume`/`fork`) so it restarts from the
+ *     config default; a same-session `reload`/`startup` keeps any override).
  *
  * Downstream epics extend this factory (register `/mode`, keybindings, etc.)
  * by adding more `pi.on(...)` / `pi.registerCommand(...)` calls — edit, don't
@@ -40,5 +42,5 @@ export default function (pi: ExtensionAPI) {
   registerModeCommand(pi);
   registerModeInspectCommand(pi);
   registerModeKeybindings(pi);
-  pi.on("session_start", (_e, ctx) => applyDefaultFromConfig(ctx.cwd));
+  pi.on("session_start", (e, ctx) => applySessionStart(e.reason, ctx.cwd));
 }

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   loadPluginConfig,
   applyDefaultFromConfig,
+  applySessionStart,
   setConfigPathsForTesting,
   resetConfigForTesting,
 } from "../src/config.js";
@@ -13,6 +14,8 @@ import {
   getEffectiveModeSource,
   resolveActiveModePlan,
   resetResolverForTesting,
+  setActiveMode,
+  getActiveMode,
 } from "../src/resolver.js";
 import {
   setFragmentRootForTesting,
@@ -237,5 +240,65 @@ describe("applyDefaultFromConfig — seeding", () => {
     applyDefaultFromConfig("/unused");
     expect(getDefaultMode()).toBeUndefined(); // stale prior default cleared, not retained
     expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("applySessionStart — ephemeral override clearing", () => {
+  const override = {
+    base: "pi",
+    agency: "autonomous",
+    quality: "pragmatic",
+    scope: "adjacent",
+    modifiers: [],
+  };
+
+  function configWithNoDefault(): void {
+    const d = freshDir();
+    setConfigPathsForTesting({
+      global: join(d, "missing-global.json"),
+      project: join(d, "missing-project.json"),
+    });
+  }
+
+  it.each(["new", "resume", "fork"] as const)(
+    "clears the ephemeral override on a genuinely new session (reason: %s)",
+    (reason) => {
+      buildFragments();
+      configWithNoDefault();
+      setActiveMode(override); // a session override is active
+      expect(getEffectiveModeSource()).toBe("override");
+
+      applySessionStart(reason, "/unused");
+
+      // The new session restarts from the config default (here: unset).
+      expect(getActiveMode()).toBeUndefined();
+      expect(getEffectiveModeSource()).toBe("unset");
+    },
+  );
+
+  it.each(["reload", "startup"] as const)(
+    "preserves the override on a same-session start (reason: %s)",
+    (reason) => {
+      buildFragments();
+      configWithNoDefault();
+      setActiveMode(override);
+
+      applySessionStart(reason, "/unused");
+
+      // A reload / initial startup keeps the active override.
+      expect(getActiveMode()).toEqual(override);
+      expect(getEffectiveModeSource()).toBe("override");
+    },
+  );
+
+  it("still reconciles the default tier on every reason", () => {
+    buildFragments();
+    const d = freshDir();
+    const global = join(d, "global.json");
+    writeJson(global, { defaultMode: "default" });
+    setConfigPathsForTesting({ global, project: join(d, "missing.json") });
+
+    applySessionStart("reload", "/unused");
+    expect(getDefaultMode()).toBe("default"); // default seeded from config
   });
 });

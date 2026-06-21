@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { setDefaultMode, clearDefaultMode } from "./resolver.js";
+import { setDefaultMode, clearDefaultMode, clearActiveMode } from "./resolver.js";
 
 /**
  * Plugin-owned configuration — the durable, file-backed source for the
@@ -113,6 +113,33 @@ export function applyDefaultFromConfig(cwd: string): void {
     );
     clearDefaultMode();
   }
+}
+
+/** Why a `session_start` fired (mirrors pi's `SessionStartEvent.reason`). */
+export type SessionStartReason =
+  | "startup"
+  | "reload"
+  | "new"
+  | "resume"
+  | "fork";
+
+/**
+ * Handle a `session_start`. The session OVERRIDE (`/mode`, keybinding) is
+ * EPHEMERAL per the SPEC: a genuinely new session must restart from the config
+ * default, so the in-process override (module state that outlives a session
+ * boundary) is cleared on `new` / `resume` / `fork`. A same-session `reload`
+ * (and the initial `startup`, which has no prior override) preserves any active
+ * override. The DEFAULT tier is always reconciled to the current config.
+ *
+ * Without the clear, an override set in one session would survive into the next
+ * same-process session and keep winning `override ?? default` — contradicting
+ * "a new session restarts from the config default."
+ */
+export function applySessionStart(reason: SessionStartReason, cwd: string): void {
+  if (reason === "new" || reason === "resume" || reason === "fork") {
+    clearActiveMode();
+  }
+  applyDefaultFromConfig(cwd);
 }
 
 /**

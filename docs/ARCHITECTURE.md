@@ -6,7 +6,8 @@ How pi-model-modes is put together and what happens each turn.
 
 ```
 pi-model-modes/
-├─ package.json              pi-package manifest: pi { extensions, prompts }
+├─ package.json              pi-package manifest: pi { extensions } + files allowlist
+│                            (prompts/ is loaded by the plugin at runtime, package-relative)
 ├─ extensions/
 │   └─ index.ts              default export: registers handler, /mode, keybinding, session_start
 ├─ src/
@@ -21,7 +22,8 @@ pi-model-modes/
 │   ├─ commands.ts           /mode, /mode off, /mode:inspect
 │   └─ keybinding.ts         cycle keybinding
 ├─ prompts/
-│   ├─ base/      base.json (slot order) + voice overlays (chill.md, flow.md)
+│   ├─ base.json  overlay manifest (slot order) — at the prompts/ root
+│   ├─ base/      voice overlays (chill.md, flow.md, pi-direct.md)
 │   ├─ axis/
 │   │   ├─ agency/   autonomous, collaborative, surgical, partner
 │   │   ├─ quality/  architect, pragmatic, minimal
@@ -123,10 +125,13 @@ composition model:
 - **modifiers/** — one file per modifier, zero or more selected, applied
   in the order the preset or command declares.
 
-`src/fragments.ts` reads each file once, caches the trimmed content in a
-module-scope `Map<path, string>`, and returns cache hits without touching
-disk. This is independent of the per-turn cache key — it survives mode
-switches.
+`src/fragments.ts` caches trimmed content in a module-scope
+`Map<path, { mtimeMs, content }>` and re-reads a file only when its `mtimeMs`
+changes (a cheap `statSync` per access; a full read only on a miss or an edit).
+So editing a fragment `.md` takes effect on the next turn within the same
+session — no `/reload` or restart. This is independent of the per-turn cache
+key, but a content edit changes the mode signature (which hashes fragment
+content), so the next turn re-assembles.
 
 ## Cache and change signal (`src/cache.ts`)
 
