@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-identity-derivation
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-identity-injection
 depends_on: []
@@ -556,3 +556,13 @@ parallel in this same working tree (`src/cache.ts`, `tests/cache.test.ts`,
 and its item file were untracked/modified at commit time). This feature's
 files are committed in isolation; the cache feature's artifacts are left
 untouched for its own implementor to land.
+
+## Review (2026-06-21)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+**Nits**: none
+
+**Notes**: Standard-lane substrate review as requested for this small pure-module feature. Verified the map is typed as `Readonly<Record<KnownProvider, string>>`, contains 35 keys matching the installed `KnownProvider` union, and the runtime completeness test iterates 35 ids. Verified the revised fallback predicate preserves mixed-case/all-caps/alphanumeric segments while title-casing lowercase-only segments; `providerDisplayName("openai")` intentionally returns the known map value `OpenAI`, while the fallback rule would title-case a lowercase-only unknown segment to `Openai`. `deriveIdentityLine` reads only `model.name` / `model.provider` and returns the exact `You are {name} from {provider}.` format. Type imports come from `@earendil-works/pi-ai` and `@earendil-works/pi-ai` is declared as a dev dependency. Tests use concrete assertions, including map completeness; no handler/cache/ctx logic landed in this feature. Re-ran `npm test` (5 files, 64 tests; `tests/identity.test.ts` 29 tests) and `npm run typecheck`; both exited 0.
