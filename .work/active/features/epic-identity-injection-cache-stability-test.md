@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-cache-stability-test
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-handler-integration]
@@ -187,3 +187,42 @@ features; the only dependency is the landed `handleBeforeAgentStart` (done).
   change-detection tests (done). The negative control here only proves the test
   *can* observe a change, not that the handler invalidates on a base change in
   production (that is the sibling's contract). Documented so the split is clear.
+
+## Implementation notes
+
+Landed `tests/cache-stability.test.ts` exactly per Unit 1 — one cohesive
+test file, no production-code changes, no harness extension, no child stories.
+
+- **Imports** (ESM/NodeNext `.js`): `handleBeforeAgentStart` from
+  `../src/handler.js`, `deriveIdentityLine` from `../src/identity.js`,
+  `resetCacheForTesting` from `../src/cache.js`, `makeEvent` / `makeContext` /
+  `makeModel` from `./harness.js`.
+- **Fixtures**: `N = 10`; `model = makeModel({ name: "GLM-4.6", provider:
+  "zai" })`; the multi-line `base`; `expected = ${deriveIdentityLine(model)}\n${base}`.
+- **`beforeEach(() => resetCacheForTesting())`** for isolation; the
+  forced-MISS and negative-control tests reset explicitly inside their
+  loops/sub-sequences.
+- A small local `runTurn(b, m)` helper drives one real
+  `handleBeforeAgentStart` call through the harness and returns `systemPrompt`.
+
+Four `it(...)` blocks, all four assertions confirmed passing:
+1. **HIT-path stability** — N turns, all `=== expected` (+ `Set` size 1).
+2. **Forced-MISS determinism** (load-bearing) — `resetCacheForTesting()`
+   before each of N turns, all re-assembled outputs `=== expected`.
+3. **No dynamic content** — single turn `=== expected` AND
+   `length === expected.length` (nothing appended).
+4. **Negative control** — model A vs model B (`anthropic`, different name)
+   bytes `!==`; base X vs base Y bytes `!==`. Kept as its own `it`, never
+   interleaved with stability checks.
+
+**Verification** (both run, both clean):
+- `npm run typecheck` (`tsc --noEmit`): clean, no errors.
+- `npm test` (`vitest --run`): **76 passed** (7 files) — 72 prior + 4 new.
+  No prior tests regressed (test-only addition).
+
+**Rationale logged** (autopilot judgment): negative-control base-change fixture
+appends `\n\n<extra>changed</extra>` to `base` (a real, observable byte change
+through the same assembly path); model-B uses `{ name: "Claude", provider:
+"anthropic" }` so both the name and provider differ from model A, exercising the
+identity line's full divergence. Stability genuinely holds — no Invariant-2
+violation observed; no blocker.
