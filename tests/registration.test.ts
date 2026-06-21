@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import factory from "../extensions/index.js";
 import { handleBeforeAgentStart } from "../src/handler.js";
-import { MODE_INSPECT_COMMAND } from "../src/commands.js";
+import { MODE_COMMAND, MODE_INSPECT_COMMAND } from "../src/commands.js";
 import { makePi } from "./harness.js";
 
 /**
@@ -40,13 +40,15 @@ describe("factory registration wiring", () => {
     expect(typeof registrations[0].args[1]).toBe("function");
   });
 
-  it("registers the /mode:inspect command exactly once and nothing else", () => {
+  it("registers the /mode + /mode:inspect commands and nothing unexpected", () => {
     const { pi, calls } = makePi();
     factory(pi);
 
-    const commands = calls.filter((c) => c.method === "registerCommand");
-    expect(commands).toHaveLength(1);
-    expect(commands[0].args[0]).toBe(MODE_INSPECT_COMMAND);
+    const commands = calls
+      .filter((c) => c.method === "registerCommand")
+      .map((c) => c.args[0])
+      .sort();
+    expect(commands).toEqual([MODE_COMMAND, MODE_INSPECT_COMMAND].sort());
 
     // The only `on` registrations are before_agent_start + session_start.
     const events = calls
@@ -55,7 +57,7 @@ describe("factory registration wiring", () => {
       .sort();
     expect(events).toEqual(["before_agent_start", "session_start"]);
 
-    // Nothing beyond the `on` registrations and the inspect command (no tools,
+    // Nothing beyond the `on` registrations and the two commands (no tools,
     // shortcuts, flags, renderers, providers, and no emit at registration).
     const unexpected = calls.filter(
       (c) => c.method !== "on" && c.method !== "registerCommand",

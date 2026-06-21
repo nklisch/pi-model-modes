@@ -179,6 +179,19 @@ Three paths converge on one resolver:
    for the current session (ephemeral override over the config default).
    `/mode` with no argument shows the current mode and available presets.
    `/mode off` clears the override (falls back to config default or unset).
+
+   Command output: with **no argument** `/mode` emits a display-only panel (a
+   `customType:"mode"` message, no turn triggered) with two parts — the
+   **effective mode** (its source tier `override`/`default`/`unset`, the
+   effective preset name when one applies, and the composed axes summary
+   `base:… • agency:… • quality:… • scope:…` plus any `+modifier`s; a broken
+   active mode degrades to an `(unresolvable — …)` line) and the **available
+   presets** (the sorted `presets.json` names). With a **`<preset>`** argument
+   `/mode` sets the session override and confirms via a toast (`mode set to
+   "<name>"`); an unknown preset / missing fragment surfaces the resolver's
+   error as an error toast and leaves the prior override intact. **`/mode off`**
+   clears the override and toasts the new effective state (the config default,
+   or unset).
 2. **Config default** — a `defaultMode` key in the plugin-owned
    `pi-model-modes.json`, read from `~/.pi/agent/pi-model-modes.json` (global)
    and `<cwd>/.pi/pi-model-modes.json` (project), shallow-merged with the

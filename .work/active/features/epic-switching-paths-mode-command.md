@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-mode-command
 kind: feature
-stage: implementing
+stage: review
 tags: []
 parent: epic-switching-paths
 depends_on: [epic-switching-paths-config-default]
@@ -100,6 +100,40 @@ presets in `beforeEach`; extend `makePi` to record `registerCommand` (already do
 ### Unit 4: `docs/SPEC.md` — `/mode` command-output semantics note.
 
 ## Acceptance criteria
-- [ ] `/mode <preset>` sets the override; `/mode off` falls back to the default;
+- [x] `/mode <preset>` sets the override; `/mode off` falls back to the default;
   `/mode` (no arg) lists effective + presets; unknown preset → graceful error,
   prior override intact. typecheck clean; suite green.
+
+## Implementation notes
+
+- **`src/commands.ts`**: added `registerModeCommand(pi)` (registers command
+  `"mode"`) plus the pure helper `formatModeListing(source, specName, mode,
+  modeError, presets)` and exports `MODE_COMMAND` / `MODE_LISTING_MESSAGE_TYPE`.
+  Handler behavior per design: empty arg → `pi.sendMessage({ customType:"mode",
+  content, display:true })` (no `triggerTurn`) with the effective source +
+  effective spec name (`getActiveMode() ?? getDefaultMode()`, surfaced only when
+  it's a string preset) + composed axes via `formatModeSummary(
+  resolveActiveModePlan().mode)` wrapped in try/catch (broken mode → an
+  `(unresolvable — …)` line, not a crash) + the sorted preset names
+  (`Object.keys(loadPresets()).sort()`); `"off"` → `clearActiveMode()` then a
+  `ctx.ui.notify` of the new effective state; a name → `setActiveMode(arg)` in
+  try/catch (success → `ctx.ui.notify('mode set to "<arg>"')`, failure →
+  `ctx.ui.notify(err.message, "error")`, prior override intact).
+- **`extensions/index.ts`**: added `registerModeCommand(pi)` alongside the
+  existing handler + inspect + session_start (additive).
+- **`tests/mode-command.test.ts`** (new, 7 tests): drives the extracted handler
+  with a temp prompts fixture (covering the real `safe` preset's fragments) +
+  the real bundled `presets.json`; a notify-capturing ctx stub built on
+  `makeContext`. Covers: factory registers `mode`; no-arg listing (effective +
+  a real preset name; default-tier label + axes); `<preset>` sets the override
+  (`getActiveMode()` reflects it); `off` reverts to default and to unset; unknown
+  preset → error notify + override unchanged. `beforeEach`/`afterEach` reset
+  resolver/fragment/presets/cache.
+- **`tests/registration.test.ts`**: rolled the surface assertion forward to
+  `[MODE_COMMAND, MODE_INSPECT_COMMAND]` (still zero tools/shortcuts/flags/
+  renderers/providers and no emit at registration) — not weakened.
+- **`docs/SPEC.md`**: added the `/mode` command-output semantics note under
+  "Switching paths".
+- **Harness**: no change needed — `makePi` already records `registerCommand` +
+  `sendMessage`.
+- typecheck clean; full suite green at **207 tests** (was 200; +7 mode-command).

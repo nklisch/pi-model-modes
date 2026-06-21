@@ -3,7 +3,15 @@ import type { Model } from "@earendil-works/pi-ai";
 import { deriveIdentityLine } from "./identity.js";
 import { getChangeSignal } from "./cache.js";
 import type { ChangeSignalSnapshot, ChangeSignalEntry, ChangeReason } from "./cache.js";
-import { resolveActiveModePlan } from "./resolver.js";
+import {
+  resolveActiveModePlan,
+  setActiveMode,
+  clearActiveMode,
+  getActiveMode,
+  getDefaultMode,
+  getEffectiveModeSource,
+} from "./resolver.js";
+import { loadPresets } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
 
 /**
@@ -105,6 +113,109 @@ export function renderModeInspect(
     formatLastChanged(snapshot),
     `Cache key: ${cacheKey}`,
   ].join("\n");
+}
+
+/** Slash command name for the `/mode` command family. */
+export const MODE_COMMAND = "mode";
+/** `customType` tag for the `/mode` no-arg listing message. */
+export const MODE_LISTING_MESSAGE_TYPE = "mode";
+
+/**
+ * PURE: build the `/mode` (no-arg) listing panel. Shows the EFFECTIVE mode
+ * (source tier + the effective spec name + composed axes summary) and the
+ * available presets. No pi coupling → fully unit-tested.
+ *
+ *   `source`   — `getEffectiveModeSource()` ("override" | "default" | "unset").
+ *   `specName` — the effective spec name (`getActiveMode() ?? getDefaultMode()`)
+ *                when it is a string preset name; `undefined` for an explicit
+ *                object spec or no mode (the summary line still conveys the axes).
+ *   `mode`     — `resolveActiveModePlan().mode` (the resolved axes), or
+ *                `undefined` for no mode.
+ *   `modeError`— set when the resolve threw (a broken active mode); renders an
+ *                error line instead of crashing the listing.
+ *   `presets`  — sorted preset names (`Object.keys(loadPresets()).sort()`).
+ */
+export function formatModeListing(
+  source: "override" | "default" | "unset",
+  specName: string | undefined,
+  mode: ResolvedMode | undefined,
+  modeError: string | undefined,
+  presets: readonly string[],
+): string {
+  const label = specName ? `${specName} (${source})` : source;
+  const summary = modeError
+    ? `(unresolvable — ${modeError})`
+    : formatModeSummary(mode);
+  const presetList =
+    presets.length > 0 ? presets.map((p) => `  - ${p}`).join("\n") : "  (none)";
+  return [
+    `Effective mode: ${label}`,
+    `  ${summary}`,
+    "Available presets:",
+    presetList,
+  ].join("\n");
+}
+
+/**
+ * The `/mode` command family — the interactive switching path.
+ *   - no arg → emit a display-only listing panel (effective mode + presets).
+ *   - `off`  → `clearActiveMode()` (override falls back to the config default
+ *              per the precedence layer); notify the new effective state.
+ *   - a name → `setActiveMode(arg)` (validated at set-time); success notifies,
+ *              failure surfaces the resolver error and leaves prior override
+ *              intact.
+ */
+export function registerModeCommand(pi: ExtensionAPI): void {
+  pi.registerCommand(MODE_COMMAND, {
+    description:
+      "Show or set the session mode (no arg lists; <preset> sets; off reverts to default)",
+    handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+      const arg = args?.trim() ?? "";
+
+      // No arg → emit the listing panel.
+      if (arg === "") {
+        const source = getEffectiveModeSource();
+        const effectiveSpec = getActiveMode() ?? getDefaultMode();
+        const specName = typeof effectiveSpec === "string" ? effectiveSpec : undefined;
+        let mode: ResolvedMode | undefined;
+        let modeError: string | undefined;
+        try {
+          mode = resolveActiveModePlan().mode;
+        } catch (err) {
+          modeError = (err as Error).message;
+        }
+        const presets = Object.keys(loadPresets()).sort();
+        pi.sendMessage({
+          customType: MODE_LISTING_MESSAGE_TYPE,
+          content: formatModeListing(source, specName, mode, modeError, presets),
+          display: true,
+        });
+        return;
+      }
+
+      // `off` → clear the override; effective falls back to the config default.
+      if (arg === "off") {
+        clearActiveMode();
+        const source = getEffectiveModeSource();
+        const effectiveSpec = getActiveMode() ?? getDefaultMode();
+        const specName = typeof effectiveSpec === "string" ? effectiveSpec : undefined;
+        const state =
+          source === "unset"
+            ? "override cleared — mode unset"
+            : `override cleared — mode now ${specName ?? source} (${source})`;
+        ctx.ui.notify(state, "info");
+        return;
+      }
+
+      // A name → set the override (validated at set-time by the resolver).
+      try {
+        setActiveMode(arg);
+        ctx.ui.notify(`mode set to "${arg}"`, "info");
+      } catch (err) {
+        ctx.ui.notify((err as Error).message, "error");
+      }
+    },
+  });
 }
 
 /** The only pi seam: register `/mode:inspect`. Reads the change signal + the
