@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library
 kind: epic
-stage: implementing
+stage: done
 tags: [docs, patterns]
 parent: null
 depends_on: [epic-mode-composition]
@@ -123,3 +123,28 @@ referencing a not-yet-authored fragment fails at `setActiveMode`, so presets mus
 ship after the fragments. Its acceptance: every shipped preset must be
 `setActiveMode`-able against the bundled tree. The `refactor` preset is renamed
 **`refactor-safe`** to avoid colliding with the load-bearing `[refactor]` routing tag.
+
+## Epic completion
+
+All six child features are `done`. The behavioral content library + curated
+preset catalog are authored against the (already-fixed) engine contract:
+
+- 24 fragments under `prompts/`: 4 agency, 3 quality, 3 scope, 11 modifiers, and
+  3 thin base overlays (chill/flow/pi-direct) + `base.json` manifest. All
+  adapt-ported from `../claude-code-modes`, stripped of Claude-Code framing, fit to
+  pi's transform-not-replace model, byte-stable (no dynamic text).
+- `presets.json` — the curated 9 (`default` + create/explore/safe/refactor-safe/
+  debug/flow/partner/muse), `flow` SPEC-canonical, `refactor`→`refactor-safe`
+  (tag-clash). Every preset proven `setActiveMode`-able against the real tree.
+
+**Content review** (fresh-context) confirmed the fragments are clean; **codex
+cross-model review** confirmed the catalog references only authored fragments and
+the settability acceptance test is genuine. **Verification:** typecheck clean;
+200 tests green.
+
+## Epic review record
+
+**Verdict: Approve.** All children done and reviewed (content review + a codex
+catalog-integration review). The library + catalog are coherent and load through
+the engine; the settability test is the load-bearing proof. Advanced
+implementing → done.
