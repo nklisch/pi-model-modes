@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-preset-bundles
 kind: feature
-stage: review
+stage: done
 tags: []
 parent: epic-fragment-library
 depends_on: [epic-fragment-library-base-overlays, epic-fragment-library-agency-axis, epic-fragment-library-quality-axis, epic-fragment-library-scope-axis, epic-fragment-library-modifiers]
@@ -173,3 +173,13 @@ fragment fixture and references only the unchanged `default` preset.
 
 **Every preset settable confirmed**: Unit 3 materializes all 9 presets against the
 real `prompts/` tree with zero missing/ambiguous-fragment errors.
+
+## Review record
+
+**Verdict: Approve** — cross-model codex review (peeragent, --effort high). No
+findings. The 9-preset catalog is valid (no dup keys), references only authored
+fragments, keeps `pi` as the no-overlay sentinel, makes `flow` SPEC-canonical, and
+uses `refactor-safe`. The settability test genuinely materializes every preset
+against the real `prompts/` tree (a misspelled value would throw). The preset-table
+real-file assertions rolled forward without weakening the synthetic validation
+tests; config tests unaffected. 200 tests green. Advanced review → done.
