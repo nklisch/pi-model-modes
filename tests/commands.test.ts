@@ -216,6 +216,7 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
 
     // Seam: the handler populates the cache → inspect reads it.
     handleBeforeAgentStart(makeEvent("base prompt"), makeContext({ model }));
+    const turnBefore = getChangeSignal().currentTurn;
 
     const { pi, calls } = makePi();
     registerModeInspectCommand(pi);
@@ -229,7 +230,7 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
     const sends = calls.filter((c: RecordedCall) => c.method === "sendMessage");
     expect(sends).toHaveLength(1);
     const [message, sendOptions] = sends[0].args as [
-      { customType: string; content: string; display: boolean },
+      { customType: string; content: string; display: boolean; triggerTurn?: boolean },
       { triggerTurn?: boolean } | undefined,
     ];
     expect(message.customType).toBe(MODE_INSPECT_MESSAGE_TYPE);
@@ -237,7 +238,11 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
     // Content carries the live identity line and the cache-key field.
     expect(message.content).toContain(deriveIdentityLine(model));
     expect(message.content).toContain("Cache key:");
-    // Must NOT provoke a model turn: no triggerTurn option.
+    // Must NOT provoke a model turn: no triggerTurn — neither as a send option
+    // nor smuggled into the message object.
     expect(sendOptions?.triggerTurn).toBeUndefined();
+    expect("triggerTurn" in message).toBe(false);
+    // Inspect is a pure read: invoking it must not advance the turn counter.
+    expect(getChangeSignal().currentTurn).toBe(turnBefore);
   });
 });

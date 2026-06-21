@@ -30,8 +30,9 @@ pi-model-modes/
 ├─ presets.json              named bundles (e.g. "flow", "explore", "create")
 └─ tests/
     ├─ cache.test.ts
-    ├─ cache-stability.test.ts   (downstream, not yet present)
+    ├─ cache-stability.test.ts
     ├─ clean-base.test.ts
+    ├─ commands.test.ts
     ├─ handler.test.ts
     ├─ identity.test.ts
     ├─ noop.test.ts
@@ -156,6 +157,10 @@ Cache key: 9f3a...c1e2
 - **The cache key is the only thing that decides work.** Switching models
   or modes is the only thing that forces a re-assemble. Everything else
   is a hit.
-- **The plugin never touches message history.** All transformation happens
-  inside the system prompt. Conversation cost and context-growth behavior
-  are pi's; this plugin adds nothing to them.
+- **The plugin never rewrites message history.** All per-turn transformation
+  happens inside the system prompt; the plugin never mutates or rewrites
+  existing conversation entries. The one additive exception is the
+  user-invoked `/mode:inspect`, which emits a single `display:true` status
+  message (so the inspect panel may appear in later context — an accepted v1
+  tradeoff, see `epic-identity-injection-mode-inspect`). Ordinary turns add
+  nothing to conversation cost or context growth.
