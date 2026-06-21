@@ -10,3 +10,10 @@ npm-debug.log*
 .env.*
 !.env.example
 .DS_Store
+
+# Never track: stray CLI downloads (not part of this project)
+aws/
+awscliv2.zip
+google-cloud-cli-*
+# pi session-local config
+.pi/
