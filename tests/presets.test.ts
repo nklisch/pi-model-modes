@@ -32,14 +32,14 @@ beforeEach(() => {
 });
 
 describe("getPreset — lookup (hit) returns the exact preset", () => {
-  it("getPreset('flow') returns the exact starter object", () => {
+  it("getPreset('flow') returns the curated SPEC-canonical object", () => {
     const reg = loadPresets();
     expect(getPreset("flow", reg)).toEqual({
-      base: "pi",
+      base: "chill",
       agency: "autonomous",
       quality: "pragmatic",
       scope: "adjacent",
-      modifiers: ["tdd"],
+      modifiers: ["flow"],
     });
   });
 });
@@ -80,6 +80,7 @@ describe("unknown-preset fail-fast", () => {
     }
     expect(message).toContain("default");
     expect(message).toContain("flow");
+    expect(message).toContain("refactor-safe");
   });
 });
 
@@ -205,9 +206,19 @@ describe("base:'pi' vs no-mode distinction (this feature's representational cont
 });
 
 describe("starter-set sanity / load-from-disk", () => {
-  it("loadPresets() reads the real file; keys are exactly the starter names", () => {
+  it("loadPresets() reads the real file; keys are exactly the curated catalog", () => {
     const reg = loadPresets();
-    expect(Object.keys(reg).sort()).toEqual(["default", "flow"]);
+    expect(Object.keys(reg).sort()).toEqual([
+      "create",
+      "debug",
+      "default",
+      "explore",
+      "flow",
+      "muse",
+      "partner",
+      "refactor-safe",
+      "safe",
+    ]);
   });
 
   it("every shipped preset is well-formed (all five components, correct types)", () => {
@@ -272,6 +283,16 @@ describe("memoization + reset", () => {
     loadPresets({ json: SYNTHETIC }); // override read — must not memoize
     const fromDiskAgain = loadPresets();
     expect(fromDiskAgain).toBe(fromDisk);
-    expect(Object.keys(fromDiskAgain).sort()).toEqual(["default", "flow"]);
+    expect(Object.keys(fromDiskAgain).sort()).toEqual([
+      "create",
+      "debug",
+      "default",
+      "explore",
+      "flow",
+      "muse",
+      "partner",
+      "refactor-safe",
+      "safe",
+    ]);
   });
 });

@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-preset-bundles
 kind: feature
-stage: implementing
+stage: review
 tags: []
 parent: epic-fragment-library
 depends_on: [epic-fragment-library-base-overlays, epic-fragment-library-agency-axis, epic-fragment-library-quality-axis, epic-fragment-library-scope-axis, epic-fragment-library-modifiers]
@@ -127,3 +127,49 @@ that the catalog references only authored fragments.
   preset-table tests change; synthetic fixtures + config tests stay green (verify).
 - **A preset referencing a misspelled value** would fail the settability test
   (Unit 3) — which is exactly its purpose (catch a broken catalog at build time).
+
+## Implementation notes
+
+Shipped all three units. No mapping corrections were needed — every value in the
+design's 9-preset table references an authored fragment.
+
+- **Unit 1 — `presets.json`**: replaced the starter `{ default, flow }` with the
+  curated 9 (`default, create, explore, safe, refactor-safe, debug, flow,
+  partner, muse`), each exactly per the design's mappings table. Valid JSON, no
+  duplicate keys. Confirmed every referenced fragment exists under `prompts/`:
+  - bases: `pi` (no-overlay sentinel), `chill`, `flow` (`prompts/base/chill.md`,
+    `prompts/base/flow.md` present);
+  - agency: `autonomous`, `collaborative`, `partner`, `surgical` (all present);
+  - quality: `architect`, `pragmatic` (present);
+  - scope: `adjacent`, `narrow`, `unrestricted` (all present);
+  - modifiers: `bold`, `muse`, `readonly`, `methodical`, `debug`, `flow`,
+    `playful` (all present in `prompts/modifiers/`).
+  - `flow` is SPEC-canonical: `base:chill / autonomous / pragmatic / adjacent /
+    modifiers:[flow]`.
+
+- **Unit 2 — `tests/presets.test.ts`**: rolled forward ONLY the real-file
+  assertions. `getPreset("flow")` now expects the curated chill/autonomous/
+  pragmatic/adjacent/[flow] object; the two keys-list assertions
+  (starter-set-sanity + memoization-reset) now expect the 9 sorted names; the
+  unknown-preset available-names assertion additionally asserts `refactor-safe`.
+  `getPreset("default")` and the `base:'pi'` distinction tests were untouched
+  (the neutral `default` mapping is unchanged). All synthetic-`{json}` shape/dup/
+  validation tests untouched.
+
+- **Unit 3 — `tests/preset-catalog.test.ts` (new)**: the settability acceptance.
+  Runs against the REAL bundled `prompts/` tree (no fragment-root override;
+  `resetFragmentCacheForTesting()` in `beforeEach` restores the package-relative
+  default root). `loadPresets()`, then for EVERY preset name: `setActiveMode(name)`
+  does not throw, `resolveActiveModePlan()` returns a plan whose `mode` matches the
+  preset's base/agency/quality/scope, every planned fragment has a non-empty path
+  + loaded content, the three axes are always present, a non-`pi` base contributes
+  a base overlay, and every declared modifier contributes a fragment. This is the
+  load-bearing proof the catalog references only authored fragments.
+
+**Verification**: `npm run typecheck` clean; `npm test` green — 200 tests / 17
+files (was 199; net +1 from the new catalog test, with the rolled-forward preset
+assertions edited in place). `tests/config.test.ts` stays green — it uses its own
+fragment fixture and references only the unchanged `default` preset.
+
+**Every preset settable confirmed**: Unit 3 materializes all 9 presets against the
+real `prompts/` tree with zero missing/ambiguous-fragment errors.

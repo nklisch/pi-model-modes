@@ -6,11 +6,60 @@
     "scope": "adjacent",
     "modifiers": []
   },
-  "flow": {
+  "create": {
+    "base": "flow",
+    "agency": "autonomous",
+    "quality": "architect",
+    "scope": "unrestricted",
+    "modifiers": ["bold"]
+  },
+  "explore": {
+    "base": "flow",
+    "agency": "autonomous",
+    "quality": "pragmatic",
+    "scope": "unrestricted",
+    "modifiers": ["muse"]
+  },
+  "safe": {
+    "base": "pi",
+    "agency": "surgical",
+    "quality": "pragmatic",
+    "scope": "narrow",
+    "modifiers": ["readonly"]
+  },
+  "refactor-safe": {
+    "base": "pi",
+    "agency": "collaborative",
+    "quality": "architect",
+    "scope": "adjacent",
+    "modifiers": ["methodical"]
+  },
+  "debug": {
     "base": "pi",
     "agency": "autonomous",
     "quality": "pragmatic",
     "scope": "adjacent",
-    "modifiers": ["tdd"]
+    "modifiers": ["debug"]
+  },
+  "flow": {
+    "base": "chill",
+    "agency": "autonomous",
+    "quality": "pragmatic",
+    "scope": "adjacent",
+    "modifiers": ["flow"]
+  },
+  "partner": {
+    "base": "pi",
+    "agency": "partner",
+    "quality": "architect",
+    "scope": "adjacent",
+    "modifiers": []
+  },
+  "muse": {
+    "base": "flow",
+    "agency": "collaborative",
+    "quality": "pragmatic",
+    "scope": "unrestricted",
+    "modifiers": ["muse", "playful"]
   }
 }
