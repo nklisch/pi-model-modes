@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-cache-and-change-signal
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-identity-injection
 depends_on: []
@@ -518,3 +518,43 @@ and a `peer` call is a sub-agent delegation. Resolved all design questions
 with host judgment per the delegation instruction; rationale logged under
 `## Design decisions`. A reviewer pass (`/agile-workflow:review`) at
 `stage: review` is the appropriate second pair of eyes for this design.
+
+## Implementation notes
+
+Implemented exactly to spec — no design deviations. Two files created:
+
+- `src/cache.ts` — full module per Unit 1. Public surface: `NO_MODE_SIGNATURE`,
+  `CacheKeyInputs`, `computeCacheKey`, `getCachedResult`, `setCachedResult`,
+  `ChangeReason`, `ChangeSignalEntry`, `ChangeSignalSnapshot`,
+  `getChangeSignal`, `resetCacheForTesting`. Internal helpers: `RING_CAPACITY=16`,
+  `KeyComponents`, `sha256Hex`, `componentsOf`, `encodeComponents` (length-
+  delimited `<byteLen>:<field>` joined by `|`), `classifyReason` (priority
+  initial > model-switched > mode-switched > base-changed). Module-scope state
+  (`lastKey`, `lastResult`, `lastComponents`, `currentTurn`, `ring`) is mutated
+  only inside `getCachedResult` (turn++), `setCachedResult` (state + ring), and
+  `resetCacheForTesting` (clears all). SHA-256 via `node:crypto` `createHash` —
+  zero deps. Fail Fast throw on `key === lastKey` lives at the top of
+  `setCachedResult` before any state mutation (so a misuse throw leaves state
+  untouched). `getChangeSignal()` returns `entries: [...ring]` (shallow copy).
+- `tests/cache.test.ts` — 28 tests across 7 `describe` blocks, one per item in
+  the `## Testing` list (purity/determinism, 5 change-detection incl.
+  length-delimited ambiguity, hit/miss incl. uninitialized-cannot-HIT and
+  miss-after-base-change, 7 reason-classification incl. simultaneous-change
+  priority, 3 ring-buffer incl. 17-set eviction + copy isolation, 3 read-API,
+  2 turn-accounting, 1 miss-only-contract throw). `beforeEach(() =>
+  resetCacheForTesting())` isolates every test.
+
+Verification:
+- `npm run typecheck` → clean (strict, `noUnusedLocals/Parameters`,
+  `verbatimModuleSyntax` honored: `import type` for `CacheKeyInputs`).
+- `npx vitest --run tests/cache.test.ts` → **28 passed (28)**.
+- Full `npm test` → 4 of 5 test files pass (64 of 65 tests). The single
+  failure is in `tests/identity.test.ts` — a **sibling feature's** file
+  (`epic-identity-injection-identity-derivation`, being implemented by a
+  parallel autopilot stride; `providerDisplayName("gpt5-Mini")` title-case
+  assertion). It is unrelated to `src/cache.ts` (my module exports nothing
+  called `providerDisplayName` and touches no identity code). Left untouched
+  per test-integrity rules — not my feature's file; the identity implementor
+  owns it. No regression in `noop`/`clean-base`/`registration`.
+
+All acceptance criteria satisfied; ready for `/agile-workflow:review`.
