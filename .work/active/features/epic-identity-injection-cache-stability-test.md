@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-cache-stability-test
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-handler-integration]
@@ -226,3 +226,17 @@ through the same assembly path); model-B uses `{ name: "Claude", provider:
 "anthropic" }` so both the name and provider differ from model A, exercising the
 identity line's full divergence. Stability genuinely holds — no Invariant-2
 violation observed; no blocker.
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), fresh-context evaluation.
+
+Fresh-context reviewer (opus) confirmed Invariant-2 enforcement is genuine, not
+gamed: HIT-path stability (10 identical turns byte-identical); forced-MISS
+determinism with `resetCacheForTesting()` as the first statement of each loop
+iteration (a true MISS each turn, not HIT-path in disguise); exact-shape anchor
+`${deriveIdentityLine(model)}\n${base}` matching handler assembly; no-dynamic-
+content length check; and a fail-able negative control in its own `it` (divergent
+model/base through the same assembly path, `not.toBe`). Test-only file, no
+production changes. typecheck clean; 8 files / 92 tests green. No findings above
+nit. Advanced review → done.

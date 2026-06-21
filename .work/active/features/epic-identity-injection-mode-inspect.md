@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-mode-inspect
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-cache-and-change-signal, epic-identity-injection-identity-derivation]
@@ -438,3 +438,22 @@ not await it); `ExtensionCommandContext extends ExtensionContext` carries
 **Verification:** `npm run typecheck` clean; `npm test` green — 92 tests across
 8 files (was 72 across 7; added `tests/commands.test.ts` with 19 cases and split
 `registration.test.ts` from 1 into 2 cases).
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), fresh-context evaluation, following a
+cross-model codex implementation review that approved with doc/test nits (all
+applied).
+
+Fresh-context reviewer (opus, did not write the code) verified every criterion
+PASS: Mode `unset` for v1; Identity renders the literal `deriveIdentityLine`
+with `(no model)` fallback; "N turns ago" math + this turn/1 turn ago/N turns ago
+wording; empty ring → "never"; absent key → "(none)"; `shortHex` first4...last4
+with short-string defense; `formatChangeDetail` never emits `undefined →` and
+omits the parenthetical on `initial`; command name exactly `"mode:inspect"`;
+`sendMessage` customType `mode-inspect`, `display:true`, NO `triggerTurn` (option
+AND not smuggled in the message object); `getChangeSignal` proven a pure read
+(inspect does not advance the turn counter). `registration.test.ts` still
+constrains "exactly handler + one command, nothing else". No gamed assertions.
+typecheck clean; 8 files / 92 tests green. No findings above nit. Advanced
+review → done.
