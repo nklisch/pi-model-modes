@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-handler-integration
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-identity-derivation, epic-identity-injection-cache-and-change-signal]
@@ -690,3 +690,35 @@ final suite 72 tests green, typecheck clean.
 
 Net new tests: 72 total (was 68). Commits: `1377f45` (initial), `3c4c2a4`
 (review fixes), plus the undefined-model cache-state tightening.
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), fresh-context evaluation.
+
+A fresh-context reviewer (opus, did not write the code) verified every
+acceptance-criteria line against HEAD: all PASS. Handler always-returns on both
+paths (strict `RequiredBeforeAgentStartResult` preserved); identity-leads on
+MISS with byte-identical remainder; HIT returns prior-MISS bytes wholesale (no
+stacking); clean-base splice from `e.systemPrompt` with no event mutation;
+undefined-`ctx.model` skips identity, no leading newline, result === base, and
+still engages the cache (change-signal ring asserted); `modelId` participates in
+the key (same-provider/distinct-id MISS proof). Tests are content-bearing — no
+gamed/presence-only assertions where content matters. Docs (SPEC Invariant 3 +
+Identity-line + Open-questions; ARCHITECTURE enforcement table + per-turn flow +
+components test list) match current truth. typecheck clean; `npm test` 6 files /
+72 tests green.
+
+Two nits, both judged acceptable:
+- `docs/ARCHITECTURE.md` source-file *tree* still lists `assemble.ts` (and other
+  not-yet-shipped files) and omits shipped `identity.ts`. This is the
+  forward-looking target-architecture map (intended-future-state, permitted by
+  AGENTS.md); `assemble.ts` is the same downstream-placeholder class as its
+  siblings and arrives with `epic-mode-composition`. Not drift this feature owns
+  — left as-is.
+- `extensions/index.ts` doc-comment called it "the no-op handler" — now stale.
+  Fixed in this review pass (trivial truth correction): reworded to
+  "identity-injecting, cache-aware handler". Behavior/registration unchanged.
+
+Advanced review → done. Note: this substrate review followed a 2-pass
+cross-model implementation review (codex) that had already converged; the deep
+review re-verified independently rather than re-running a redundant codex loop.

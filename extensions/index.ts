@@ -6,9 +6,10 @@ import { handleBeforeAgentStart } from "../src/handler.js";
  * calls via jiti. It receives the public ExtensionAPI.
  *
  * Registrations (single registration surface per ARCHITECTURE.md):
- *   - `before_agent_start` → `handleBeforeAgentStart` (the no-op handler from
- *     `src/handler.ts`). Registered by reference so the unit tests can assert
- *     the registered handler is the same function object they import.
+ *   - `before_agent_start` → `handleBeforeAgentStart` (the identity-injecting,
+ *     cache-aware handler from `src/handler.ts`). Registered by reference so the
+ *     unit tests can assert the registered handler is the same function object
+ *     they import.
  *
  * Downstream epics extend this factory (register `/mode`, keybindings, etc.)
  * by adding more `pi.on(...)` / `pi.registerCommand(...)` calls — edit, don't
