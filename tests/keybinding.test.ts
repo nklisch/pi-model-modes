@@ -222,9 +222,12 @@ describe("registerModeKeybindings", () => {
 
     await backward(ctx);
 
-    // The override is now set (cycled from the effective "safe").
+    // Cycles backward RELATIVE TO the effective default "safe": in the sorted
+    // catalog (…, "refactor-safe", "safe"), "safe" is last, so one step back is
+    // "refactor-safe". An impl that ignored the effective mode (treated it as
+    // unset) would land on the LAST preset ("safe") and fail this.
+    expect(getActiveMode()).toBe("refactor-safe");
     expect(getEffectiveModeSource()).toBe("override");
-    expect(typeof getActiveMode()).toBe("string");
-    expect(notifies.at(-1)?.message).toMatch(/^mode: /);
+    expect(notifies.at(-1)?.message).toBe("mode: refactor-safe");
   });
 });
