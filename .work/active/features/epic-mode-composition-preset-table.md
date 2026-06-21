@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-preset-table
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-mode-composition
 depends_on: []
@@ -441,3 +441,46 @@ potentially-material ambiguity — typed-union vs validated-string for axis valu
 — is resolved decisively by the epic's locked convention-discovery decision
 (closed unions would drift from the discovered fragment set), so no real
 architectural ambiguity remained to warrant a codex consult.
+
+## Implementation notes
+
+Landed as a single stride per the design body, no deviations.
+
+**Files created:**
+
+- `src/presets.ts` — exports `PI_BASE = "pi"`, the `ResolvedMode` and `Preset`
+  interfaces (kept structurally distinct, not aliased, per the Risks note), the
+  `PresetFile` / `PresetRegistry` / `LoadPresetsOptions` types, and the
+  `loadPresets(opts?)` / `getPreset(name, registry)` / `resetPresetsForTesting()`
+  surface. Disk read is package-relative via
+  `fileURLToPath(new URL("../presets.json", import.meta.url))` + `readFileSync` +
+  `JSON.parse` (consistent with the sibling fragment-loader, NOT a static JSON
+  import). Module-scope memo of the disk-loaded registry with the `{ json }`
+  test seam that parses fresh and never poisons the memo. Fail-fast validators:
+  shape well-formedness (`validatePreset`), raw-text duplicate-id detection
+  (`assertNoDuplicateIds`, run before `JSON.parse` collapses repeated keys), and
+  unknown-preset lookup miss in `getPreset`. Axis-VALUE existence is deliberately
+  NOT checked here (resolver's job) — only shape.
+- `presets.json` — minimal starter: `default` (`base:"pi"`, no modifiers) and
+  `flow` (`base:"pi"`, `agency:"autonomous"`, `modifiers:["flow"]`), both on
+  `base:"pi"` per the starter-fragment-alignment risk (no base-overlay reference
+  the starter set may lack).
+- `tests/presets.test.ts` — 18 tests covering every case in the Testing section:
+  lookup hit / atomic expansion / unknown-preset fail-fast (names miss + lists
+  available) / duplicate-id fail-fast (raw-text seam, differing bodies prove
+  last-wins isn't relied on) / malformed-shape (non-object top level, missing
+  field, empty string, non-array modifiers, empty modifier entry, invalid JSON)
+  / `PI_BASE` vs `NO_MODE_SIGNATURE` distinction / starter-set load-from-disk
+  sanity / validated-string (unknown axis value loads) / memoization + reset +
+  override-doesn't-poison-memo.
+
+**Final `ResolvedMode` shape:** `{ base: string; agency: string; quality:
+string; scope: string; modifiers: string[] }` — exactly as specified.
+
+**Verification:**
+
+- `npm run typecheck` (`tsc --noEmit`) — clean. (Used `typecheck`; there is no
+  `build` script in package.json.)
+- `npm test` — full suite green: 10 files, 134 tests pass (presets.test.ts
+  contributes 18; the remaining growth above the prior 92 is the sibling
+  fragment-loader's parallel tests).

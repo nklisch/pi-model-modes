@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-fragment-loader
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-mode-composition
 depends_on: []
@@ -394,3 +394,41 @@ cross-session resume surface, and the natural seams are file-vs-test, which is t
 boundary, not a story boundary. Per the skill's "stories are pure overhead" criteria — all
 four conditions hold — the feature itself is the implementation unit. Implement directly
 under the feature.
+
+## Implementation notes
+
+Landed as a single stride, exactly per the design body.
+
+- **`src/fragments.ts`** (Unit 1): `Axis`/`AXES`, `BaseManifest`, the private
+  `CacheEntry` shape, `PACKAGE_ROOT = fileURLToPath(new URL("../prompts/", import.meta.url))`,
+  module-scope `rootOverride` + `contentCache` Map + `fragmentRoot()` accessor.
+  A private `listMarkdown(dir)` helper does the `readdirSync({withFileTypes})` →
+  filter `isFile() && .md` → `join` → `.sort()` shared by `discoverAxis` and
+  `discoverModifiers`. Fail-fast wiring: `discoverAxis` throws "axis dir not found"
+  on ENOENT and "is empty" after a zero-length filter; `discoverModifiers` throws
+  "modifiers dir not found" on ENOENT but returns `[]` on empty (ENOENT distinguished
+  via `err.code === "ENOENT"`). `discoverBaseOverlays` reads/parses `base.json`
+  (distinct "not found" vs "unparseable" messages), validates `overlays` is a
+  `string[]`, `statSync`-checks each resolved entry (throws "missing overlay"), and
+  preserves manifest order (no sort). `loadFragment` does `statSync` → mtimeMs
+  hit/miss → `readFileSync(...,"utf8").trim()`, caching the trimmed content.
+  `setFragmentRootForTesting` / `resetFragmentCacheForTesting` mirror `cache.ts`.
+  All errors are `throw new Error(...)` carrying the offending absolute path.
+  (Deviation: dropped the unused `basename` import the skeleton listed — the loader
+  has no naming policy and `noUnusedLocals` flags it; the resolver owns `basename`.)
+- **`prompts/` starter set** (Unit 2): `base.json` = `{ "overlays": ["base/pi-direct.md"] }`,
+  plus `base/pi-direct.md`, `axis/agency/autonomous.md`, `axis/quality/pragmatic.md`,
+  `axis/scope/adjacent.md`, `modifiers/tdd.md` — each a heading + 1-3 lines of static
+  prose (no dynamic text), SPEC value names exactly.
+- **`tests/fragments.test.ts`**: 24 tests over a `mkdtempSync` temp fixture root via
+  `setFragmentRootForTesting` (`beforeEach(resetFragmentCacheForTesting)`, temp cleanup
+  in `afterEach`). Covers discovery determinism (sorted axes; base overlays in manifest
+  order with a deliberately-unsorted manifest), the full mtime contract (re-read on a
+  `utimesSync` bump; the no-re-read half proven by an out-of-band write WITH the mtime
+  restored, asserting the stale cached value still surfaces — no module mocking), all
+  fail-fast cases (missing/empty axis, missing modifiers throws + empty returns `[]`,
+  orphaned/malformed/unparseable base.json, missing `loadFragment` path), reset
+  isolation, and starter-set sanity against the REAL package root.
+
+**Verification**: `npm run typecheck` clean; `npm test` green — full suite **116 tests**
+(was 92; this feature adds 24 in `tests/fragments.test.ts`).
