@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-cache-and-change-signal
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-identity-injection
 depends_on: []
@@ -558,3 +558,13 @@ Verification:
   owns it. No regression in `noop`/`clean-base`/`registration`.
 
 All acceptance criteria satisfied; ready for `/agile-workflow:review`.
+
+## Review (2026-06-21)
+
+**Verdict**: Approve with comments
+
+**Blockers**: none
+**Important**: `followup-cache-model-mode-priority-test` — add the missing explicit simultaneous model+mode priority regression test.
+**Nits**: `tests/cache.test.ts:227` contains a tautological hash-stability assertion before the meaningful `from !== to` check; harmless, optional cleanup with the follow-up.
+
+**Notes**: Substrate feature deep review by Codex after GLM implementation. Reviewed item design and implementation notes; `docs/SPEC.md` cache-key/change-signal contract; `docs/ARCHITECTURE.md` cache/ring-buffer design; `.agents/rules/agile-workflow.md` test-integrity rule; implementation commit `475e89d`; `src/cache.ts`; and `tests/cache.test.ts`. Cross-model/fresh-context requirement satisfied by reviewer model switch (GLM implementor → Codex reviewer); no additional sub-agent spawned because this reviewer role cannot spawn sub-agents. Verification rerun: `npm test -- tests/cache.test.ts` → 28 passed, `npm run typecheck` → clean, full `npm test` → 64 passed. Code satisfies the cache key, miss-only, uninitialized miss, change signal, ring buffer, turn accounting, no-pi-coupling, and test isolation contracts. The only material gap found is test coverage, not implementation behavior: existing priority tests prove model>base and mode>base, while `src/cache.ts` currently implements model>mode via checking model before mode; a follow-up backlog story records the missing direct regression test.
