@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   PI_BASE,
+  NONE_PRESET,
   loadPresets,
   getPreset,
+  listPresetNames,
   resetPresetsForTesting,
   type ResolvedMode,
   type PresetRegistry,
@@ -35,9 +37,9 @@ describe("getPreset — lookup (hit) returns the exact preset", () => {
   it("getPreset('flow') returns the curated SPEC-canonical object", () => {
     const reg = loadPresets();
     expect(getPreset("flow", reg)).toEqual({
-      base: "chill",
+      base: "flow",
       agency: "autonomous",
-      quality: "pragmatic",
+      quality: "architect",
       scope: "adjacent",
       modifiers: ["flow"],
     });
@@ -45,9 +47,9 @@ describe("getPreset — lookup (hit) returns the exact preset", () => {
 });
 
 describe("atomic expansion — a preset carries all five components at once", () => {
-  it("'default' expands to every axis in one object (empty modifiers included)", () => {
+  it("'extend' expands to every axis in one object (empty modifiers included)", () => {
     const reg = loadPresets();
-    const preset = getPreset("default", reg);
+    const preset = getPreset("extend", reg);
     // Selecting a preset yields every axis at once — no partial selection.
     expect(preset).toEqual({
       base: "pi",
@@ -78,9 +80,9 @@ describe("unknown-preset fail-fast", () => {
     } catch (err) {
       message = (err as Error).message;
     }
-    expect(message).toContain("default");
+    expect(message).toContain("extend");
     expect(message).toContain("flow");
-    expect(message).toContain("refactor-safe");
+    expect(message).toContain("none");
   });
 });
 
@@ -190,9 +192,9 @@ describe("base:'pi' vs no-mode distinction (this feature's representational cont
     expect(PI_BASE).not.toBe(NO_MODE_SIGNATURE);
   });
 
-  it("the 'default' preset is a real, fully-populated mode with base === PI_BASE", () => {
+  it("the 'extend' preset is a real, fully-populated mode with base === PI_BASE", () => {
     const reg = loadPresets();
-    const preset = getPreset("default", reg);
+    const preset = getPreset("extend", reg);
     // base:"pi" is a REAL mode (full axis fragments) — NOT the no-mode state.
     // The no-mode state has no ResolvedMode object at all (NO_MODE_SIGNATURE);
     // here every axis is populated.
@@ -203,6 +205,14 @@ describe("base:'pi' vs no-mode distinction (this feature's representational cont
     expect(asResolved.scope).toBeTruthy();
     expect(Array.isArray(asResolved.modifiers)).toBe(true);
   });
+
+  it("'none' is a virtual preset name, not an on-disk ResolvedMode", () => {
+    const reg = loadPresets();
+    expect(NONE_PRESET).toBe("none");
+    expect(Object.keys(reg)).not.toContain("none");
+    expect(listPresetNames(reg)).toContain("none");
+    expect(() => getPreset("none", reg)).toThrow(/unknown preset "none"/);
+  });
 });
 
 describe("starter-set sanity / load-from-disk", () => {
@@ -211,13 +221,36 @@ describe("starter-set sanity / load-from-disk", () => {
     expect(Object.keys(reg).sort()).toEqual([
       "create",
       "debug",
-      "default",
+      "director",
       "explore",
+      "extend",
       "flow",
+      "methodical",
       "muse",
       "partner",
-      "refactor-safe",
+      "refactor",
       "safe",
+      "spark",
+      "tinker",
+    ]);
+  });
+
+  it("listPresetNames includes the virtual none mode for user-facing selectors", () => {
+    expect(listPresetNames()).toEqual([
+      "create",
+      "debug",
+      "director",
+      "explore",
+      "extend",
+      "flow",
+      "methodical",
+      "muse",
+      "none",
+      "partner",
+      "refactor",
+      "safe",
+      "spark",
+      "tinker",
     ]);
   });
 
@@ -286,13 +319,17 @@ describe("memoization + reset", () => {
     expect(Object.keys(fromDiskAgain).sort()).toEqual([
       "create",
       "debug",
-      "default",
+      "director",
       "explore",
+      "extend",
       "flow",
+      "methodical",
       "muse",
       "partner",
-      "refactor-safe",
+      "refactor",
       "safe",
+      "spark",
+      "tinker",
     ]);
   });
 });

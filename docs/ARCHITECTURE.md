@@ -9,7 +9,7 @@ pi-model-modes/
 ├─ package.json              pi-package manifest: pi { extensions } + files allowlist
 │                            (prompts/ is loaded by the plugin at runtime, package-relative)
 ├─ extensions/
-│   └─ index.ts              default export: registers handler, /mode, keybinding, session_start
+│   └─ index.ts              default export: registers handler, /mode, session_start
 ├─ src/
 │   ├─ handler.ts            before_agent_start entry — orchestrates the transform
 │   ├─ resolver.ts           mode resolution: two tiers (override > default), effective = override ?? default ?? unset
@@ -20,7 +20,7 @@ pi-model-modes/
 │   ├─ presets.ts            preset table (name → {base, agency, quality, scope, mods})
 │   ├─ provider-names.ts     provider id → display name map
 │   ├─ commands.ts           /mode, /mode off, /mode:inspect
-│   └─ keybinding.ts         cycle keybinding
+│   └─ keybinding.ts         optional cycle keybinding helper (not auto-registered)
 ├─ prompts/
 │   ├─ base.json  overlay manifest (slot order) — at the prompts/ root
 │   ├─ base/      voice overlays (chill.md, flow.md, pi-direct.md)
@@ -30,7 +30,7 @@ pi-model-modes/
 │   │   └─ scope/    unrestricted, adjacent, narrow
 │   └─ modifiers/   bold, tdd, debug, flow, muse, readonly, methodical,
 │                   director, speak-plain, context-pacing, playful
-├─ presets.json              named bundles (e.g. "flow", "explore", "create")
+├─ presets.json              named bundles (e.g. "flow", "refactor", "create")
 └─ tests/
     ├─ cache.test.ts
     ├─ cache-stability.test.ts
@@ -46,8 +46,8 @@ pi-model-modes/
 ```
 
 `extensions/index.ts` is the single registration surface. It wires the
-handler, the command, the keybinding, and the `session_start` config-seed to
-pi's `ExtensionAPI`. Everything else is plain modules with no pi coupling
+handler, the commands, and the `session_start` config-seed to pi's
+`ExtensionAPI`. Everything else is plain modules with no pi coupling
 except through typed interfaces — which keeps the logic unit-testable without
 spinning up pi.
 

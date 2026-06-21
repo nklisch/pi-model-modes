@@ -37,6 +37,13 @@ import { readFileSync } from "node:fs";
 export const PI_BASE = "pi";
 
 /**
+ * Virtual preset matching claude-code-modes' `none` mode. It is intentionally
+ * not stored in presets.json because it has no axes or fragments: selecting it
+ * means an explicit no-mode override.
+ */
+export const NONE_PRESET = "none";
+
+/**
  * The shared resolved-mode selection contract — the single source of truth
  * for a resolved mode's shape. `mode-resolver` PRODUCES this; `assemble.ts`
  * (deterministic-splice) CONSUMES it. Axis values are validated strings, NOT
@@ -298,10 +305,15 @@ export function loadPresets(opts?: LoadPresetsOptions): PresetRegistry {
 export function getPreset(name: string, registry: PresetRegistry): Preset {
   const preset = registry[name];
   if (preset === undefined) {
-    const available = Object.keys(registry).join(", ");
+    const available = listPresetNames(registry).join(", ");
     throw new Error(`unknown preset "${name}" — available: ${available}`);
   }
   return preset;
+}
+
+/** Sorted user-facing preset names, including virtual `none`. */
+export function listPresetNames(registry: PresetRegistry = loadPresets()): string[] {
+  return [...Object.keys(registry), NONE_PRESET].sort();
 }
 
 /** TEST-ONLY: clear the memoized registry so the next loadPresets re-reads. */

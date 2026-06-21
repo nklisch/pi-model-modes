@@ -49,13 +49,9 @@ behavior or a stuck mode.
 
 ### Keybindings
 
-| Key | Action |
-|---|---|
-| `Ctrl+M` | Cycle forward through the sorted preset list. |
-| `Shift+Ctrl+M` | Cycle backward. |
-
-Both are user-rebindable via `~/.pi/agent/keybindings.json`. Each hit sets the
-session override and toasts `mode: <name>`.
+No mode-cycle shortcut is registered by default. Mode changes are made with
+`/mode`; this avoids terminal control-character collisions such as `Ctrl+M`,
+which is encoded like Enter in legacy terminal input.
 
 ### Config default
 
@@ -75,7 +71,7 @@ Shape (v1):
 An invalid `defaultMode` (unknown preset / missing fragment) warns and is
 skipped — it never crashes the session.
 
-**Precedence:** session override (`/mode`, keybinding) > config default > unset.
+**Precedence:** session override (`/mode`) > config default > unset.
 The override is ephemeral (in-memory, not written to disk): a genuinely new
 session (`/new`, `/resume`, `/fork`) restarts from the config default, while a
 same-session `/reload` or `startup` keeps any active override.
@@ -101,20 +97,26 @@ same-session `/reload` or `startup` keeps any active override.
 
 | Preset | base | agency | quality | scope | modifiers |
 |---|---|---|---|---|---|
-| `default` | pi | autonomous | pragmatic | adjacent | — |
-| `create` | flow | autonomous | architect | unrestricted | bold |
-| `explore` | flow | autonomous | pragmatic | unrestricted | muse |
-| `safe` | pi | surgical | pragmatic | narrow | readonly |
-| `refactor-safe` | pi | collaborative | architect | adjacent | methodical |
-| `debug` | pi | autonomous | pragmatic | adjacent | debug |
-| `flow` | chill | autonomous | pragmatic | adjacent | flow |
-| `partner` | pi | partner | architect | adjacent | — |
-| `muse` | flow | collaborative | pragmatic | unrestricted | muse, playful |
+| `create` | pi | autonomous | architect | unrestricted | — |
+| `extend` | pi | autonomous | pragmatic | adjacent | — |
+| `safe` | pi | collaborative | minimal | narrow | — |
+| `refactor` | pi | autonomous | pragmatic | unrestricted | — |
+| `explore` | pi | collaborative | architect | narrow | readonly |
+| `debug` | chill | collaborative | pragmatic | narrow | debug |
+| `methodical` | chill | surgical | architect | narrow | methodical |
+| `director` | chill | collaborative | architect | unrestricted | director |
+| `partner` | chill | partner | pragmatic | adjacent | speak-plain, tdd |
+| `muse` | chill | autonomous | architect | unrestricted | muse |
+| `flow` | flow | autonomous | architect | adjacent | flow |
+| `tinker` | flow | autonomous | pragmatic | unrestricted | flow, playful |
+| `spark` | chill | autonomous | architect | unrestricted | muse, playful |
+| `none` | — | — | — | — | virtual no-mode override |
 
-Preset definitions live in [`presets.json`](presets.json); the fragment text
-lives in [`prompts/`](prompts) (`base/`, `axis/{agency,quality,scope}/`,
-`modifiers/`). Fragment files are cached by mtime, so editing one takes effect on
-the next turn — no `/reload` needed.
+Preset definitions live in [`presets.json`](presets.json), except `none`, which
+is virtual and injects no mode fragments. The fragment text lives in
+[`prompts/`](prompts) (`base/`, `axis/{agency,quality,scope}/`, `modifiers/`).
+Fragment files are cached by mtime, so editing one takes effect on the next turn
+— no `/reload` needed.
 
 ## How it works
 
@@ -146,7 +148,7 @@ The hard contract (invariants, cache key, resolution precedence) is documented i
 
 The registration surface is a single factory in
 [`extensions/index.ts`](extensions/index.ts) — the `before_agent_start` handler,
-`/mode` + `/mode:inspect` commands, the cycle keybinding, and a
-`session_start` config-seed. All logic lives in plain modules under `src/` with
-no pi coupling except through typed interfaces, which keeps it unit-testable
-without spinning up pi (tests under `tests/`).
+`/mode` + `/mode:inspect` commands, and a `session_start` config-seed. All logic
+lives in plain modules under `src/` with no pi coupling except through typed
+interfaces, which keeps it unit-testable without spinning up pi (tests under
+`tests/`).

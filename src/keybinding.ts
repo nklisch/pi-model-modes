@@ -7,33 +7,30 @@ import {
   getActiveMode,
   getDefaultMode,
 } from "./resolver.js";
-import { loadPresets } from "./presets.js";
+import { listPresetNames } from "./presets.js";
 
 /**
- * Mode-cycle keybindings — the keyboard switching path. `Ctrl+M` cycles
- * FORWARD through the sorted preset list and `Shift+Ctrl+M` cycles BACKWARD,
+ * Mode-cycle keybindings — the keyboard switching path. `Ctrl+Shift+U` cycles
+ * FORWARD through the sorted preset list and `Ctrl+Shift+Alt+U` cycles BACKWARD,
  * each setting the session OVERRIDE (via the resolver seam) relative to the
- * current EFFECTIVE mode. User-rebindable via `~/.pi/agent/keybindings.json`.
+ * current EFFECTIVE mode. This helper is not auto-registered by the extension
+ * factory; callers must opt in deliberately.
  *
  * The cycle math (`nextPresetName`) is a PURE helper — fully unit-testable
  * without pi. `registerModeKeybindings` is the thin pi seam.
  *
- * `Key` import note: the reference `preset.ts` imports `Key` from
- * `@earendil-works/pi-tui` (`Key.ctrl("m")`). That package is NOT a direct
- * dependency of this plugin (it lives nested under `pi-coding-agent`'s own
- * node_modules, not hoisted/resolvable from here), so importing it would not
- * resolve under NodeNext + `verbatimModuleSyntax`. We use the equivalent
- * `KeyId` STRING form instead — `"ctrl+m"` / `"ctrl+shift+m"` — which are valid
- * members of pi's `KeyId` union and typecheck against `registerShortcut`'s
- * `shortcut: KeyId` parameter without the extra dependency.
+ * `Key` import note: pi examples import `Key` from `@earendil-works/pi-tui`.
+ * That package is nested under `pi-coding-agent`, not a direct dependency here,
+ * so this module uses equivalent `KeyId` strings.
  *
- * Design: `.work/active/features/epic-switching-paths-keybinding-cycle.md`.
+ * `Ctrl+M` is intentionally avoided: terminal legacy input encodes it as
+ * carriage return, so it collides with Enter.
  */
 
-/** KeyId for forward cycle (Ctrl+M). The user-rebindable default. */
-export const CYCLE_FORWARD_KEY = "ctrl+m";
-/** KeyId for backward cycle (Shift+Ctrl+M). The user-rebindable default. */
-export const CYCLE_BACKWARD_KEY = "ctrl+shift+m";
+/** KeyId for forward cycle. */
+export const CYCLE_FORWARD_KEY = "ctrl+shift+u";
+/** KeyId for backward cycle. */
+export const CYCLE_BACKWARD_KEY = "ctrl+shift+alt+u";
 
 /**
  * PURE: the next preset name when cycling through a SORTED preset list.
@@ -71,7 +68,7 @@ export function nextPresetName(
  */
 export function registerModeKeybindings(pi: ExtensionAPI): void {
   const cycle = (dir: 1 | -1) => async (ctx: ExtensionContext): Promise<void> => {
-    const names = Object.keys(loadPresets()).sort();
+    const names = listPresetNames();
     if (names.length === 0) {
       ctx.ui.notify("no presets", "info");
       return;

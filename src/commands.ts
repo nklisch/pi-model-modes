@@ -11,7 +11,7 @@ import {
   getDefaultMode,
   getEffectiveModeSource,
 } from "./resolver.js";
-import { loadPresets } from "./presets.js";
+import { listPresetNames } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
 
 /**
@@ -133,7 +133,7 @@ export const MODE_LISTING_MESSAGE_TYPE = "mode";
  *                `undefined` for no mode.
  *   `modeError`— set when the resolve threw (a broken active mode); renders an
  *                error line instead of crashing the listing.
- *   `presets`  — sorted preset names (`Object.keys(loadPresets()).sort()`).
+ *   `presets`  — sorted preset names, including virtual `none`.
  */
 export function formatModeListing(
   source: "override" | "default" | "unset",
@@ -184,7 +184,7 @@ export function registerModeCommand(pi: ExtensionAPI): void {
         } catch (err) {
           modeError = (err as Error).message;
         }
-        const presets = Object.keys(loadPresets()).sort();
+        const presets = listPresetNames();
         pi.sendMessage({
           customType: MODE_LISTING_MESSAGE_TYPE,
           content: formatModeListing(source, specName, mode, modeError, presets),

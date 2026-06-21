@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import {
+  NONE_PRESET,
   PI_BASE,
   getPreset,
   loadPresets,
@@ -149,6 +150,10 @@ function normalize(spec: ModeSpec): ResolvedMode {
   };
 }
 
+function noModePlan(): ModePlan {
+  return { mode: undefined, signature: NO_MODE_SIGNATURE, fragments: [] };
+}
+
 /**
  * Materialize a normalized `ResolvedMode` into a `ModePlan`: discover + load
  * the selected fragments in canonical splice order (base? → agency → quality →
@@ -213,6 +218,10 @@ export function setActiveMode(spec: ModeSpec | undefined): void {
     activeSpec = undefined;
     return;
   }
+  if (spec === NONE_PRESET) {
+    activeSpec = NONE_PRESET;
+    return;
+  }
   const normalized = normalize(spec);
   // Validate by materializing — throws on failure, leaving activeSpec intact.
   materializePlan(normalized);
@@ -252,6 +261,10 @@ export function clearActiveMode(): void {
 export function setDefaultMode(spec: ModeSpec | undefined): void {
   if (spec === undefined) {
     defaultSpec = undefined;
+    return;
+  }
+  if (spec === NONE_PRESET) {
+    defaultSpec = NONE_PRESET;
     return;
   }
   const normalized = normalize(spec);
@@ -304,7 +317,10 @@ export function getEffectiveModeSource(): "override" | "default" | "unset" {
 export function resolveActiveModePlan(): ModePlan {
   const spec = activeSpec ?? defaultSpec;
   if (spec === undefined) {
-    return { mode: undefined, signature: NO_MODE_SIGNATURE, fragments: [] };
+    return noModePlan();
+  }
+  if (spec === NONE_PRESET) {
+    return noModePlan();
   }
   return materializePlan(normalize(spec));
 }

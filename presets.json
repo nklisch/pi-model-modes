@@ -1,64 +1,92 @@
 {
-  "default": {
+  "create": {
+    "base": "pi",
+    "agency": "autonomous",
+    "quality": "architect",
+    "scope": "unrestricted",
+    "modifiers": []
+  },
+  "extend": {
     "base": "pi",
     "agency": "autonomous",
     "quality": "pragmatic",
     "scope": "adjacent",
     "modifiers": []
-  },
-  "create": {
-    "base": "flow",
-    "agency": "autonomous",
-    "quality": "architect",
-    "scope": "unrestricted",
-    "modifiers": ["bold"]
-  },
-  "explore": {
-    "base": "flow",
-    "agency": "autonomous",
-    "quality": "pragmatic",
-    "scope": "unrestricted",
-    "modifiers": ["muse"]
   },
   "safe": {
     "base": "pi",
-    "agency": "surgical",
+    "agency": "collaborative",
+    "quality": "minimal",
+    "scope": "narrow",
+    "modifiers": []
+  },
+  "refactor": {
+    "base": "pi",
+    "agency": "autonomous",
     "quality": "pragmatic",
+    "scope": "unrestricted",
+    "modifiers": []
+  },
+  "explore": {
+    "base": "pi",
+    "agency": "collaborative",
+    "quality": "architect",
     "scope": "narrow",
     "modifiers": ["readonly"]
   },
-  "refactor-safe": {
-    "base": "pi",
-    "agency": "collaborative",
-    "quality": "architect",
-    "scope": "adjacent",
-    "modifiers": ["methodical"]
-  },
   "debug": {
-    "base": "pi",
-    "agency": "autonomous",
+    "base": "chill",
+    "agency": "collaborative",
     "quality": "pragmatic",
-    "scope": "adjacent",
+    "scope": "narrow",
     "modifiers": ["debug"]
   },
-  "flow": {
+  "methodical": {
+    "base": "chill",
+    "agency": "surgical",
+    "quality": "architect",
+    "scope": "narrow",
+    "modifiers": ["methodical"]
+  },
+  "director": {
+    "base": "chill",
+    "agency": "collaborative",
+    "quality": "architect",
+    "scope": "unrestricted",
+    "modifiers": ["director"]
+  },
+  "partner": {
+    "base": "chill",
+    "agency": "partner",
+    "quality": "pragmatic",
+    "scope": "adjacent",
+    "modifiers": ["speak-plain", "tdd"]
+  },
+  "muse": {
     "base": "chill",
     "agency": "autonomous",
-    "quality": "pragmatic",
+    "quality": "architect",
+    "scope": "unrestricted",
+    "modifiers": ["muse"]
+  },
+  "flow": {
+    "base": "flow",
+    "agency": "autonomous",
+    "quality": "architect",
     "scope": "adjacent",
     "modifiers": ["flow"]
   },
-  "partner": {
-    "base": "pi",
-    "agency": "partner",
-    "quality": "architect",
-    "scope": "adjacent",
-    "modifiers": []
-  },
-  "muse": {
+  "tinker": {
     "base": "flow",
-    "agency": "collaborative",
+    "agency": "autonomous",
     "quality": "pragmatic",
+    "scope": "unrestricted",
+    "modifiers": ["flow", "playful"]
+  },
+  "spark": {
+    "base": "chill",
+    "agency": "autonomous",
+    "quality": "architect",
     "scope": "unrestricted",
     "modifiers": ["muse", "playful"]
   }

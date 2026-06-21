@@ -95,7 +95,7 @@ function buildFixture(): string {
   for (const v of ["autonomous", "surgical", "collaborative", "partner"]) {
     write(root, `axis/agency/${v}.md`, `AGENCY-${v}`);
   }
-  for (const v of ["pragmatic", "architect"]) {
+  for (const v of ["pragmatic", "architect", "minimal"]) {
     write(root, `axis/quality/${v}.md`, `QUALITY-${v}`);
   }
   for (const v of ["adjacent", "unrestricted", "narrow"]) {
@@ -110,6 +110,9 @@ function buildFixture(): string {
     "debug",
     "flow",
     "playful",
+    "director",
+    "speak-plain",
+    "tdd",
   ]) {
     write(root, `modifiers/${v}.md`, `MOD-${v}`);
   }
@@ -223,11 +226,11 @@ describe("registerModeKeybindings", () => {
     await backward(ctx);
 
     // Cycles backward RELATIVE TO the effective default "safe": in the sorted
-    // catalog (…, "refactor-safe", "safe"), "safe" is last, so one step back is
-    // "refactor-safe". An impl that ignored the effective mode (treated it as
-    // unset) would land on the LAST preset ("safe") and fail this.
-    expect(getActiveMode()).toBe("refactor-safe");
+    // catalog (…, "refactor", "safe", …), one step back is "refactor". An impl
+    // that ignored the effective mode (treated it as unset) would land on the
+    // LAST preset ("tinker") and fail this.
+    expect(getActiveMode()).toBe("refactor");
     expect(getEffectiveModeSource()).toBe("override");
-    expect(notifies.at(-1)?.message).toBe("mode: refactor-safe");
+    expect(notifies.at(-1)?.message).toBe("mode: refactor");
   });
 });

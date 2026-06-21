@@ -165,7 +165,7 @@ describe("explicit ResolvedMode spec — ordered fragment materialization", () =
     // The resolver resolves string specs via the disk presets.json memo; here
     // we exercise that path against a real shipped preset name.
     resetPresetsForTesting();
-    setActiveMode("default"); // a shipped preset (base:pi, autonomous/pragmatic/adjacent)
+    setActiveMode("extend"); // a shipped preset (base:pi, autonomous/pragmatic/adjacent)
     const plan = resolveActiveModePlan();
     // base:pi → no base fragment; three axes present.
     expect(plan.fragments.map((f) => f.slot)).toEqual([
@@ -174,6 +174,18 @@ describe("explicit ResolvedMode spec — ordered fragment materialization", () =
       "scope",
     ]);
     expect(plan.signature.length).toBeGreaterThan(0);
+  });
+
+  it("the virtual none preset is an explicit no-mode override", () => {
+    buildFixture();
+    setActiveMode("none");
+
+    expect(getActiveMode()).toBe("none");
+    expect(resolveActiveModePlan()).toEqual({
+      mode: undefined,
+      signature: NO_MODE_SIGNATURE,
+      fragments: [],
+    });
   });
 });
 

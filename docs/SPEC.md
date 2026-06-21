@@ -11,7 +11,7 @@ pi-model-modes is a pi extension package (`pi-package`), installed via
 - A `before_agent_start` handler that transforms pi's assembled system
   prompt per turn.
 - A `/mode` command family for interactive mode selection.
-- A keybinding that cycles modes.
+- No mode-cycle keybinding is registered by default.
 - A `session_start` handler that seeds the default mode from plugin-owned
   config (`pi-model-modes.json`, global + project merged).
 
@@ -78,7 +78,7 @@ Forbidden in assembled output, unconditionally:
 
 ### 3. No-op when unset
 
-With no mode selected (no `/mode`, no keybinding hit, no config default),
+With no mode selected (no `/mode`, no config default),
 the handler prepends the identity line and injects NO mode fragments.
 Baseline pi behavior is preserved for mode — no axis or modifier fragments,
 same tools, same skills, same context, same caching. Identity is purely
@@ -174,7 +174,8 @@ edit takes effect on the next turn (no `/reload`) while disk reads stay minimal.
 
 ## Switching paths
 
-Three paths converge on one resolver:
+Two built-in paths converge on one resolver, with one optional helper retained
+for explicit consumers:
 
 1. **`/mode <name|preset>`** — interactive command. Sets the active mode
    for the current session (ephemeral override over the config default).
@@ -187,12 +188,13 @@ Three paths converge on one resolver:
    effective preset name when one applies, and the composed axes summary
    `base:… • agency:… • quality:… • scope:…` plus any `+modifier`s; a broken
    active mode degrades to an `(unresolvable — …)` line) and the **available
-   presets** (the sorted `presets.json` names). With a **`<preset>`** argument
-   `/mode` sets the session override and confirms via a toast (`mode set to
-   "<name>"`); an unknown preset / missing fragment surfaces the resolver's
-   error as an error toast and leaves the prior override intact. **`/mode off`**
-   clears the override and toasts the new effective state (the config default,
-   or unset).
+   presets** (the sorted `presets.json` names plus the virtual `none` mode).
+   With a **`<preset>`** argument `/mode` sets the session override and confirms
+   via a toast (`mode set to "<name>"`); an unknown preset / missing fragment
+   surfaces the resolver's error as an error toast and leaves the prior override
+   intact. **`/mode none`** is a virtual no-mode override: it wins over config
+   default and injects no mode fragments. **`/mode off`** clears the override and
+   toasts the new effective state (the config default, or unset).
 2. **Config default** — a `defaultMode` key in the plugin-owned
    `pi-model-modes.json`, read from `~/.pi/agent/pi-model-modes.json` (global)
    and `<cwd>/.pi/pi-model-modes.json` (project), shallow-merged with the
@@ -200,12 +202,10 @@ Three paths converge on one resolver:
    which has no plugin namespace.) Seeded into the resolver's default tier at
    `session_start`; an invalid value warns and is skipped (never crashes the
    session). Persists across sessions unless overridden.
-3. **Keybinding** — cycles forward (and shifted, backward) through the
-   sorted preset list, relative to the current effective mode (from unset it
-   enters at the first preset going forward, the last going backward). Each hit
-   sets the session override and toasts `mode: <name>`. The default binding is
-   **Ctrl+M** forward / **Shift+Ctrl+M** backward, user-rebindable via
-   `~/.pi/agent/keybindings.json`.
+3. **Optional keybinding helper** — `src/keybinding.ts` retains a tested helper
+   that can register cycle shortcuts for explicit consumers. The package factory
+   does not call it, because `Ctrl+M` is encoded like Enter in legacy terminal
+   input and package-level default shortcuts can interfere with normal entry.
 
 Resolution precedence: session override (`/mode`) > config default > unset.
 The resolver holds this as two distinct tiers (override + default); the
@@ -234,8 +234,5 @@ state, not written to disk). A new session restarts from the config default.
   MISS off live `ctx.model`; the model-switch test in `tests/handler.test.ts`
   proves the line updates on the next MISS. The cache key includes
   `model.id`/`model.provider`, so a model switch forces a MISS and re-derive.
-- **Default cycle keybinding:** Resolved — **Ctrl+M** forward / **Shift+Ctrl+M**
-  backward is the chosen default (registered via pi's `registerShortcut` with
-  the `"ctrl+m"` / `"ctrl+shift+m"` KeyId strings), and it is user-rebindable via
-  `~/.pi/agent/keybindings.json`, so any collision with a user's keymap is
-  resolved by rebinding rather than a fixed binding.
+- **Default cycle keybinding:** Resolved — no default shortcut is registered.
+  `Ctrl+M` is not safe in terminal input because it collides with Enter.

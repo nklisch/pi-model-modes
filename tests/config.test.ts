@@ -50,7 +50,7 @@ function writeRaw(path: string, text: string): void {
   writeFileSync(path, text, "utf8");
 }
 
-/** Build a fragment fixture covering the shipped "default"/"flow" presets. */
+/** Build a fragment fixture covering the shipped "extend" preset. */
 function buildFragments(): void {
   const root = mkdtempSync(join(tmpdir(), "config-frag-"));
   fragRoot = root;
@@ -98,19 +98,19 @@ describe("loadPluginConfig — merge + tolerance", () => {
   it("project only", () => {
     const d = freshDir();
     const project = join(d, "project.json");
-    writeJson(project, { defaultMode: "default" });
+    writeJson(project, { defaultMode: "extend" });
     setConfigPathsForTesting({
       global: join(d, "missing-global.json"),
       project,
     });
-    expect(loadPluginConfig("/unused")).toEqual({ defaultMode: "default" });
+    expect(loadPluginConfig("/unused")).toEqual({ defaultMode: "extend" });
   });
 
   it("project overrides global (shallow merge, project wins)", () => {
     const d = freshDir();
     const global = join(d, "global.json");
     const project = join(d, "project.json");
-    writeJson(global, { defaultMode: "default" });
+    writeJson(global, { defaultMode: "extend" });
     writeJson(project, { defaultMode: "flow" });
     setConfigPathsForTesting({ global, project });
     expect(loadPluginConfig("/unused")).toEqual({ defaultMode: "flow" });
@@ -157,7 +157,7 @@ describe("applyDefaultFromConfig — seeding", () => {
     buildFragments();
     const d = freshDir();
     const global = join(d, "global.json");
-    writeJson(global, { defaultMode: "default" });
+    writeJson(global, { defaultMode: "extend" });
     setConfigPathsForTesting({
       global,
       project: join(d, "missing-project.json"),
@@ -165,7 +165,7 @@ describe("applyDefaultFromConfig — seeding", () => {
 
     applyDefaultFromConfig("/unused");
 
-    expect(getDefaultMode()).toBe("default");
+    expect(getDefaultMode()).toBe("extend");
     expect(getEffectiveModeSource()).toBe("default");
     expect(resolveActiveModePlan().mode?.agency).toBe("autonomous");
   });
@@ -209,12 +209,12 @@ describe("applyDefaultFromConfig — seeding", () => {
     const d = freshDir();
     const withDefault = join(d, "with.json");
     const without = join(d, "without.json");
-    writeJson(withDefault, { defaultMode: "default" });
+    writeJson(withDefault, { defaultMode: "extend" });
     writeJson(without, {});
 
     setConfigPathsForTesting({ global: withDefault, project: join(d, "missing.json") });
     applyDefaultFromConfig("/unused");
-    expect(getDefaultMode()).toBe("default"); // seeded
+    expect(getDefaultMode()).toBe("extend"); // seeded
 
     // Reseed with a config that has no defaultMode → prior default cleared.
     setConfigPathsForTesting({ global: without, project: join(d, "missing.json") });
@@ -228,13 +228,13 @@ describe("applyDefaultFromConfig — seeding", () => {
     const d = freshDir();
     const good = join(d, "good.json");
     const bad = join(d, "bad.json");
-    writeJson(good, { defaultMode: "default" });
+    writeJson(good, { defaultMode: "extend" });
     writeJson(bad, { defaultMode: "no-such-preset" });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     setConfigPathsForTesting({ global: good, project: join(d, "missing.json") });
     applyDefaultFromConfig("/unused");
-    expect(getDefaultMode()).toBe("default");
+    expect(getDefaultMode()).toBe("extend");
 
     setConfigPathsForTesting({ global: bad, project: join(d, "missing.json") });
     applyDefaultFromConfig("/unused");
@@ -295,10 +295,10 @@ describe("applySessionStart — ephemeral override clearing", () => {
     buildFragments();
     const d = freshDir();
     const global = join(d, "global.json");
-    writeJson(global, { defaultMode: "default" });
+    writeJson(global, { defaultMode: "extend" });
     setConfigPathsForTesting({ global, project: join(d, "missing.json") });
 
     applySessionStart("reload", "/unused");
-    expect(getDefaultMode()).toBe("default"); // default seeded from config
+    expect(getDefaultMode()).toBe("extend"); // default seeded from config
   });
 });

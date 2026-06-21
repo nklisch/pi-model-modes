@@ -49,16 +49,16 @@ function write(root: string, rel: string, content: string): void {
   writeFileSync(abs, content, "utf8");
 }
 
-/** Build a fixture covering the `safe` + `default` presets' fragments so those
+/** Build a fixture covering the `safe` + `extend` presets' fragments so those
  *  real presets resolve through the loader. */
 function buildFixture(): string {
   const root = freshRoot();
   write(root, "axis/agency/autonomous.md", "AGENCY-autonomous");
-  write(root, "axis/agency/surgical.md", "AGENCY-surgical");
+  write(root, "axis/agency/collaborative.md", "AGENCY-collaborative");
   write(root, "axis/quality/pragmatic.md", "QUALITY-pragmatic");
+  write(root, "axis/quality/minimal.md", "QUALITY-minimal");
   write(root, "axis/scope/adjacent.md", "SCOPE-adjacent");
   write(root, "axis/scope/narrow.md", "SCOPE-narrow");
-  write(root, "modifiers/readonly.md", "MOD-readonly");
   write(root, "base.json", JSON.stringify({ overlays: [] }));
   return root;
 }
@@ -172,7 +172,7 @@ describe("/mode (no arg) — listing", () => {
     const sent = calls.find((c) => c.method === "sendMessage");
     const msg = sent!.args[0] as { content: string };
     expect(msg.content).toContain("safe (default)");
-    expect(msg.content).toContain("agency:surgical");
+    expect(msg.content).toContain("agency:collaborative");
   });
 });
 
@@ -187,6 +187,18 @@ describe("/mode <preset> — set override", () => {
     expect(getActiveMode()).toBe("safe");
     expect(getEffectiveModeSource()).toBe("override");
     expect(notifies).toEqual([{ message: 'mode set to "safe"', type: "info" }]);
+  });
+
+  it("sets the virtual none override without requiring fragments", async () => {
+    buildFixture();
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx();
+
+    await handler("none", ctx);
+
+    expect(getActiveMode()).toBe("none");
+    expect(getEffectiveModeSource()).toBe("override");
+    expect(notifies).toEqual([{ message: 'mode set to "none"', type: "info" }]);
   });
 });
 

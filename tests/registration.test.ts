@@ -2,10 +2,6 @@ import { describe, it, expect } from "vitest";
 import factory from "../extensions/index.js";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { MODE_COMMAND, MODE_INSPECT_COMMAND } from "../src/commands.js";
-import {
-  CYCLE_FORWARD_KEY,
-  CYCLE_BACKWARD_KEY,
-} from "../src/keybinding.js";
 import { makePi } from "./harness.js";
 
 /**
@@ -61,31 +57,21 @@ describe("factory registration wiring", () => {
       .sort();
     expect(events).toEqual(["before_agent_start", "session_start"]);
 
-    // Nothing beyond the `on` registrations, the two commands, and the two
-    // cycle shortcuts (no tools, flags, renderers, providers, no emit at
-    // registration).
+    // Nothing beyond the `on` registrations and the two commands (no automatic
+    // shortcuts, tools, flags, renderers, providers, no emit at registration).
     const unexpected = calls.filter(
       (c) =>
         c.method !== "on" &&
-        c.method !== "registerCommand" &&
-        c.method !== "registerShortcut",
+        c.method !== "registerCommand",
     );
     expect(unexpected).toHaveLength(0);
   });
 
-  it("registers the two mode-cycle shortcuts with handlers", () => {
+  it("does not auto-register mode-cycle shortcuts", () => {
     const { pi, calls } = makePi();
     factory(pi);
 
     const shortcuts = calls.filter((c) => c.method === "registerShortcut");
-    expect(shortcuts).toHaveLength(2);
-
-    const keys = shortcuts.map((c) => c.args[0]).sort();
-    expect(keys).toEqual([CYCLE_FORWARD_KEY, CYCLE_BACKWARD_KEY].sort());
-
-    for (const sc of shortcuts) {
-      const options = sc.args[1] as { handler: unknown };
-      expect(typeof options.handler).toBe("function");
-    }
+    expect(shortcuts).toHaveLength(0);
   });
 });
