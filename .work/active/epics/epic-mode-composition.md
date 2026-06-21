@@ -68,3 +68,27 @@ starter set of fragments (one per type) sufficient to test the engine.
 
 <!-- The design pass on each child feature fills in real specifics.
 Do not treat these as commitments. -->
+
+## Design decisions
+
+- **mode.signature composition**: Content-hash, not name-only. The cache key
+  hashes the CONTENT of the selected fragments (plus `model.id`,
+  `model.provider`, and `hash(e.systemPrompt)`). Editing a fragment `.md`
+  takes effect on the next turn within the same session — no `/reload` or
+  restart needed. Still deterministic and cache-stable: fragment contents do
+  not change between turns unless edited, so Invariant 2 (byte-identical
+  across no-change turns) holds.
+- **Fragment layout and discovery**: Hybrid. Axes (`agency`/`quality`/`scope`)
+  and `modifiers/` are discovered by directory convention — drop a `.md` in
+  `axis/agency/` and it is a new selectable value, no code change. `base/`
+  keeps an ordered manifest (`base.json`) because slot order is load-bearing
+  for deterministic splicing. Matches pi's convention-directory philosophy
+  (packages.md) and the reference plugin's approach.
+- **Discovery invalidation**: Because the cache key hashes fragment CONTENT,
+  newly-added or edited fragment files are picked up automatically when their
+  hash changes — the module-scope fragment-file cache and the per-turn result
+  cache stay consistent without explicit registration.
+- **Cache stability preserved**: Ordered-array assembly only (no `Set`
+  iteration, no unordered object keys). Convention discovery yields
+  deterministic file orderings (sorted by filename) so the splice is
+  reproducible across turns; the base manifest pins base ordering explicitly.
