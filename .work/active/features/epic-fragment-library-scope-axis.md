@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-scope-axis
 kind: feature
-stage: review
+stage: done
 tags: [prose]
 parent: epic-fragment-library
 depends_on: []
@@ -75,3 +75,15 @@ authored state. The quality/modifiers/overlay assertions and the total-count lin
 are owned by sibling content features landing in parallel and were reconciled by
 their owners — not weakened here. My commit is race-scoped to the three fragment
 files plus this feature item and deliberately excludes the co-owned test file.
+
+## Review record
+
+**Verdict: Approve** — [prose] content feature, fresh-context content review.
+
+A fresh-context reviewer verified the authored fragments against the locked
+constraints: no leaked Claude-Code framing (whole-tree grep clean), no dynamic
+text / timestamps / counters, no tool/identity/context restatement, value names
+match the SPEC sets exactly, and (for base-overlays) the overlays are genuinely
+thin tone-setters with a coherent base.json. The fragments load via the
+convention discovery and the real-root starter-set sanity test asserts the full
+24-fragment catalog. 199 tests green. Advanced review → done.

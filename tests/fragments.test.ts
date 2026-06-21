@@ -264,9 +264,8 @@ describe("reset isolation", () => {
 
 describe("starter-set sanity (real package root, no override)", () => {
   it("each axis exposes its expected value names", () => {
-    // No override — exercise the shipped prompts/ tree.
-    // agency and scope are fully authored (filename-sorted ascending); quality is
-    // still at its minimal starter (one value).
+    // No override — exercise the shipped prompts/ tree. All three axes are now
+    // fully authored (filename-sorted ascending).
     expect(discoverAxis("agency").map((p) => basename(p, ".md"))).toEqual([
       "autonomous",
       "collaborative",

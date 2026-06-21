@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-base-overlays
 kind: feature
-stage: review
+stage: done
 tags: [prose]
 parent: epic-fragment-library
 depends_on: []
@@ -68,3 +68,15 @@ No dynamic text/timestamps; the splice stays byte-stable. Reconciled the
 `tests/fragments.test.ts` starter-set sanity case: the stale single-`pi-direct`
 base-overlay assertion now asserts the shipped trio in manifest order (chill,
 flow, pi-direct). `npm test` green (199 passed).
+
+## Review record
+
+**Verdict: Approve** — [prose] content feature, fresh-context content review.
+
+A fresh-context reviewer verified the authored fragments against the locked
+constraints: no leaked Claude-Code framing (whole-tree grep clean), no dynamic
+text / timestamps / counters, no tool/identity/context restatement, value names
+match the SPEC sets exactly, and (for base-overlays) the overlays are genuinely
+thin tone-setters with a coherent base.json. The fragments load via the
+convention discovery and the real-root starter-set sanity test asserts the full
+24-fragment catalog. 199 tests green. Advanced review → done.
