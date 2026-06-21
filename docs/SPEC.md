@@ -12,7 +12,8 @@ pi-model-modes is a pi extension package (`pi-package`), installed via
   prompt per turn.
 - A `/mode` command family for interactive mode selection.
 - A keybinding that cycles modes.
-- A config key for a session default mode.
+- A `session_start` handler that seeds the default mode from plugin-owned
+  config (`pi-model-modes.json`, global + project merged).
 
 No subprocess is spawned. No pi internals are monkey-patched. The plugin
 operates entirely through the public `ExtensionAPI`.
@@ -178,18 +179,26 @@ Three paths converge on one resolver:
    for the current session (ephemeral override over the config default).
    `/mode` with no argument shows the current mode and available presets.
    `/mode off` clears the override (falls back to config default or unset).
-2. **Config default** — `mode` key in `~/.pi/agent/settings.json` or
-   `.pi/settings.json`. Persists across sessions unless overridden.
+2. **Config default** — a `defaultMode` key in the plugin-owned
+   `pi-model-modes.json`, read from `~/.pi/agent/pi-model-modes.json` (global)
+   and `<cwd>/.pi/pi-model-modes.json` (project), shallow-merged with the
+   project file winning. (Plugin-owned config, NOT pi's closed `settings.json`,
+   which has no plugin namespace.) Seeded into the resolver's default tier at
+   `session_start`; an invalid value warns and is skipped (never crashes the
+   session). Persists across sessions unless overridden.
 3. **Keybinding** — cycles forward (and shifted, backward) through the
    preset list. Default binding is chosen at implementation time to avoid
    collisions (Ctrl+M is the candidate; verify against the user's
    keymap).
 
 Resolution precedence: session override (`/mode`) > config default > unset.
+The resolver holds this as two distinct tiers (override + default); the
+effective mode is `override ?? default ?? unset`. `/mode off` clears only the
+override tier, so resolution falls back to the config default (not to unset).
 
-Mode-state persistence model: config default is durable; the session
-override is ephemeral (lives in module state, not written to disk). A new
-session restarts from the config default.
+Mode-state persistence model: config default is durable (file-backed in
+`pi-model-modes.json`); the session override is ephemeral (lives in module
+state, not written to disk). A new session restarts from the config default.
 
 ## Out of scope for v1
 

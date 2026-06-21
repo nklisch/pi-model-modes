@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { registerModeInspectCommand } from "../src/commands.js";
+import { applyDefaultFromConfig } from "../src/config.js";
 
 /**
  * pi extension entry. The default export is the factory pi discovers and
@@ -14,6 +15,9 @@ import { registerModeInspectCommand } from "../src/commands.js";
  *   - `/mode:inspect` → registered via `registerModeInspectCommand` (the
  *     plain-text status panel from `src/commands.ts` that reads the change
  *     signal + current identity).
+ *   - `session_start` → `applyDefaultFromConfig(ctx.cwd)` (seeds the DEFAULT
+ *     mode tier from the plugin-owned config — global + project `pi-model-modes.json`
+ *     merged — on every session reason: startup/reload/new/resume/fork).
  *
  * Downstream epics extend this factory (register `/mode`, keybindings, etc.)
  * by adding more `pi.on(...)` / `pi.registerCommand(...)` calls — edit, don't
@@ -27,4 +31,5 @@ import { registerModeInspectCommand } from "../src/commands.js";
 export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", handleBeforeAgentStart);
   registerModeInspectCommand(pi);
+  pi.on("session_start", (_e, ctx) => applyDefaultFromConfig(ctx.cwd));
 }

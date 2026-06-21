@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-config-default
 kind: feature
-stage: implementing
+stage: review
 tags: []
 parent: epic-switching-paths
 depends_on: []
@@ -168,3 +168,62 @@ override>default>unset; override ephemeral, default durable. ARCHITECTURE
 - **session_start `reason`** ("startup"/"reload"/"new"/"resume"/"fork"): seed on all
   reasons (the default should apply to every fresh/resumed session) — simplest and
   correct; no reason-gating for v1.
+
+## Implementation notes
+
+Landed all 5 units exactly per the design.
+
+- **Unit 1 — `src/resolver.ts` (additive two-tier state).** Added
+  `let defaultSpec: ModeSpec | undefined` beside the existing `activeSpec`
+  (the OVERRIDE). New exports: `setDefaultMode` (validate-by-materialize-before-assign
+  + clone-on-set, mirroring `setActiveMode`), `getDefaultMode` (clone-on-read),
+  `clearDefaultMode`, `getEffectiveModeSource()` (override→"override", else
+  default→"default", else "unset"). `resolveActiveModePlan()` now resolves
+  `const spec = activeSpec ?? defaultSpec` → no-mode fast-path if undefined, else
+  `materializePlan(normalize(spec))`. `resetResolverForTesting()` clears BOTH
+  tiers. `setActiveMode`/`getActiveMode`/`clearActiveMode` keep their names +
+  semantics as the OVERRIDE API (override-only ⇒ effective = override), so the
+  existing `tests/resolver.test.ts` passes unchanged. Module JSDoc updated to
+  describe the two tiers + precedence.
+- **Unit 2 — `src/config.ts` (new).** `PluginConfig { defaultMode? }`;
+  `loadPluginConfig(cwd)` reads global `~/.pi/agent/pi-model-modes.json` +
+  project `<cwd>/.pi/pi-model-modes.json` via `readFileSync`+`JSON.parse` in
+  try/catch (ENOENT → `{}`; parse error / non-object → `console.warn` + `{}`),
+  shallow-merging project over global. `applyDefaultFromConfig(cwd)` seeds the
+  default tier via `setDefaultMode` wrapped in try/catch (invalid default →
+  `console.warn`, no throw — `session_start` can never crash). Test seam:
+  `setConfigPathsForTesting({ global?, project? })` + `resetConfigForTesting()`.
+  node: builtins throughout.
+- **Unit 3 — `extensions/index.ts`.** Added
+  `pi.on("session_start", (_e, ctx) => applyDefaultFromConfig(ctx.cwd))`
+  (additive, alongside the existing handler + command). Doc-comment updated.
+  Grounded against pi's types: the `on("session_start", …)` overload and
+  `ExtensionContext.cwd` both exist.
+- **Unit 4 — docs roll-forward.** SPEC "Switching paths" now describes the
+  plugin-owned `pi-model-modes.json` (global `~/.pi/agent` + project `.pi`,
+  merged, project wins), NOT `settings.json`; the two-tier override>default>unset
+  precedence with `/mode off` falling back to the default; the Extension-model
+  bullet now names the `session_start` config-seed. ARCHITECTURE "Components"
+  adds `src/config.ts` + a two-tier-state note; the test listing adds
+  `config.test.ts` / `resolver-tiers.test.ts` (and the pre-existing
+  `resolver.test.ts`).
+- **Unit 5 — tests.** `tests/resolver-tiers.test.ts` (effective-mode source;
+  override ?? default precedence; `clearActiveMode` falls back to default;
+  clone/clear/reset of the default tier; bad default throws at `setDefaultMode`
+  with state intact). `tests/config.test.ts` (global-only / project-only /
+  project-overrides-global / both-missing→{} / malformed→warn+{} / array→warn+{};
+  `applyDefaultFromConfig` seeds a valid default, no-ops absent `defaultMode`,
+  warns+skips an invalid default without throwing — via the path seam + temp
+  files + a fragment fixture).
+
+**Registration test update (necessary, in-scope):** `tests/registration.test.ts`
+asserted exactly one `pi.on` registration as the "single registration surface"
+contract. Unit 3 legitimately adds the `session_start` `on` call, so the test was
+rolled forward: it now asserts `before_agent_start` is registered once by
+reference AND `session_start` is registered once (added coverage, not weakened),
+and the `on` event set is exactly `[before_agent_start, session_start]`.
+
+**Verification.** `npm run typecheck` clean. `npm test` → **197 passed** (16
+files), up from 178 (added 19 across the two new test files). The pre-existing
+`tests/resolver.test.ts` (override-only seam) passes unchanged. No real bugs
+surfaced; no design deviations.

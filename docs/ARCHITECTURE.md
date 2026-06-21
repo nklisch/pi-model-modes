@@ -8,10 +8,11 @@ How pi-model-modes is put together and what happens each turn.
 pi-model-modes/
 ├─ package.json              pi-package manifest: pi { extensions, prompts }
 ├─ extensions/
-│   └─ index.ts              default export: registers handler, /mode, keybinding
+│   └─ index.ts              default export: registers handler, /mode, keybinding, session_start
 ├─ src/
 │   ├─ handler.ts            before_agent_start entry — orchestrates the transform
-│   ├─ resolver.ts           mode resolution: override > config default > unset
+│   ├─ resolver.ts           mode resolution: two tiers (override > default), effective = override ?? default ?? unset
+│   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds the default tier
 │   ├─ assemble.ts           identity derivation + fragment splice
 │   ├─ cache.ts              cache key, lastKey/lastResult, change signal
 │   ├─ fragments.ts          fragment loader (reads prompts/, caches in module scope)
@@ -33,16 +34,29 @@ pi-model-modes/
     ├─ cache-stability.test.ts
     ├─ clean-base.test.ts
     ├─ commands.test.ts
+    ├─ config.test.ts
     ├─ handler.test.ts
     ├─ identity.test.ts
     ├─ noop.test.ts
-    └─ registration.test.ts
+    ├─ registration.test.ts
+    ├─ resolver.test.ts
+    └─ resolver-tiers.test.ts
 ```
 
 `extensions/index.ts` is the single registration surface. It wires the
-handler, the command, and the keybinding to pi's `ExtensionAPI`. Everything
-else is plain modules with no pi coupling except through typed interfaces —
-which keeps the logic unit-testable without spinning up pi.
+handler, the command, the keybinding, and the `session_start` config-seed to
+pi's `ExtensionAPI`. Everything else is plain modules with no pi coupling
+except through typed interfaces — which keeps the logic unit-testable without
+spinning up pi.
+
+**Two-tier mode state.** `resolver.ts` holds the effective selection as two
+distinct tiers: an ephemeral OVERRIDE (`/mode`, set via `setActiveMode` /
+cleared via `clearActiveMode`) layered over a durable DEFAULT (config-seeded
+via `setDefaultMode`). The per-turn resolve materializes `override ?? default`,
+falling back to no-mode when both are unset; `getEffectiveModeSource()` reports
+which tier won. `config.ts` reads the merged plugin config and seeds the
+default tier at `session_start` (`applyDefaultFromConfig`), tolerating missing
+or invalid config without crashing.
 
 ## Per-turn data flow
 

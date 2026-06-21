@@ -33,11 +33,19 @@ import { NO_MODE_SIGNATURE } from "./cache.js";
  * Model id/provider and the base system prompt are EXCLUDED here too; the
  * handler composes those in `computeCacheKey`.
  *
- * Pure module (Node builtins + the preset/fragment layers only). The internal
- * active-mode state is the minimal non-user-facing seam: `epic-switching-paths`
- * later layers precedence (override > config default > unset) on top of it.
+ * Pure module (Node builtins + the preset/fragment layers only). The mode state
+ * is TWO-TIER (precedence override > default > unset):
+ *   - the OVERRIDE tier (`activeSpec`, set via `setActiveMode`/`clearActiveMode`)
+ *     is the ephemeral session selection driven by `/mode`,
+ *   - the DEFAULT tier (`defaultSpec`, set via `setDefaultMode`) is the durable
+ *     config-seeded baseline applied at `session_start`.
+ * The EFFECTIVE mode resolved per turn is `override ?? default ?? unset`, so
+ * `clearActiveMode()` (= `/mode off`) falls back to the default, not to unset.
+ * `getEffectiveModeSource()` reports which tier won. Both tiers validate by
+ * materialize-before-assign and clone object specs on set/read.
  *
- * Design: `.work/active/features/epic-mode-composition-mode-resolver.md`.
+ * Design: `.work/active/features/epic-mode-composition-mode-resolver.md`
+ *   + `.work/active/features/epic-switching-paths-config-default.md`.
  */
 
 /** Which slot a planned fragment fills, in canonical splice order. */
@@ -71,8 +79,13 @@ interface SigEntry {
   hash: string;
 }
 
-// --- internal active-mode state (switching-paths drives this seam later) -----
+// --- internal mode state: two tiers (override > default > unset) -------------
+// The OVERRIDE tier — the ephemeral session selection (`/mode`). When set it
+// wins over the default.
 let activeSpec: ModeSpec | undefined;
+// The DEFAULT tier — the durable config-seeded baseline (`session_start`).
+// Applies when no override is set.
+let defaultSpec: ModeSpec | undefined;
 
 // --- internal helpers --------------------------------------------------------
 
@@ -221,26 +234,83 @@ export function getActiveMode(): ModeSpec | undefined {
   return { ...activeSpec, modifiers: [...activeSpec.modifiers] };
 }
 
-/** Clear the active mode (equivalent to `setActiveMode(undefined)`). */
+/** Clear the active mode = the OVERRIDE tier (equivalent to
+ *  `setActiveMode(undefined)`). The effective mode falls back to the default
+ *  tier (or unset if no default). This is `/mode off`. */
 export function clearActiveMode(): void {
   activeSpec = undefined;
 }
 
 /**
- * Materialize the active mode into a `ModePlan`. Fast-paths no-mode: when unset,
- * returns `{ mode: undefined, signature: NO_MODE_SIGNATURE, fragments: [] }`
- * with ZERO discovery/load work. Otherwise re-materializes + re-hashes (honoring
- * live fragment edits via the loader's mtime cache). THROWS on missing/ambiguous
+ * Set the DEFAULT mode (the durable, config-seeded baseline). Same discipline
+ * as `setActiveMode`: validates by fully materializing once (throws on unknown
+ * preset / missing fragment / bad axis value / ambiguous match) BEFORE
+ * assignment, so a bad default never becomes the default and prior state is
+ * intact on throw. Explicit `ResolvedMode` specs are stored as the CLONED
+ * normalized object; string specs are stored as-is. `undefined` clears it.
+ */
+export function setDefaultMode(spec: ModeSpec | undefined): void {
+  if (spec === undefined) {
+    defaultSpec = undefined;
+    return;
+  }
+  const normalized = normalize(spec);
+  // Validate by materializing — throws on failure, leaving defaultSpec intact.
+  materializePlan(normalized);
+  defaultSpec = typeof spec === "string" ? spec : normalized;
+}
+
+/**
+ * The current DEFAULT-tier mode spec, or `undefined` when no default is set.
+ * Object (`ResolvedMode`) specs are returned as a CLONE (fresh `modifiers`
+ * array too); string specs are returned as-is. Mirrors `getActiveMode`.
+ */
+export function getDefaultMode(): ModeSpec | undefined {
+  if (defaultSpec === undefined || typeof defaultSpec === "string") {
+    return defaultSpec;
+  }
+  return { ...defaultSpec, modifiers: [...defaultSpec.modifiers] };
+}
+
+/** Clear the DEFAULT mode (equivalent to `setDefaultMode(undefined)`). */
+export function clearDefaultMode(): void {
+  defaultSpec = undefined;
+}
+
+/**
+ * Which tier supplies the EFFECTIVE mode: `"override"` when a session override
+ * is set, else `"default"` when a config default is set, else `"unset"`.
+ * Surfaces (the `/mode` no-arg display, keybinding cycle start, `/mode:inspect`)
+ * read this to report *why* the current mode is what it is.
+ */
+export function getEffectiveModeSource(): "override" | "default" | "unset" {
+  if (activeSpec !== undefined) {
+    return "override";
+  }
+  if (defaultSpec !== undefined) {
+    return "default";
+  }
+  return "unset";
+}
+
+/**
+ * Materialize the EFFECTIVE mode (`override ?? default ?? unset`) into a
+ * `ModePlan`. Fast-paths no-mode: when neither tier is set, returns
+ * `{ mode: undefined, signature: NO_MODE_SIGNATURE, fragments: [] }` with ZERO
+ * discovery/load work. Otherwise re-materializes + re-hashes (honoring live
+ * fragment edits via the loader's mtime cache). THROWS on missing/ambiguous
  * fragments — resolve-time is the integrity gate (files can change after set).
  */
 export function resolveActiveModePlan(): ModePlan {
-  if (activeSpec === undefined) {
+  const spec = activeSpec ?? defaultSpec;
+  if (spec === undefined) {
     return { mode: undefined, signature: NO_MODE_SIGNATURE, fragments: [] };
   }
-  return materializePlan(normalize(activeSpec));
+  return materializePlan(normalize(spec));
 }
 
-/** TEST-ONLY: clear active-mode state. */
+/** TEST-ONLY: clear BOTH tiers of mode state (override + default). */
 export function resetResolverForTesting(): void {
   activeSpec = undefined;
+  defaultSpec = undefined;
 }

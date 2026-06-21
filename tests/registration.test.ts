@@ -7,16 +7,19 @@ import { makePi } from "./harness.js";
 /**
  * Registration wiring — the factory registers the `before_agent_start` handler
  * exactly once, by reference (the same function object the unit tests import),
- * and registers the `/mode:inspect` command exactly once. Proves the "single
- * registration surface" property from ARCHITECTURE.md: the factory wires the
- * handler and the command, and nothing more.
+ * the `session_start` config-seed once, and the `/mode:inspect` command once.
+ * Proves the "single registration surface" property from ARCHITECTURE.md: the
+ * factory wires the handler, the session-start seed, and the command, and
+ * nothing more.
  */
 describe("factory registration wiring", () => {
   it("registers before_agent_start by reference exactly once", () => {
     const { pi, calls } = makePi();
     factory(pi);
 
-    const registrations = calls.filter((c) => c.method === "on");
+    const registrations = calls.filter(
+      (c) => c.method === "on" && c.args[0] === "before_agent_start",
+    );
     expect(registrations).toHaveLength(1);
 
     const [call] = registrations;
@@ -24,6 +27,17 @@ describe("factory registration wiring", () => {
     // Registered by reference: the registered handler IS the same function
     // object the unit tests import (not an inline arrow).
     expect(call.args[1]).toBe(handleBeforeAgentStart);
+  });
+
+  it("registers a session_start handler exactly once", () => {
+    const { pi, calls } = makePi();
+    factory(pi);
+
+    const registrations = calls.filter(
+      (c) => c.method === "on" && c.args[0] === "session_start",
+    );
+    expect(registrations).toHaveLength(1);
+    expect(typeof registrations[0].args[1]).toBe("function");
   });
 
   it("registers the /mode:inspect command exactly once and nothing else", () => {
@@ -34,7 +48,14 @@ describe("factory registration wiring", () => {
     expect(commands).toHaveLength(1);
     expect(commands[0].args[0]).toBe(MODE_INSPECT_COMMAND);
 
-    // Nothing beyond the handler `on` and the inspect command (no tools,
+    // The only `on` registrations are before_agent_start + session_start.
+    const events = calls
+      .filter((c) => c.method === "on")
+      .map((c) => c.args[0])
+      .sort();
+    expect(events).toEqual(["before_agent_start", "session_start"]);
+
+    // Nothing beyond the `on` registrations and the inspect command (no tools,
     // shortcuts, flags, renderers, providers, and no emit at registration).
     const unexpected = calls.filter(
       (c) => c.method !== "on" && c.method !== "registerCommand",
