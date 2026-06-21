@@ -1,7 +1,7 @@
 ---
 id: epic-scaffold-handler
 kind: epic
-stage: drafting
+stage: implementing
 tags: [tests]
 parent: null
 depends_on: []
@@ -47,17 +47,45 @@ loading, or any user-facing command. It is pure integration scaffolding.
 - `docs/VISION.md` — "What this is not" (pure in-process extension, no
   subprocess).
 
-## Anticipated child features
+## Decomposition
 
-- `feature-package-skeleton` — `package.json` with `pi` manifest, TypeScript
-  config, the `extensions/index.ts` default export that registers the handler.
-- `feature-noop-handler` — the `before_agent_start` handler returning
-  `{ systemPrompt: e.systemPrompt }`; the test harness asserting byte-equality.
-- `feature-clean-base-discipline` — a test proving the handler never mutates
-  or caches `e.systemPrompt` as "previous output" (the seed of Invariant 1).
+Split by capability: the skeleton ("can pi discover and load this package?")
+and the handler discipline ("does it correctly no-op and never cache?") are
+distinct test surfaces with a clean producer/consumer seam — the skeleton
+produces the loadable package, the entry-point factory signature, and the
+`@earendil-works/pi-coding-agent` + `typebox` peer-dep type surface; the
+handler feature consumes that factory to register the `before_agent_start`
+hook. The provisional third candidate (`feature-clean-base-discipline`) was
+collapsed into the handler feature: at this scaffolding stage the clean-base
+discipline is a property of the same no-op handler that owns the
+Invariant-3 byte-equality test (one handler, one harness, both invariant
+assertions), so a standalone 1-2 unit feature would slice too thin.
 
-<!-- The design pass on each child feature fills in real specifics.
-Do not treat these as commitments. -->
+### Child features
+
+- `epic-scaffold-handler-package-skeleton` — `package.json` with `pi`
+  manifest, tsconfig, `extensions/index.ts` default-export factory shell,
+  peer-dep declarations; proves pi discovers and loads the package — depends
+  on: `[]`
+- `epic-scaffold-handler-noop-handler` — the `before_agent_start` handler
+  always returning `{ systemPrompt: e.systemPrompt }`; the synthetic-event
+  test harness; Invariant-3 byte-equality and Invariant-1 clean-base
+  discipline tests — depends on:
+  `[epic-scaffold-handler-package-skeleton]`
+
+### Decomposition risks
+
+- **Co-owned file `extensions/index.ts`.** The skeleton feature creates the
+  factory; the handler feature extends its body to register the hook. Two
+  sequential features touch one file. Mitigation: the handler feature's
+  brief flags this (edit, don't overwrite), and the linear `depends_on`
+  edge serializes them so no merge conflict is possible.
+- **Manifest correctness gates everything downstream.** The package-skeleton
+  manifest shape (pi key, `keywords: ["pi-package"]`, peer-dep ranges) must
+  be exactly right or pi won't load the extension — and no sibling epic can
+  register anything until it loads. Mitigation: the skeleton feature's brief
+  carries the exact pi-discovery constraints so its design pass inherits
+  them rather than rediscovering them.
 
 ## Design decisions
 
