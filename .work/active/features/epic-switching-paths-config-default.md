@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-config-default
 kind: feature
-stage: drafting
+stage: implementing
 tags: []
 parent: epic-switching-paths
 depends_on: []
@@ -62,3 +62,109 @@ they manipulate.
 - **Effective-mode state layer** (codex advisory): distinct default vs override so
   `/mode off` falls back to the default, not to unset. Expose the effective spec +
   its source.
+
+## Design decisions (resolved during feature-design)
+
+Resolved under autopilot (scope `--all`). Implementation tier: OPUS. The decisive
+architecture (default/override tiers) was set by the epic's codex decomposition
+advisory; grounded against pi's APIs below. Cross-model advisory at IMPLEMENTATION
+review.
+
+- **Two-tier mode state in the resolver** (codex). `src/resolver.ts` gains a
+  `defaultSpec` tier alongside the existing active spec (now the **override**).
+  Effective = `override ?? default ?? unset`. `resolveActiveModePlan()` resolves
+  the effective spec; `setActiveMode`/`getActiveMode`/`clearActiveMode` keep their
+  meaning as the OVERRIDE API (existing tests pass unchanged — override-only →
+  effective = override). New: `setDefaultMode(spec)` (validated like the override),
+  `getDefaultMode()`, `clearDefaultMode()`, `getEffectiveModeSource(): "override" |
+  "default" | "unset"`. `resetResolverForTesting()` clears BOTH tiers. So
+  `/mode off` = `clearActiveMode()` → effective falls back to the default (not unset).
+- **Plugin-owned config** (`src/config.ts`). `loadPluginConfig(cwd)` reads global
+  `~/.pi/agent/pi-model-modes.json` (`join(homedir(), ".pi", "agent", ...)`) and
+  project `<cwd>/.pi/pi-model-modes.json`, JSON-parses each (missing → `{}`;
+  malformed → warn + `{}`, never crash), and **shallow-merges project over global**
+  → `{ defaultMode?: string }` (v1 shape; extensible). A test seam overrides the
+  two file paths (or injects JSON) so tests don't touch the real home dir.
+- **Session-start seeding.** `applyDefaultFromConfig(cwd)` loads the config and, if
+  `defaultMode` is present, `setDefaultMode(defaultMode)` — wrapped so an INVALID
+  default (unknown preset / missing fragment) warns and is skipped rather than
+  crashing `session_start`. Registered via `pi.on("session_start", (e, ctx) =>
+  applyDefaultFromConfig(ctx.cwd))` in `extensions/index.ts` (edit, don't overwrite).
+- **Docs roll-forward (OWNED here).** `docs/SPEC.md` "Switching paths" assumed a
+  `mode` key in `settings.json`; pi's `Settings` is closed (no plugin namespace —
+  verified). Roll SPEC + ARCHITECTURE forward to plugin-owned config
+  (`pi-model-modes.json`, global + project merge) and the override>default>unset
+  precedence. (mode-command owns command-output docs; keybinding owns the Ctrl+M
+  note — not this feature.)
+- **No child stories** — one cohesive foundation (resolver tier extension + config
+  module + session wiring + docs + tests).
+
+## Architectural choice
+Extend the existing `resolver.ts` with the default tier (keeps mode resolution in
+one module; no circular dep) + a new pure `config.ts` (file read/merge, no pi
+coupling beyond `cwd`) + a thin `session_start` registration. The config module is
+the only new file; the resolver change is additive (existing override API intact).
+
+## Implementation Units
+
+### Unit 1: `src/resolver.ts` — add the default tier
+- Add `let defaultSpec: ModeSpec | undefined;` beside the existing override spec.
+- `export function setDefaultMode(spec: ModeSpec | undefined): void` — same
+  validate-by-materialize-before-assign + clone-on-set as `setActiveMode`.
+- `export function getDefaultMode(): ModeSpec | undefined` — clone object specs
+  (like `getActiveMode`).
+- `export function clearDefaultMode(): void`.
+- `export function getEffectiveModeSource(): "override" | "default" | "unset"` —
+  override present → "override"; else default present → "default"; else "unset".
+- `resolveActiveModePlan()` — resolve `const spec = <override> ?? defaultSpec`; if
+  `undefined` → the no-mode fast-path; else `materializePlan(normalize(spec))`.
+- `resetResolverForTesting()` — clear override AND default.
+- Update the module JSDoc to describe the two tiers + precedence.
+
+### Unit 2: `src/config.ts` (new)
+```ts
+export interface PluginConfig { defaultMode?: string; }
+export function loadPluginConfig(cwd: string): PluginConfig; // global+project merge, tolerant
+export function applyDefaultFromConfig(cwd: string): void;   // setDefaultMode(config.defaultMode) if valid; warn+skip on bad
+// test seam: setConfigPathsForTesting({ global?, project? }) / resetConfigForTesting()
+```
+Notes: read with `readFileSync`+`JSON.parse` in try/catch (ENOENT → `{}`; parse
+error → `console.warn` + `{}`). Merge shallow, project precedence. `applyDefault`
+wraps `setDefaultMode` in try/catch (invalid default → `console.warn`, no throw).
+
+### Unit 3: `extensions/index.ts` — session_start registration
+`pi.on("session_start", (_e, ctx) => applyDefaultFromConfig(ctx.cwd));` (additive).
+
+### Unit 4: `docs/SPEC.md` + `docs/ARCHITECTURE.md` roll-forward
+SPEC "Switching paths": config default lives in plugin-owned `pi-model-modes.json`
+(global `~/.pi/agent/` + project `.pi/`, merged), NOT `settings.json`; precedence
+override>default>unset; override ephemeral, default durable. ARCHITECTURE
+"Components": add `src/config.ts`; note the two-tier resolver state.
+
+### Unit 5: tests
+- `tests/resolver-tiers.test.ts` (or extend resolver.test): override ?? default
+  precedence; `getEffectiveModeSource`; `clearActiveMode` falls back to default;
+  `clearDefaultMode`; reset clears both; a bad default throws at setDefaultMode.
+- `tests/config.test.ts`: global-only, project-only, project-overrides-global,
+  missing files → `{}`, malformed → warn + `{}`; `applyDefaultFromConfig` seeds a
+  valid default and skips+warns an invalid one (no throw). Use the config test seam.
+
+## Acceptance criteria
+- [ ] Effective mode = override ?? default ?? unset; `resolveActiveModePlan()`
+  reflects it; existing override-only tests pass unchanged.
+- [ ] `clearActiveMode()` (= `/mode off`) falls back to the config default.
+- [ ] `getEffectiveModeSource()` returns override/default/unset correctly.
+- [ ] Config global+project merge (project wins); missing/malformed tolerated
+  (warn, no crash); `applyDefaultFromConfig` seeds a valid default, warns+skips a
+  bad one.
+- [ ] SPEC + ARCHITECTURE rolled forward to plugin-owned config + precedence.
+- [ ] typecheck clean; full suite green.
+
+## Risks
+- **Resolver API churn** (LOW): the change is additive; the override API keeps its
+  names + semantics, so handler-wiring + existing tests are unaffected.
+- **Global config touches `~`** (mitigated): the config test seam overrides both
+  paths so tests never read/write the real home dir.
+- **session_start `reason`** ("startup"/"reload"/"new"/"resume"/"fork"): seed on all
+  reasons (the default should apply to every fresh/resumed session) — simplest and
+  correct; no reason-gating for v1.
