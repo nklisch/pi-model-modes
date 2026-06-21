@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-mode-command
 kind: feature
-stage: review
+stage: done
 tags: []
 parent: epic-switching-paths
 depends_on: [epic-switching-paths-config-default]
@@ -137,3 +137,13 @@ presets in `beforeEach`; extend `makePi` to record `registerCommand` (already do
 - **Harness**: no change needed — `makePi` already records `registerCommand` +
   `sendMessage`.
 - typecheck clean; full suite green at **207 tests** (was 200; +7 mode-command).
+
+## Review record
+
+**Verdict: Approve** — cross-model codex review (peeragent, --effort high). No
+implementation defects.
+Codex confirmed: no-arg listing reads the EFFECTIVE state (source + spec +
+resolved axes in try/catch); `off` clears only the override (falls to default);
+an unknown preset notifies an error WITHOUT changing the prior override (the
+resolver validates-before-assign); the panel is display-only with no triggerTurn.
+217 tests green. Advanced review → done.

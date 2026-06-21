@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-keybinding-cycle
 kind: feature
-stage: review
+stage: done
 tags: []
 parent: epic-switching-paths
 depends_on: [epic-switching-paths-config-default]
@@ -119,3 +119,13 @@ to record `registerShortcut`) asserting two shortcuts registered with handlers.
   user-rebindable) and expanded switching-path #3.
 - typecheck clean; full suite green at **217 tests** (was 207 after Feature 1;
   +10 keybinding/registration).
+
+## Review record
+
+**Verdict: Approve** — cross-model codex review (peeragent, --effort high). No
+implementation defects.
+Codex confirmed: `nextPresetName` handles wrap / unset / empty; handlers cycle
+relative to `getActiveMode() ?? getDefaultMode()`; the `"ctrl+m"`/`"ctrl+shift+m"`
+KeyId fallback is valid (pi-tui not hoisted) with no cast. One test-strength nit
+fixed (exact effective-relative assertion). registration.test still constrains the
+surface. 217 tests green. Advanced review → done.
