@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-config-default
 kind: feature
-stage: review
+stage: done
 tags: []
 parent: epic-switching-paths
 depends_on: []
@@ -227,3 +227,16 @@ and the `on` event set is exactly `[before_agent_start, session_start]`.
 files), up from 178 (added 19 across the two new test files). The pre-existing
 `tests/resolver.test.ts` (override-only seam) passes unchanged. No real bugs
 surfaced; no design deviations.
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), cross-model review via codex
+(peeragent, --effort high). One should-fix, fixed: `applyDefaultFromConfig()` left
+a stale prior default across repeated `session_start` reseeds when the new config
+had no/invalid `defaultMode`; now fully reconciles the default tier each call
+(valid→set, absent→clear, invalid→warn+clear) with two reseed tests. Everything
+else confirmed sound: resolver precedence `override ?? default ?? unset`, override
+API semantics preserved (existing resolver tests unchanged), object specs cloned on
+set/read, tolerant project-wins config merge, path seam avoids the real home dir,
+additive session_start registration, docs roll forward correctly. 199 tests green.
+Advanced review → done.
