@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-engine-invariant-tests
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-handler-wiring]
@@ -190,3 +190,15 @@ full form), byte-identical assembly across no-change turns on both HIT and force
 MISS paths (Invariant 2), and deterministic SPEC fragment ordering. No real
 product bug surfaced — assertions are genuine byte/count checks, and the negative
 control confirms they can observe a real change. No deviations.
+
+## Review record
+
+**Verdict: Approve** — cross-model codex review (peeragent, --effort high). No
+findings. The Invariant-1 assertions use exact occurrence counts over unique
+sentinels (a doubling bug would fail); the forced-MISS-determinism test correctly
+relies on `resetCacheForTesting()` clearing only cache-module state while
+`activeSpec` lives in the resolver (so it forces result-cache MISSes with the mode
+active, proving assembly determinism, not HIT replay); deterministic ordering uses
+distinct-sentinel `indexOf` checks + a byte-identical rerun; the negative control
+is genuinely fail-able; the existing identity-only group is intact. 178 tests,
+typecheck clean. Advanced review → done.
