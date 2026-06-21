@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-mode-resolver
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-fragment-loader, epic-mode-composition-preset-table]
@@ -290,3 +290,44 @@ export function resetResolverForTesting(): void;
   cache's own encoding, only be stable + collision-resistant across selections.
 - **Set-time validation does I/O** (ACCEPTED): `setActiveMode` materializes once
   to reject bad modes early; it's a user-action-frequency call, not per-turn.
+
+## Implementation notes
+
+Landed exactly per Unit 1, no contract deviations.
+
+**`src/resolver.ts`** — the pure resolution + materialization core:
+- Types `FragmentSlot`, `PlannedFragment`, `ModePlan`, `ModeSpec` per the spec;
+  internal `SigEntry` for signature building; module-scope `activeSpec` state.
+- `setActiveMode`/`getActiveMode`/`clearActiveMode`/`resolveActiveModePlan`/
+  `resetResolverForTesting` per the exact signatures.
+- `normalize(spec)`: string → `getPreset(spec, loadPresets())`; `ResolvedMode`
+  → field clone; `modifiers` de-duped first-wins via `[...new Set(...)]`. Always
+  returns a fresh resolver-owned object.
+- `materializePlan(mode)`: base (PI_BASE → virtual sig entry `{base,"pi",""}` and
+  NO fragment; else `matchOne(discoverBaseOverlays(),...)` → load → fragment +
+  sig); axes via `matchOne(discoverAxis(axis),...)`; modifiers discovered/loaded
+  ONLY when non-empty. Builds the ordered `fragments[]` AND the `sigEntries[]`.
+- `matchOne(paths,value,slot)`: basename filter; 0 → "has no fragment file"; >1 →
+  "ambiguous … matches N fragments"; else the single hit.
+- `encode(sigEntries)`: length-delimited `<byteLen>:<field>` per slot/value/hash
+  joined by `|`, entries by `\n` (mirrors `cache.ts`'s `encodeComponents`);
+  `sha256` via `createHash("sha256")`.
+- Fast-path no-mode (`activeSpec === undefined` → `{undefined, NO_MODE_SIGNATURE,
+  []}` with ZERO discovery). `setActiveMode` validates by materializing the
+  normalized clone BEFORE assignment (throw leaves prior state intact) and stores
+  the string OR the cloned normalized `ResolvedMode` — never the caller's object.
+  `.js` ESM imports; `node:crypto`/`node:path` for builtins.
+
+**`tests/resolver.test.ts`** — 15 tests covering every acceptance criterion:
+no-mode fast-path (incl. NO fragment root configured), preset/explicit resolution
++ ordered fragments + trimmed content, base:pi signature participation (pi vs real
+overlay → different signatures), signature edit-sensitivity (mtime bump → changed;
+no edit → stable across N calls), modifier dedup + order, fail-fast (missing
+axis/base/modifier at set AND resolve-time integrity; ambiguous base match),
+set-time validation (bad spec throws + does NOT become active; prior mode survives
+a failed set), clone-on-set (post-set caller mutation inert), seam basics.
+`beforeEach` resets resolver + fragment + preset caches.
+
+**Verification**: `npm run typecheck` clean; `npm test` green — 154 tests (139
+prior + 15 new resolver tests), 11 files. No deviations from the contract; no
+dependency-export mismatches surfaced.
