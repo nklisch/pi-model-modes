@@ -1,20 +1,24 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { handleBeforeAgentStart } from "../src/handler.js";
 
 /**
  * pi extension entry. The default export is the factory pi discovers and
  * calls via jiti. It receives the public ExtensionAPI.
  *
- * This skeleton deliberately registers NOTHING. The `before_agent_start`
- * handler is registered in the sibling feature
- * `epic-scaffold-handler-noop-handler`, which edits this file (extends the
- * body — does not overwrite it).
+ * Registrations (single registration surface per ARCHITECTURE.md):
+ *   - `before_agent_start` → `handleBeforeAgentStart` (the no-op handler from
+ *     `src/handler.ts`). Registered by reference so the unit tests can assert
+ *     the registered handler is the same function object they import.
+ *
+ * Downstream epics extend this factory (register `/mode`, keybindings, etc.)
+ * by adding more `pi.on(...)` / `pi.registerCommand(...)` calls — edit, don't
+ * overwrite.
  *
  * Contract this feature guarantees and downstream features rely on:
  *   - default export is a function (sync or async) taking ExtensionAPI
  *   - loading the module has no side effects beyond defining the factory
- *   - the param is named `_pi` only because it is unused in the shell;
- *     the sibling feature renames it to `pi` when it starts using it.
+ *     (the handler is only registered when pi invokes the factory)
  */
-export default function (_pi: ExtensionAPI) {
-  // handler registered in the noop-handler feature
+export default function (pi: ExtensionAPI) {
+  pi.on("before_agent_start", handleBeforeAgentStart);
 }

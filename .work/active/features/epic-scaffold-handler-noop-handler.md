@@ -1,7 +1,7 @@
 ---
 id: epic-scaffold-handler-noop-handler
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-scaffold-handler
 depends_on: [epic-scaffold-handler-package-skeleton]
@@ -542,3 +542,52 @@ skeleton; lockfile present) and run `npm test` + `npm run typecheck`.
 No `depends_on` change (the existing edge on
 `epic-scaffold-handler-package-skeleton` is correct; it is `stage: done`).
 No tsconfig change (`.js` specifiers resolve natively under NodeNext).
+
+## Implementation notes
+
+**Execution path.** Originally delegated to the `implementor` sub-agent, but
+it hit an environmental blocker: the host's auto-mode permission classifier
+fails closed for ALL mutating tools inside sub-agents (write/edit/bash/todo),
+while read-only tools work and the host can mutate fine. Since the host IS
+the GLM 5.2 model the run uses for implementation, the stride was completed
+inline by the host (same model, no design change). Files written verbatim to
+spec.
+
+**Files created/edited:** `src/handler.ts`, `tests/harness.ts`,
+`tests/noop.test.ts`, `tests/clean-base.test.ts`, `tests/registration.test.ts`,
+and `extensions/index.ts` (edited: renamed `_pi`→`pi`, registered the handler
+by reference).
+
+**Verification (actual):**
+- `npm run typecheck` → exit 0, no diagnostics. The strict
+  `RequiredBeforeAgentStartResult` return type compiles — the always-return
+  guarantee is now compile-time-enforced.
+- `npm test` → 3 files, 7 tests, all pass, ~100ms.
+
+**One hardening beyond the design**, found by a standalone Proxy sanity
+check: the fail-fast `makeContext()` Proxy initially only guarded `symbol`
+access, but JS probes the string key `.then` (the thenable check) and
+`.toJSON`/`constructor`/`asymmetricMatch` during introspection — returning
+`undefined` for those is correct (they are not real ctx fields), so an
+`INTROSPECTION_KEYS` allowlist was added. Fail-fast still applies to all real
+string-keyed ctx fields (verified: `ctx.model` throws, `ctx.cwd` returns the
+override, `ctx.then` returns undefined). The existing tests pass because the
+no-op handler never touches `ctx`; the fix protects downstream epics that
+`await` a returned stub or get deep-equal-introspected.
+
+**Registration wiring verified:** the factory registers `before_agent_start`
+→ `handleBeforeAgentStart` exactly once, by reference (the registered handler
+IS the same function object the unit tests import), and registers nothing
+else — confirmed by `tests/registration.test.ts`.
+
+**No divergence from design** beyond the Proxy allowlist addition.
+
+## Blocker (resolved inline)
+
+The sub-agent permission-classifier failure is an environment-level issue
+affecting ALL delegated mutating work in this run, not just this feature. It
+will recur for every subsequent `implement`/`review` delegation. The host
+autopilot (GLM, with working mutating tools) will complete implementation
+strides inline for the remainder of this run, continuing to use codex
+sub-agents (read-only consult/review work) which are unaffected. Flagged for
+the user to address out-of-band (the classifier service or its extension).
