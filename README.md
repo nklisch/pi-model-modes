@@ -1,31 +1,152 @@
 # pi-model-modes
 
-A pi extension that adapts the system prompt per model/mode.
+A [pi](https://pi.dev) extension that adapts the system prompt per model and per
+behavioral **mode**.
 
-pi discovers and loads this package via the `pi` manifest in `package.json`,
-which points at `extensions/index.ts` as the extension entry. That file's
-default export is the factory pi calls with its public `ExtensionAPI`.
+Every turn it tells the model what it is — `You are {model.name} from {provider}.`
+— read live from `ctx.model`, and (when a mode is selected) splices a composable
+mode into pi's assembled system prompt. It **transforms** pi's prompt rather than
+replacing it: tools, skills, `<project_context>`, and date/cwd all survive. With
+no mode selected, only the identity line is added.
 
-**What it does.** Every turn it tells the model what it is — `You are
-{model.name} from {provider}.` — read live from `ctx.model`, and (when a mode is
-selected) splices a composable behavioral mode into pi's assembled system
-prompt. A mode is one **base** voice + one value from each of three axes
-(**agency** × **quality** × **scope**) + zero or more **modifiers**; **presets**
-bundle common combinations. Modes are selectable via the `/mode` command, a
-`Ctrl+M` / `Shift+Ctrl+M` cycle keybinding, or a plugin-owned config default
-(`pi-model-modes.json`), with precedence session-override > config-default >
-unset. `/mode:inspect` shows the effective mode, last-change reason, and cache
-key. Transforms pi's prompt rather than replacing it — tools, skills, and
-`<project_context>` survive; with no mode selected, only the identity line is
-added.
+The assembled prompt is byte-stable across turns where nothing relevant changed
+(a per-turn cache key over model + mode signature + pi's base keeps provider
+prefix caches warm).
 
-The system prompt is byte-stable across turns where nothing relevant changed (a
-per-turn cache key over model + mode signature + pi's base keeps provider prefix
-caches warm).
+## Install
+
+This is a pi package (`pi-package` keyword + `pi` manifest in `package.json`,
+entry at `extensions/index.ts`).
+
+```bash
+# from a local clone — edits hot-reload via /reload during development
+pi install /absolute/path/to/pi-model-modes
+
+# …or try it for the current run only, without writing to settings
+pi -e /absolute/path/to/pi-model-modes
+```
+
+`pi install` writes the package into your `settings.json` `packages` list; the
+extension is then auto-loaded on every session.
+
+## Using modes
+
+A **mode** composes one **base** voice + one value from each of three axes
+(**agency** × **quality** × **scope**) + zero or more **modifiers**. A **preset**
+is a named bundle of those choices, applied atomically.
+
+### Commands
+
+| Command | Effect |
+|---|---|
+| `/mode` | Show the effective mode (its source tier + composed axes) and the available presets. Display-only — triggers no turn. |
+| `/mode <preset>` | Set the mode for this session (an ephemeral override). Unknown presets surface an error and leave the prior mode intact. |
+| `/mode off` | Clear the session override; falls back to the config default (or unset). |
+
+`/mode:inspect` shows the effective mode, the derived identity line, when/why the
+prompt last changed, and the current cache key — useful for debugging cache
+behavior or a stuck mode.
+
+### Keybindings
+
+| Key | Action |
+|---|---|
+| `Ctrl+M` | Cycle forward through the sorted preset list. |
+| `Shift+Ctrl+M` | Cycle backward. |
+
+Both are user-rebindable via `~/.pi/agent/keybindings.json`. Each hit sets the
+session override and toasts `mode: <name>`.
+
+### Config default
+
+A durable default mode can be set in a plugin-owned config file (separate from
+pi's closed `settings.json`, which has no plugin namespace). Two files are read
+and shallow-merged, **project over global**:
+
+- global:  `~/.pi/agent/pi-model-modes.json`
+- project: `<cwd>/.pi/pi-model-modes.json`
+
+Shape (v1):
+
+```json
+{ "defaultMode": "flow" }
+```
+
+An invalid `defaultMode` (unknown preset / missing fragment) warns and is
+skipped — it never crashes the session.
+
+**Precedence:** session override (`/mode`, keybinding) > config default > unset.
+The override is ephemeral (in-memory, not written to disk): a genuinely new
+session (`/new`, `/resume`, `/fork`) restarts from the config default, while a
+same-session `/reload` or `startup` keeps any active override.
+
+## Mode reference
+
+**Base** voice (default `pi` = no overlay, identity only):
+
+- `pi` — no voice overlay
+- `chill`, `flow`, `pi-direct` — overlay voices (`prompts/base/*.md`)
+
+**Agency** — `autonomous` · `collaborative` · `surgical` · `partner`
+
+**Quality** — `architect` · `pragmatic` · `minimal`
+
+**Scope** — `unrestricted` · `adjacent` · `narrow`
+
+**Modifiers** (zero or more) — `bold` · `tdd` · `debug` · `flow` · `muse` ·
+`readonly` · `methodical` · `director` · `speak-plain` · `context-pacing` ·
+`playful`
+
+### Built-in presets
+
+| Preset | base | agency | quality | scope | modifiers |
+|---|---|---|---|---|---|
+| `default` | pi | autonomous | pragmatic | adjacent | — |
+| `create` | flow | autonomous | architect | unrestricted | bold |
+| `explore` | flow | autonomous | pragmatic | unrestricted | muse |
+| `safe` | pi | surgical | pragmatic | narrow | readonly |
+| `refactor-safe` | pi | collaborative | architect | adjacent | methodical |
+| `debug` | pi | autonomous | pragmatic | adjacent | debug |
+| `flow` | chill | autonomous | pragmatic | adjacent | flow |
+| `partner` | pi | partner | architect | adjacent | — |
+| `muse` | flow | collaborative | pragmatic | unrestricted | muse, playful |
+
+Preset definitions live in [`presets.json`](presets.json); the fragment text
+lives in [`prompts/`](prompts) (`base/`, `axis/{agency,quality,scope}/`,
+`modifiers/`). Fragment files are cached by mtime, so editing one takes effect on
+the next turn — no `/reload` needed.
+
+## How it works
+
+- **Identity is additive.** `You are {model.name} from {provider}.` is prepended
+  as the very first line on every turn — including mode-unset turns and turns
+  with a custom `SYSTEM.md` / `--system-prompt`. It never overrides or removes
+  the user's base content.
+- **Assembly is deterministic.** Within the splice, order is fixed: identity →
+  base voice → agency → quality → scope → modifiers (in preset-declared order) →
+  pi's assembled base.
+- **Cache-stable.** The handler computes a cache key each turn over
+  `model.id` + `model.provider` + the mode signature + a hash of pi's base, and
+  only re-assembles on a miss. There are no timestamps, counters, or
+  nondeterministic values in the assembled output, so consecutive no-change
+  turns produce byte-identical prompts.
+- **No-op when unset.** With no mode selected, only the identity line is
+  prepended; no axis or modifier fragments are injected.
+
+The hard contract (invariants, cache key, resolution precedence) is documented in
+[`docs/SPEC.md`](docs/SPEC.md); the component layout and per-turn flow are in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Development
 
+- **Runtime:** Node >= 22.19.0
 - **Install:** `npm install`
 - **Test:** `npm test`
 - **Typecheck:** `npm run typecheck`
-- **Runtime:** Node >= 22.19.0
+
+The registration surface is a single factory in
+[`extensions/index.ts`](extensions/index.ts) — the `before_agent_start` handler,
+`/mode` + `/mode:inspect` commands, the cycle keybinding, and a
+`session_start` config-seed. All logic lives in plain modules under `src/` with
+no pi coupling except through typed interfaces, which keeps it unit-testable
+without spinning up pi (tests under `tests/`).
