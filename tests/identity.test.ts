@@ -5,27 +5,7 @@ import {
   PROVIDER_DISPLAY_NAMES,
   providerDisplayName,
 } from "../src/provider-names.js";
-
-/**
- * Minimal `Model<any>` factory — only `name` and `provider` matter for
- * identity; the rest are filled with harmless defaults. Local to this
- * feature; handler-integration may promote a richer factory to harness.ts.
- */
-function makeModel(
-  overrides: Partial<Model<any>> & Pick<Model<any>, "name" | "provider">,
-): Model<any> {
-  return {
-    id: "test-model",
-    api: "openai-responses" as any,
-    baseUrl: "https://api.example.com",
-    reasoning: false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128000,
-    maxTokens: 8192,
-    ...overrides,
-  };
-}
+import { makeModel } from "./harness.js";
 
 describe("providerDisplayName — known providers", () => {
   it.each([

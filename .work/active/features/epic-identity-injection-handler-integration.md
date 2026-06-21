@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-handler-integration
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-identity-derivation, epic-identity-injection-cache-and-change-signal]
@@ -597,3 +597,66 @@ rework of the landed modules is needed.
   present string. A regression where the MISS path returns `undefined` would
   silently drop identity+mode — this is the worst failure mode and must be
   caught.
+
+## Implementation notes
+
+All 7 units landed in a single stride, exactly per the design's literal code
+blocks. No deviations.
+
+**What landed:**
+- `src/handler.ts` — rewritten from the no-op form into the cache-aware,
+  identity-injecting form. Reads `ctx.model` directly; builds `CacheKeyInputs`
+  once (passed to both `computeCacheKey` and `setCachedResult`); branches
+  HIT → return cached bytes wholesale, MISS → derive identity, assemble
+  `${identity}\n${base}` (only when identity non-empty), store, return. Strict
+  `RequiredBeforeAgentStartResult` (`systemPrompt: string`) preserved; both
+  paths return a present string. `_ctx` → `ctx` (now read).
+- `tests/harness.ts` — promoted the `makeModel` factory (SSOT) with the full
+  required `Model<any>` shape and `id: "test-model"` default; added the
+  `@earendil-works/pi-ai` `Model` type import.
+- `tests/identity.test.ts` — dropped the local `makeModel`, now imports it from
+  `./harness.js`. (Kept the `Model` type import — still used by the freeze
+  cast in the purity test.)
+
+**Test-debt evolution (legitimate, per test-integrity rules):**
+- `tests/noop.test.ts` — Invariant-3 scaffolding assertion (return === input
+  byte-for-byte) can no longer hold once identity always prepends. Evolved to
+  the 4 codex assertions: (a) identity is the first line and matches
+  `deriveIdentityLine(model)`; (b) remainder byte-identical to input;
+  (c) exactly one identity line across repeated calls (no cache stacking);
+  (d) always a present `systemPrompt`. Dropped the degenerate `empty: ""`
+  fixture. Now supplies `makeContext({ model })` (handler reads `ctx.model`).
+- `tests/clean-base.test.ts` — Invariant-1 spirit (no mutation, no cached-output
+  leak) carries forward; literal byte-equality assertions evolved to
+  identity-prepended (`${identity}\n${base}`). Now supplies
+  `makeContext({ model })`. This was the design's flagged highest-likelihood
+  miss — build breaks without it (fail-fast Proxy throws on unprovided
+  `ctx.model`). Touched as required.
+
+**New coverage:**
+- `tests/handler.test.ts` — cache-path always-return on HIT and MISS, plus the
+  model-switch case proving per-turn live identity derivation (switching
+  `ctx.model` → MISS → re-derived line). The seam test for the two foundations
+  composing behind the handler.
+
+Every handler-exercising file uses `beforeEach(() => resetCacheForTesting())`
+for module-scope cache isolation.
+
+**Doc roll-forward (rolling-foundation, owned here):**
+- `docs/SPEC.md` — Invariant 3 rewritten (identity always prepended, no mode
+  fragments, additive/never-overriding, applies under custom `SYSTEM.md` /
+  `--system-prompt`); Identity-line section gained an explicit every-turn
+  sentence; Open-questions ctx.model-freshness note resolved (points at the
+  model-switch test).
+- `docs/ARCHITECTURE.md` — enforcement-table "No-op when unset" row reworded;
+  per-turn-flow steps 4 & 6 clarified for the no-mode case; Components `tests/`
+  list aligned with files on disk (drift fix: `noop-unset.test.ts` →
+  `noop.test.ts`, added cache/handler/registration, noted cache-stability as
+  downstream/not-yet-present).
+
+**Verification:**
+- `npm run typecheck` (tsc --noEmit): clean.
+- `npm test` (vitest --run): 6 files, 68 tests, all green
+  (cache, clean-base, handler, identity, noop, registration).
+- `extensions/index.ts` unchanged — exactly one
+  `pi.on("before_agent_start", handleBeforeAgentStart)`.

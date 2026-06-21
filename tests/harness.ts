@@ -3,6 +3,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import type { Model } from "@earendil-works/pi-ai";
 
 /**
  * Test harness — synthetic event/context/pi builders, all typed against pi's
@@ -71,6 +72,28 @@ export function makeContext(
       );
     },
   }) as unknown as ExtensionContext;
+}
+
+/**
+ * Minimal `Model<any>` factory (SSOT) — only `name` and `provider` matter for
+ * identity derivation; the rest are harmless defaults satisfying the required
+ * `Model<any>` shape. Shared by the identity, noop, clean-base, and handler
+ * tests so a single factory governs every fixture model.
+ */
+export function makeModel(
+  overrides: Partial<Model<any>> & Pick<Model<any>, "name" | "provider">,
+): Model<any> {
+  return {
+    id: "test-model",
+    api: "openai-responses" as any,
+    baseUrl: "https://api.example.com",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128000,
+    maxTokens: 8192,
+    ...overrides,
+  };
 }
 
 export type RecordedCall = { method: string; args: unknown[] };

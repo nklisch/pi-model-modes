@@ -3,48 +3,69 @@ import type {
   BeforeAgentStartEventResult,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { deriveIdentityLine } from "./identity.js";
+import {
+  computeCacheKey,
+  getCachedResult,
+  setCachedResult,
+  NO_MODE_SIGNATURE,
+} from "./cache.js";
+import type { CacheKeyInputs } from "./cache.js";
 
-/**
- * Strict return type — narrows pi's optional `systemPrompt?: string` field to
- * a required `string`. This makes the always-return guarantee a COMPILE-TIME
- * invariant: a handler that returns `{}`, `undefined`, or omits the field is
- * a type error, not just a test failure. Defense-in-depth: `tests/noop.test.ts`
- * also asserts the return is a present string across fixtures.
- */
 export type RequiredBeforeAgentStartResult = BeforeAgentStartEventResult & {
   systemPrompt: string;
 };
 
 /**
- * `before_agent_start` handler. SCAFFOLDING / NO-OP FORM.
+ * `before_agent_start` handler — identity-injecting, cache-aware form.
  *
- * CONTRACT (established here, inherited by every downstream epic):
- *  - ALWAYS returns `{ systemPrompt: e.systemPrompt }` — never `undefined`.
- *    pi reads `undefined` (or a missing field) as "revert to base" and would
- *    drop any later identity/mode injection, so the always-return discipline
- *    is baked in here. The strict `RequiredBeforeAgentStartResult` return
- *    type enforces this at compile time; `tests/noop.test.ts` enforces it at
- *    runtime as defense-in-depth.
- *  - Never mutates `e.systemPrompt` (or any field of `e`).
- *  - Never sources from a cached "previous output." There is no module-level
- *    mutable state on the return path at this stage; the shape is deliberately
- *    free of any `let lastResult` so later epics inherit the clean-base
- *    discipline by construction.
+ * Per turn:
+ *   1. Build cache-key inputs from `ctx.model` (empty id/provider when the
+ *      model is undefined) + `NO_MODE_SIGNATURE` (no mode yet) +
+ *      `e.systemPrompt` (pi's assembled base).
+ *   2. `getCachedResult(key)` — advances the turn counter; returns the cached
+ *      result on HIT, `undefined` on MISS.
+ *   3. HIT  → return `{ systemPrompt: cached }` (identity was baked in at the
+ *      prior miss; no re-assembly, no re-derive).
+ *   4. MISS → derive identity from `ctx.model` (empty string when undefined),
+ *      assemble `identity + "\n" + e.systemPrompt` when identity is non-empty
+ *      (else `e.systemPrompt` unchanged — no leading newline),
+ *      `setCachedResult(key, result, inputs)`, return.
  *
- * No mode/identity/fragment/cache logic yet — this epic is the no-op. The
- * `_ctx` param is unused at this stage (underscore-prefixed to satisfy
- * `noUnusedParameters`); downstream epics rename it to `ctx` when they start
- * reading `ctx.model` / `ctx.getSystemPrompt()`.
- *
- * Note on pi's application semantics: `agent-session.js` applies the result
- * with `if (result?.systemPrompt)`, so an empty-string `systemPrompt` would
- * ALSO reset to base at the final application point. Real pi prompts are
- * never empty, so this is irrelevant in production — our handler simply
- * returns its input unchanged.
+ * Contracts preserved from `epic-scaffold-handler`:
+ *   - ALWAYS returns `{ systemPrompt: <string> }`, never `undefined`, on BOTH
+ *     paths (strict `RequiredBeforeAgentStartResult` makes omission a
+ *     compile-time error).
+ *   - Never mutates `e.systemPrompt` or any field of `e`.
+ *   - Clean-base: the MISS splice sources from `e.systemPrompt`, never from
+ *     `lastResult`. The HIT path returns `lastResult` wholesale without
+ *     splicing into it — so identity is never stacked across turns.
  */
 export function handleBeforeAgentStart(
   e: BeforeAgentStartEvent,
-  _ctx: ExtensionContext,
+  ctx: ExtensionContext,
 ): RequiredBeforeAgentStartResult {
-  return { systemPrompt: e.systemPrompt };
+  const model = ctx.model; // Model<any> | undefined
+  const modelId = model?.id ?? "";
+  const modelProvider = model?.provider ?? "";
+
+  const inputs: CacheKeyInputs = {
+    modelId,
+    modelProvider,
+    modeSignature: NO_MODE_SIGNATURE,
+    baseSystemPrompt: e.systemPrompt,
+  };
+  const key = computeCacheKey(inputs);
+
+  // HIT — return the previously-assembled result unchanged.
+  const cached = getCachedResult(key);
+  if (cached !== undefined) {
+    return { systemPrompt: cached };
+  }
+
+  // MISS — derive identity, assemble (identity leads), store, return.
+  const identity = model ? deriveIdentityLine(model) : "";
+  const result = identity ? `${identity}\n${e.systemPrompt}` : e.systemPrompt;
+  setCachedResult(key, result, inputs);
+  return { systemPrompt: result };
 }

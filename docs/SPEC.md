@@ -78,13 +78,16 @@ Forbidden in assembled output, unconditionally:
 ### 3. No-op when unset
 
 With no mode selected (no `/mode`, no keybinding hit, no config default),
-the handler returns `{ systemPrompt: e.systemPrompt }` — pi's prompt
-unchanged. Baseline pi behavior is preserved exactly: same tools, same
-skills, same context, same caching.
+the handler prepends the identity line and injects NO mode fragments.
+Baseline pi behavior is preserved for mode — no axis or modifier fragments,
+same tools, same skills, same context, same caching. Identity is purely
+additive: prepended as the first line, it never overrides or removes the
+user's content, and applies even with a custom `SYSTEM.md` /
+`--system-prompt`.
 
-**Test:** with mode unset, the handler's return value equals its input
-byte-for-byte; a baseline-pi session and an installed-plugin-unset session
-produce identical system prompts.
+**Test:** with mode unset, the handler's return has the identity line as its
+first byte and no mode fragments; the remainder is byte-identical to pi's
+assembled base.
 
 ## Cache key and the change signal
 
@@ -129,6 +132,10 @@ You are {model.name} from {providerDisplayName(model.provider)}.
 The identity line is prepended to the spliced prompt as the very first
 line. It is the most-stable element and therefore the longest-lived cached
 prefix.
+
+Identity is prepended on **every** turn — including mode-unset turns and
+turns with a custom `SYSTEM.md` / `--system-prompt`. It is purely additive
+and never overrides or removes the user's base content.
 
 ## Mode composition
 
@@ -198,7 +205,9 @@ session restarts from the config default.
 
 - **`ctx.model` freshness under mid-session `/model`:** does the
   `before_agent_start` handler see the switched model on the immediately
-  next turn, or one turn later? Resolved with a test during implementation.
-  The cache key includes `model.id`, so even a one-turn lag self-corrects.
+  next turn, or one turn later? Resolved — identity is derived fresh each
+  MISS off live `ctx.model`; the model-switch test in `tests/handler.test.ts`
+  proves the line updates on the next MISS. The cache key includes
+  `model.id`/`model.provider`, so a model switch forces a MISS and re-derive.
 - **Default cycle keybinding:** Ctrl+M candidate; confirm no collision
   before shipping.

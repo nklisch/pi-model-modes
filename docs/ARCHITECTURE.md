@@ -29,11 +29,13 @@ pi-model-modes/
 │                   director, speak-plain, context-pacing, playful
 ├─ presets.json              named bundles (e.g. "flow", "explore", "create")
 └─ tests/
-    ├─ cache-stability.test.ts
+    ├─ cache.test.ts
+    ├─ cache-stability.test.ts   (downstream, not yet present)
     ├─ clean-base.test.ts
-    ├─ noop-unset.test.ts
+    ├─ handler.test.ts
     ├─ identity.test.ts
-    └─ composition.test.ts
+    ├─ noop.test.ts
+    └─ registration.test.ts
 ```
 
 `extensions/index.ts` is the single registration surface. It wires the
@@ -68,9 +70,13 @@ which keeps the logic unit-testable without spinning up pi.
                 │            mode.signature, hash(e.systemPrompt)) │
                 │  3. key === lastKey ?  ─────── yes ──▶ return lastResult
                 │  4. derive identity line from ctx.model          │
+                │     (runs every MISS, regardless of mode)        │
                 │  5. load fragments (module-scope cache)          │
                 │  6. splice: identity + base + axes + modifiers   │
                 │           + e.systemPrompt                       │
+                │     (no mode → only [identity line] +            │
+                │      e.systemPrompt; no base/axis/modifier        │
+                │      fragments)                                  │
                 │  7. store lastKey + lastResult; emit change sig  │
                 │  8. return { systemPrompt }                      │
                 └──────────────────────┬───────────────────────────┘
@@ -135,7 +141,7 @@ Cache key: 9f3a...c1e2
 |------------------|-------------|-----|
 | Clean-base handling | `assemble.ts` | splice always sources from `e.systemPrompt`, never from `lastResult` |
 | Cache stability | `assemble.ts` + `cache.ts` | no dynamic text; ordered arrays only; key covers all inputs |
-| No-op when unset | `handler.ts` | `mode === unset` short-circuits to `{ systemPrompt: e.systemPrompt }` |
+| No-op when unset | `handler.ts` | identity always prepended; mode-unset injects NO mode fragments (identity still injects) |
 
 ## Key design properties
 

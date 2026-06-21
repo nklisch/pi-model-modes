@@ -1,33 +1,53 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { handleBeforeAgentStart } from "../src/handler.js";
-import { makeContext, makeEvent } from "./harness.js";
+import { deriveIdentityLine } from "../src/identity.js";
+import { resetCacheForTesting } from "../src/cache.js";
+import { makeContext, makeEvent, makeModel } from "./harness.js";
 
-/**
- * Invariant 3 (SPEC: no-op-unset) — the handler returns pi's assembled system
- * prompt byte-identical, and the return is always a present string (never
- * undefined). Defense-in-depth for the compile-time `RequiredBeforeAgentStartResult`
- * return type on the handler.
- */
-describe("handleBeforeAgentStart — Invariant 3 (no-op-unset: byte-identical + never-undefined)", () => {
+describe("handleBeforeAgentStart — Invariant 3 evolved (identity-prepended, remainder byte-identical, never undefined)", () => {
+  const model = makeModel({ name: "GLM-4.6", provider: "zai" });
+  const identity = deriveIdentityLine(model);
+
+  beforeEach(() => resetCacheForTesting()); // module-scope cache state isolates per case
+
   const fixtures: Record<string, string> = {
-    empty: "",
+    typical: "You are an expert coding assistant...\n\nAvailable tools:\n- read",
+    "project-context": "You are an expert...\n<project_context>...</project_context>",
     whitespace: "   \n\t  ",
-    typical:
-      "You are an expert coding assistant operating inside pi...\n\nAvailable tools:\n- read: Read file contents\n- bash: Execute bash commands",
-    "project-context":
-      "You are an expert...\n\n<project_context>\n\n<project_instructions path=\"AGENTS.md\">\nProject rules here\n</project_instructions>\n\n</project_context>",
   };
 
+  const countIdentityLines = (s: string) =>
+    s.split("\n").filter((l) => l === identity).length;
+
   for (const [name, input] of Object.entries(fixtures)) {
-    it(`returns systemPrompt byte-identical and defined (${name})`, () => {
-      const result = handleBeforeAgentStart(makeEvent(input), makeContext());
-      // Never undefined — catches an accidental omitted return.
+    it(`prepends identity, remainder byte-identical (${name})`, () => {
+      const result = handleBeforeAgentStart(makeEvent(input), makeContext({ model }));
+
+      // (d) always a present systemPrompt (never undefined).
       expect(typeof result.systemPrompt).toBe("string");
-      // Byte-identical to the input.
-      expect(result.systemPrompt).toBe(input);
-      // Only the systemPrompt field is returned (no message custom payload
-      // at this stage).
-      expect(result.message).toBeUndefined();
+      expect(result.systemPrompt.length).toBeGreaterThan(0);
+
+      // (a) identity line is the FIRST line and matches deriveIdentityLine(model).
+      expect(result.systemPrompt.split("\n")[0]).toBe(identity);
+
+      // (b) the remainder after the identity line is byte-identical to the input.
+      expect(result.systemPrompt).toBe(`${identity}\n${input}`);
     });
   }
+
+  it("does not duplicate identity across repeated same-input calls (cache does not stack)", () => {
+    const input = "typical prompt body";
+    const r1 = handleBeforeAgentStart(makeEvent(input), makeContext({ model }));
+    const r2 = handleBeforeAgentStart(makeEvent(input), makeContext({ model }));
+    const r3 = handleBeforeAgentStart(makeEvent(input), makeContext({ model }));
+
+    // (c) exactly ONE identity line across repeated calls (r1 MISS, r2/r3 HIT).
+    expect(countIdentityLines(r1.systemPrompt)).toBe(1);
+    expect(countIdentityLines(r2.systemPrompt)).toBe(1);
+    expect(countIdentityLines(r3.systemPrompt)).toBe(1);
+
+    // HIT path returns the prior miss's bytes (no re-assembly, no stacking).
+    expect(r2.systemPrompt).toBe(r1.systemPrompt);
+    expect(r3.systemPrompt).toBe(r1.systemPrompt);
+  });
 });
