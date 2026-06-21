@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-engine-invariant-tests
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-handler-wiring]
@@ -151,3 +151,42 @@ typecheck clean. No production changes.
 - **Stability ≠ change-detection** (BY DESIGN): this feature owns the no-change
   direction; the cache module's tests + the resolver signature tests own
   change-detection. The negative control here only proves the assertions can fail.
+
+## Implementation notes
+
+Landed (test-only, NO production changes):
+
+- **Unit 1 — `tests/clean-base.test.ts` upgraded in place.** The existing
+  identity-only `describe(... Invariant 1 (no mutation + no cached-output leak,
+  identity-prepended))` group is UNCHANGED (still documents the unset case). Added
+  a new `describe("Invariant 1 — full form (mode set: ...)")` group plus a
+  `countOccurrences(haystack, needle)` helper. It builds a temp prompts tree
+  (base overlay + agency/quality/scope + two modifiers `tdd`/`terse`, each with a
+  unique sentinel like `FRAG-agency-autonomous`), `setActiveMode` over an explicit
+  `ResolvedMode`, full module reset in `beforeEach`/`afterEach`. Two tests:
+  (a) ONE-COPY across N=5 identical turns — `count(identity)===1` and
+  `count(sentinel)===1` for every selected fragment on every turn (turn 1 MISS,
+  turns 2..5 HIT, no stacking); (b) NO-LEAK `A→B→C→A` base rotation — each return
+  carries its own base exactly once + one copy of each fragment, BASE_A turns are
+  byte-identical re-assemblies, distinct bases yield distinct bytes.
+- **Unit 2 — `tests/engine-stability.test.ts` (new).** Full reset + fixture tree +
+  `setActiveMode` in `beforeEach`. Four tests: (a) CACHE STABILITY HIT path —
+  N=10 identical turns all `=== returns[0]`; (b) FORCED-MISS DETERMINISM — N=10
+  iterations of `resetCacheForTesting()` (RESULT cache only) then one turn, all
+  identical (confirmed the resolver's active mode survives a cache-only reset, so
+  each turn re-materializes + re-splices the same mode — verified by reading the
+  modules: `resetCacheForTesting` touches only cache-module state, `activeSpec`
+  lives in the resolver module); (c) DETERMINISTIC ORDERING — one turn asserts
+  `indexOf(identity) < base < agency < quality < scope < modifier < pi-base` via
+  sentinels, re-run from a fresh cache → byte-identical; (d) NEGATIVE CONTROL —
+  swapping the modifier set (`tdd` → `terse`) yields different bytes.
+
+**Verification:** `npm run typecheck` clean; `npm test` green —
+**14 files, 178 tests** (was 172; +6: 2 new in clean-base, 4 in engine-stability).
+The pre-existing clean-base identity-only group still passes.
+
+**Invariants HOLD:** no fragment doubling and no cached-output leak (Invariant 1
+full form), byte-identical assembly across no-change turns on both HIT and forced-
+MISS paths (Invariant 2), and deterministic SPEC fragment ordering. No real
+product bug surfaced — assertions are genuine byte/count checks, and the negative
+control confirms they can observe a real change. No deviations.
