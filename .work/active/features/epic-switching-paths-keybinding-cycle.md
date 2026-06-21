@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-keybinding-cycle
 kind: feature
-stage: implementing
+stage: review
 tags: []
 parent: epic-switching-paths
 depends_on: [epic-switching-paths-config-default]
@@ -79,6 +79,43 @@ to record `registerShortcut`) asserting two shortcuts registered with handlers.
 ### Unit 4: `docs/SPEC.md` — close the Ctrl+M open question.
 
 ## Acceptance criteria
-- [ ] Forward/backward cycle through the sorted preset list relative to the
+- [x] Forward/backward cycle through the sorted preset list relative to the
   effective mode, wrapping; from unset enters at the ends; sets the override.
   `nextPresetName` covered (wrap, unset, empty). typecheck clean; suite green.
+
+## Implementation notes
+
+- **`Key` import outcome — FALLBACK used.** `@earendil-works/pi-tui` is NOT a
+  resolvable dependency of this plugin: it lives nested under
+  `node_modules/@earendil-works/pi-coding-agent/node_modules/...`, not hoisted to
+  the project's top-level, so an `import { Key } from "@earendil-works/pi-tui"`
+  would not resolve under NodeNext + `verbatimModuleSyntax` (confirmed: a bare
+  `require("@earendil-works/pi-tui")` throws MODULE_NOT_FOUND). Per the design's
+  documented fallback, the shortcuts are registered with the `KeyId` STRING form
+  — `CYCLE_FORWARD_KEY = "ctrl+m"` and `CYCLE_BACKWARD_KEY = "ctrl+shift+m"` —
+  which are exactly the strings `Key.ctrl("m")` / `Key.ctrlShift("m")` produce
+  and are valid members of pi's `KeyId` union. `tsc` accepts them against
+  `registerShortcut(shortcut: KeyId, …)` with no cast, so typecheck stays honest.
+- **`src/keybinding.ts`** (new): pure `nextPresetName(names, current, dir)`
+  (sorted-list cycle: `indexOf` then `(idx+dir+len)%len`; from unset/non-preset
+  enters forward at `names[0]`, backward at `names[len-1]`; empty → `undefined`)
+  + `registerModeKeybindings(pi)` registering both shortcuts. Each handler:
+  `names = Object.keys(loadPresets()).sort()`; empty → `notify("no presets")`;
+  current = `getActiveMode() ?? getDefaultMode()` (string only); `next =
+  nextPresetName(...)`; `setActiveMode(next)` + `notify('mode: <next>')`.
+- **`extensions/index.ts`**: added `registerModeKeybindings(pi)` (additive, on
+  top of Feature 1's edits).
+- **`tests/keybinding.test.ts`** (new, 10 tests): pure `nextPresetName` coverage
+  (forward/backward wrap, from-unset entry at both ends, non-preset current,
+  empty → undefined, single-element self-cycle) + a registration/handler test
+  via `makePi` (two shortcuts with handlers; forward-from-unset sets the override
+  to the first preset and notifies; backward-from-a-default cycles relative to
+  the effective mode). The handler fixture covers EVERY fragment any bundled
+  preset references so whichever preset the cycle lands on resolves.
+- **`tests/registration.test.ts`**: rolled forward to allow + assert the two
+  `registerShortcut` calls (keys = forward/backward, both with handlers); the
+  "nothing unexpected" filter now also permits `registerShortcut`. Not weakened.
+- **`docs/SPEC.md`**: closed the Ctrl+M "Open questions" item (chosen default,
+  user-rebindable) and expanded switching-path #3.
+- typecheck clean; full suite green at **217 tests** (was 207 after Feature 1;
+  +10 keybinding/registration).

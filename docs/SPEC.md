@@ -200,9 +200,11 @@ Three paths converge on one resolver:
    `session_start`; an invalid value warns and is skipped (never crashes the
    session). Persists across sessions unless overridden.
 3. **Keybinding** — cycles forward (and shifted, backward) through the
-   preset list. Default binding is chosen at implementation time to avoid
-   collisions (Ctrl+M is the candidate; verify against the user's
-   keymap).
+   sorted preset list, relative to the current effective mode (from unset it
+   enters at the first preset going forward, the last going backward). Each hit
+   sets the session override and toasts `mode: <name>`. The default binding is
+   **Ctrl+M** forward / **Shift+Ctrl+M** backward, user-rebindable via
+   `~/.pi/agent/keybindings.json`.
 
 Resolution precedence: session override (`/mode`) > config default > unset.
 The resolver holds this as two distinct tiers (override + default); the
@@ -231,5 +233,8 @@ state, not written to disk). A new session restarts from the config default.
   MISS off live `ctx.model`; the model-switch test in `tests/handler.test.ts`
   proves the line updates on the next MISS. The cache key includes
   `model.id`/`model.provider`, so a model switch forces a MISS and re-derive.
-- **Default cycle keybinding:** Ctrl+M candidate; confirm no collision
-  before shipping.
+- **Default cycle keybinding:** Resolved — **Ctrl+M** forward / **Shift+Ctrl+M**
+  backward is the chosen default (registered via pi's `registerShortcut` with
+  the `"ctrl+m"` / `"ctrl+shift+m"` KeyId strings), and it is user-rebindable via
+  `~/.pi/agent/keybindings.json`, so any collision with a user's keymap is
+  resolved by rebinding rather than a fixed binding.
