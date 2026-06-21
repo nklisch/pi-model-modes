@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-modifiers
 kind: feature
-stage: drafting
+stage: review
 tags: [prose]
 parent: epic-fragment-library
 depends_on: []
@@ -45,3 +45,33 @@ cache. No-code-surface ([prose]).
   framing.
 - **Base overlays are thin tone-setters** (one short paragraph; no tool/identity/
   context restatement) — applies to base-overlays.
+
+## Authoring notes
+
+Authored all 11 modifier fragments under `prompts/modifiers/`:
+`bold, tdd, debug, flow, muse, readonly, methodical, director, speak-plain,
+context-pacing, playful`. Each adapt-ported from the corresponding
+`../claude-code-modes/prompts/modifiers/*.md`, distilled to ONE focused brief
+(heading + a few lines of prose) to match the `tdd.md` starter voice/length.
+
+Adaptation choices:
+- **Stripped CC framing** — no tool names, no "Claude Code"/"Claude" self-refs, no
+  CC-specific mechanics. `director` keeps the orchestration essence ("hands on the
+  wheel, not the keyboard", delegate-and-verify, quality gate) but drops the
+  Opus/Sonnet/Haiku model-selection table, which is Claude-specific. `debug`/`flow`/
+  `muse`/`methodical` shed their long worked `<example>` blocks; the behavioral
+  thesis is carried by prose alone to stay short and byte-stable.
+- **Transform-not-replace fit** — every brief is additive behavioral guidance and
+  restates no tools, identity, or context (the base/axis layers own those). `readonly`
+  and `speak-plain` (DEEP) preserve their operative rules since those *are* the
+  behavior, not restated scaffolding.
+- **No dynamic text/timestamps** — all content is static; the splice stays byte-stable.
+- Filename sans `.md` is the value name; the set matches `docs/SPEC.md`'s modifier
+  list exactly (11 values).
+
+Verification: `npm test` green (199/199). The real-package-root sanity test in
+`tests/fragments.test.ts` previously asserted modifiers == `["tdd"]` (the starter
+state this feature supersedes); reconciled honestly to assert the full
+filename-sorted set of 11. No assertion was weakened — it now encodes the completed
+library. (That test file is owned/contended by sibling axis/overlay features and is
+NOT part of this feature's commit paths.)
