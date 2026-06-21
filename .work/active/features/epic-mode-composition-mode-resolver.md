@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-mode-resolver
 kind: feature
-stage: drafting
+stage: implementing
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-fragment-loader, epic-mode-composition-preset-table]
@@ -72,3 +72,221 @@ handler (that is `handler-wiring`), and does NOT expose user selection (that is
   internal/test override holder; `epic-switching-paths` drives it later.
 - **Validation fail-fast**: a resolved selection missing a required axis fragment
   file (no `agency`/`quality`/`scope` match) fails fast.
+
+## Design decisions (resolved during feature-design)
+
+Resolved under autopilot (scope `--all`), informed by a codex design advisory on
+the ModePlan contract (folded in below). Implementation tier: OPUS.
+
+- **ModePlan shape** (the contract 3 features consume): `{ mode, signature,
+  fragments }`. `fragments` is the ordered, identity-independent, already-loaded
+  content list the splice concatenates; `signature` is what the handler feeds
+  `computeCacheKey` BEFORE the hit/miss check; `mode` (the `ResolvedMode` or
+  `undefined`) is for `/mode:inspect` + switching summaries. **Identity is NOT in
+  the plan** — the splice prepends it separately.
+- **Signature includes a virtual `base:pi` entry.** `base === PI_BASE` contributes
+  no overlay fragment but MUST still participate in the signature (epic decision:
+  base:pi is a real mode). So the canonical signature input always carries a base
+  entry — the real overlay's `[base, value, sha256(content)]` OR a virtual
+  `[base, "pi", ""]` when PI_BASE — followed by agency/quality/scope/modifier
+  entries. Encoding is length-delimited (mirrors `cache.ts`'s `encodeComponents`)
+  then sha256. Model id/provider and `e.systemPrompt` are EXCLUDED (the handler
+  composes those in `computeCacheKey`).
+- **Active-mode seam**: `ModeSpec = string | ResolvedMode`. `undefined` = unset.
+  Explicit `ResolvedMode` specs are **cloned on set** (so callers can't mutate
+  active state) and **runtime-validated** (later config/commands feed this seam
+  from untyped input). `switching-paths` layers precedence (override > config >
+  unset) on top of this same seam.
+- **Set-time validation + resolve-time integrity.** `setActiveMode(spec)` fully
+  materializes the plan once and throws on any failure (unknown preset, missing
+  fragment, bad axis value) so a known-bad mode never becomes active. The per-turn
+  `resolveActiveModePlan()` re-materializes and re-throws — files can change after
+  selection, so resolve-time is the integrity gate.
+- **Re-materialize every turn (no plan memo) for v1.** The handler calls
+  `resolveActiveModePlan()` per turn to get the signature; re-materializing relies
+  on `fragment-loader`'s mtime cache for cheap loads and honors live fragment
+  edits. **Fast-path no-mode**: when unset, return the no-mode plan with ZERO
+  discovery/load work. A memo keyed on spec+mtimes is deferred (a bad key could
+  silently break the content-hash promise) until measured.
+- **`discoverModifiers()` only when modifiers are non-empty** (fast-path; a mode
+  with no modifiers does no modifier discovery). Empty modifiers is valid.
+- **Ambiguous matches fail fast.** If a value name matches more than one
+  discovered fragment (possible for base overlays drawn from a multi-dir manifest),
+  throw rather than first-match-win. Axis dirs can't hold two same-basename files,
+  but the check is uniform across slots.
+- **Modifier de-dup**: preset-declared order, first-occurrence-wins.
+- **No child stories** — one cohesive module (resolver + ModePlan + signature +
+  seam) + its test. The feature IS the unit.
+
+## Other agent review
+
+A codex design advisory (peeragent, `--effort high`) ran on the ModePlan contract.
+Accepted and folded in: the virtual `base:pi` signature entry; clone + runtime-
+validate explicit `ResolvedMode` specs; set-time validation in addition to resolve-
+time; fast-path no-mode; fail on duplicate/ambiguous basename matches; only call
+`discoverModifiers()` when modifiers are non-empty; keep identity out of the plan;
+exclude model/base-prompt from the mode signature. Overall codex take: "the contract
+is viable, but make base:\"pi\" signature participation and runtime normalization/
+validation explicit before implementation" — both now explicit.
+
+## Architectural choice
+
+A single pure module `src/resolver.ts` owning: the `ModePlan`/`PlannedFragment`
+types, the internal active-mode state + seam, preset/explicit resolution,
+fragment materialization (via `fragment-loader`), and content-hash signature
+computation. It depends DOWN on `presets.ts` (`getPreset`/`loadPresets`/`PI_BASE`/
+`ResolvedMode`) and `fragments.ts` (`discoverAxis`/`discoverModifiers`/
+`discoverBaseOverlays`/`loadFragment`); `assemble.ts` and the handler depend UP on
+it. No pi-runtime coupling — fully unit-testable with the fragment/preset test
+overrides.
+
+## Implementation Units
+
+### Unit 1: `src/resolver.ts`
+
+```ts
+import { createHash } from "node:crypto";
+import { basename } from "node:path";
+import {
+  PI_BASE,
+  getPreset,
+  loadPresets,
+  type ResolvedMode,
+} from "./presets.js";
+import {
+  AXES,
+  discoverAxis,
+  discoverModifiers,
+  discoverBaseOverlays,
+  loadFragment,
+  type Axis,
+} from "./fragments.js";
+import { NO_MODE_SIGNATURE } from "./cache.js";
+
+export type FragmentSlot = "base" | Axis | "modifier";
+
+/** One materialized fragment in splice order. */
+export interface PlannedFragment {
+  slot: FragmentSlot;
+  value: string;   // basename without ".md", e.g. "autonomous"
+  path: string;    // absolute
+  content: string; // loaded + trimmed
+}
+
+/** The materialized plan: signature for the cache key + ordered content for the
+ *  splice + the resolved selection for inspect/summary. Identity is NOT here. */
+export interface ModePlan {
+  mode: ResolvedMode | undefined;          // undefined ⇔ no active mode
+  signature: string;                       // NO_MODE_SIGNATURE when no mode
+  fragments: readonly PlannedFragment[];   // [] when no mode
+}
+
+/** What can be set active: a preset name or an explicit selection. */
+export type ModeSpec = string | ResolvedMode;
+
+// --- internal active-mode state (switching-paths drives this seam later) -----
+let activeSpec: ModeSpec | undefined;
+
+/** Set the active mode. Validates by fully materializing once (throws on unknown
+ *  preset / missing fragment / bad axis value) so a known-bad mode never becomes
+ *  active. Explicit ResolvedMode specs are cloned so later caller mutation can't
+ *  affect active state. */
+export function setActiveMode(spec: ModeSpec | undefined): void;
+export function getActiveMode(): ModeSpec | undefined;
+export function clearActiveMode(): void; // setActiveMode(undefined)
+
+/** Materialize the active mode into a ModePlan. Fast-paths no-mode (no discovery).
+ *  Re-materializes + re-hashes each call (honors live fragment edits via the
+ *  loader's mtime cache). THROWS on missing/ambiguous fragments (integrity). */
+export function resolveActiveModePlan(): ModePlan;
+
+/** TEST-ONLY: clear active-mode state. */
+export function resetResolverForTesting(): void;
+```
+
+**Implementation notes**:
+- **Resolution**: `string` spec → `getPreset(spec, loadPresets())` → a `Preset`
+  (same shape as `ResolvedMode`). `ResolvedMode` spec → use directly. Normalize:
+  copy fields, de-dup `modifiers` first-wins (`[...new Set(modifiers)]` preserves
+  first-occurrence order).
+- **Materialize** `materializePlan(mode: ResolvedMode): ModePlan`:
+  - `fragments: PlannedFragment[] = []`; `sigEntries: {slot,value,hash}[] = []`.
+  - **base**: if `mode.base === PI_BASE` → push sig entry `{base,"pi",""}` only
+    (no fragment). Else `matchOne(discoverBaseOverlays(), mode.base, "base")` →
+    load → push fragment + sig `{base, value, sha256(content)}`.
+  - **axes** (`for axis of AXES`): `matchOne(discoverAxis(axis), mode[axis], axis)`
+    → load → push fragment + sig entry.
+  - **modifiers**: if `mode.modifiers.length`: `const mods = discoverModifiers()`;
+    for each (deduped) modifier name → `matchOne(mods, name, "modifier")` → load →
+    push fragment + sig entry.
+  - `signature = sha256(encode(sigEntries))`.
+- **`matchOne(paths, value, slot)`**: `const hits = paths.filter(p =>
+  basename(p, ".md") === value)`. `hits.length === 0` → throw
+  `mode <slot> "<value>" has no fragment file`. `hits.length > 1` → throw
+  `ambiguous <slot> "<value>" matches N fragments`. Return `hits[0]`.
+- **`encode(entries)`**: length-delimited canonical string — for each entry,
+  `${byteLen(slot)}:${slot}|${byteLen(value)}:${value}|${byteLen(hash)}:${hash}`
+  joined by `\n` (mirrors `cache.ts`'s `encodeComponents` discipline so field
+  boundaries can't collide). `sha256(s)` = `createHash("sha256").update(s,"utf8")
+  .digest("hex")`.
+- **`resolveActiveModePlan()`**: if `activeSpec === undefined` → return
+  `{ mode: undefined, signature: NO_MODE_SIGNATURE, fragments: [] }` (no discovery).
+  Else `materializePlan(normalize(activeSpec))`.
+- **`setActiveMode(spec)`**: if `undefined` → `activeSpec = undefined`. Else
+  `const normalized = normalize(spec)` (clones); `materializePlan(normalized)`
+  (validate — throws on failure, leaving `activeSpec` unchanged); then
+  `activeSpec = spec` is a string OR the cloned normalized ResolvedMode (never the
+  caller's object). Validation runs BEFORE assignment so a throw leaves prior
+  state intact.
+- All errors `throw new Error(...)` naming slot+value — Fail Fast.
+
+**Acceptance criteria**:
+- [ ] No active mode → `resolveActiveModePlan()` returns
+      `{mode:undefined, signature:NO_MODE_SIGNATURE, fragments:[]}` and does NO
+      fragment discovery/load.
+- [ ] A preset spec resolves: `fragments` ordered base?→agency→quality→scope→
+      modifiers, each with loaded trimmed content; `signature` non-empty.
+- [ ] `base===PI_BASE` → no base fragment in `fragments`, but the signature
+      DIFFERS from an otherwise-identical mode with a real base (virtual entry).
+- [ ] Editing a selected fragment's file (mtime bump) changes the signature on the
+      next `resolveActiveModePlan()`; no edit → identical signature (stable).
+- [ ] Modifier order = preset order; duplicate modifiers de-duped first-wins.
+- [ ] Missing axis/base/modifier fragment → throws (set-time AND resolve-time);
+      ambiguous (>1 basename match) → throws.
+- [ ] `setActiveMode` validates (a bad spec throws and does NOT become active);
+      explicit `ResolvedMode` specs are cloned (post-set caller mutation is inert).
+- [ ] `resetResolverForTesting()` clears active state.
+
+## Implementation Order
+1. `src/resolver.ts` (Unit 1).
+2. `tests/resolver.test.ts` — fixtures via `setFragmentRootForTesting` (a fixture
+   prompts tree) + `loadPresets({json})` for preset specs; cover every acceptance
+   criterion incl. signature stability/edit-sensitivity, base:pi signature
+   participation, dedup, fail-fast, clone-on-set, fast-path no-mode (assert no
+   throw + empty plan even with NO fragment root configured).
+
+## Testing
+- **Signature edit-sensitivity**: materialize a mode, capture signature; bump a
+  selected fragment's mtime+content; re-resolve; assert signature changed. No
+  change → identical signature across N calls (Invariant-2 seed at the resolver
+  level).
+- **base:pi participation**: two modes identical except base (pi vs a real
+  overlay) → different signatures.
+- **Fail-fast**: preset/explicit mode referencing a non-existent axis value →
+  throws at set AND resolve; ambiguous base match → throws.
+- **Fast-path no-mode**: with NO `setFragmentRootForTesting` configured at all,
+  `resolveActiveModePlan()` (unset) must NOT throw and must return the empty plan
+  (proves zero discovery on the no-mode path).
+- **Clone-on-set**: set an explicit `ResolvedMode`, mutate the caller's object +
+  its `modifiers` array afterward, resolve → plan reflects the value AT SET TIME.
+- Module-state isolation: `beforeEach` resets resolver + fragment + preset caches.
+
+## Risks
+- **Per-turn re-hash cost** (LOW): ≤ ~15 small fragments hashed per turn; the
+  handler's result cache short-circuits the expensive splice on a hit. Memo
+  deferred until measured (a bad memo key would break the content-hash promise).
+- **Signature ≠ cache.ts's internal hash** (BY DESIGN): the mode signature is an
+  opaque deterministic string fed to `computeCacheKey`; it need not match the
+  cache's own encoding, only be stable + collision-resistant across selections.
+- **Set-time validation does I/O** (ACCEPTED): `setActiveMode` materializes once
+  to reject bad modes early; it's a user-action-frequency call, not per-turn.
