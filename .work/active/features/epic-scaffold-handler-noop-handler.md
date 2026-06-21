@@ -131,17 +131,25 @@ on(event: "before_agent_start",
 required; every other field is optional — so a synthetic event can be built
 with **zero casts** (`{ cwd: "/test" }` satisfies it).
 
-> **Nuance / SPEC↔type divergence (flagged).** The real
+> **Nuance / SPEC↔type divergence (flagged, then hardened).** The real
 > `BeforeAgentStartEventResult.systemPrompt` field is `string | undefined`
->(optional), and `ExtensionHandler`'s return type explicitly admits `| void`.
-> So **TypeScript does NOT enforce the always-return discipline** — a handler
-> that returns `undefined` type-checks fine. The epic's locked contract
-> ("ALWAYS returns `{ systemPrompt: e.systemPrompt }`, never `undefined`,
-> because pi reverts to base on `undefined`") is therefore a **project
-> discipline enforced by test, not by the type**. The Invariant-3 test
-> asserts both byte-equality AND that the return is a present string
-> (catching an accidental `undefined`). SPEC/ARCHITECTURE described the
-> contract correctly; the type is simply looser than the contract.
+> (optional), and `ExtensionHandler`'s return type explicitly admits `| void`.
+> So pi's types alone do NOT enforce the always-return discipline. We close
+> that gap two ways (from a codex design consult):
+> 1. **Type-enforced** via a local strict return type —
+>    `type RequiredBeforeAgentStartResult = BeforeAgentStartEventResult &
+>    { systemPrompt: string }` — annotated on the handler. This makes a
+>    handler that returns `{}`, `undefined`, or omits the field a **compile
+>    error**, not just a test failure.
+> 2. **Test-enforced** as defense-in-depth: `tests/noop.test.ts` still asserts
+>    the return is a present string across fixtures.
+>
+> Note on pi's application semantics: `agent-session.js` applies the result
+> with `if (result?.systemPrompt)`, so an empty-string `systemPrompt` ALSO
+> resets to base at the final application point. Real pi prompts are never
+> empty, so this is irrelevant in production — but the empty-string test
+> fixture must not *claim* pi would apply `""`; it only asserts our handler
+> returns its input unchanged.
 
 ### Component placement: `src/handler.ts` vs `extensions/index.ts`
 
@@ -195,28 +203,37 @@ import type {
  *
  * No mode/identity/fragment/cache logic yet — this epic is the no-op.
  */
+/** Local strict return type — makes the always-return guarantee a
+ *  COMPILE-TIME error if violated, not just a test failure. pi's
+ *  BeforeAgentStartEventResult.systemPrompt is optional; this narrows it. */
+export type RequiredBeforeAgentStartResult = BeforeAgentStartEventResult & {
+  systemPrompt: string;
+};
+
 export function handleBeforeAgentStart(
   e: BeforeAgentStartEvent,
   _ctx: ExtensionContext,
-): BeforeAgentStartEventResult {
+): RequiredBeforeAgentStartResult {
   return { systemPrompt: e.systemPrompt };
 }
 ```
 
 Notes:
-- **Sync** (returns `BeforeAgentStartEventResult` directly). No async work
+- **Sync** (returns `RequiredBeforeAgentStartResult` directly). No async work
   exists at this stage. `ExtensionHandler` admits sync returns; downstream
   epics that do fragment file I/O may switch the body to `async` without
-  changing the registration site.
+  changing the registration site. (The registration site's `on()` overload
+  accepts the broader `BeforeAgentStartEventResult`-returning signature;
+  our stricter return type is assignable to it — covariant return — so no
+  cast is needed at registration.)
 - **`_ctx` underscore-prefixed** to satisfy `noUnusedParameters: true` (the
   same convention the skeleton used for `_pi`). The param is present for
   signature compatibility with `ExtensionHandler`; it is unused at this
   stage. Downstream epics rename it to `ctx` when they start reading
   `ctx.model` / `ctx.getSystemPrompt()`.
-- **Return type annotated `BeforeAgentStartEventResult`** to match the
-  registration site exactly. The type's optionality means the
-  never-`undefined` guarantee is a runtime discipline asserted by the test,
-  not by the compiler.
+- **Return type annotated `RequiredBeforeAgentStartResult`** (the local strict
+  type) — this makes the never-`undefined` guarantee a **compile-time**
+  invariant, with the runtime test as defense-in-depth.
 
 ### Relative-import specifier decision (NodeNext + jiti, no tsconfig change)
 
@@ -256,14 +273,16 @@ Three builders, all typed against the real interfaces, all minimal:
    satisfies the only required field; `prompt` defaults to `""`; `type` is
    fixed to `"before_agent_start"`. `opts` lets a test override `prompt` /
    `images` if a later epic needs them.
-2. **`makeContext(overrides?)` → `ExtensionContext`** — the no-op handler
-   reads **nothing** from `ctx`, so the stub is intentionally an empty
-   object cast `as unknown as ExtensionContext` (the direct `as` is rejected
-   because `ExtensionContext` has many required fields). The cast is honest
-   and documented: it is safe *for this handler's current contract*, which
-   touches no `ctx` field. A doc comment records that downstream epics grow
-   this stub (`ctx.model`, `ctx.getSystemPrompt()`, …) as they start reading
-   it. `overrides` partial-merges for those future cases.
+2. **`makeContext(overrides?)` → `ExtensionContext`** — a **fail-fast Proxy
+   stub**, NOT a loose `as unknown as ExtensionContext` cast (per codex
+   consult: the cast sets a weak precedent for downstream epics that DO read
+   `ctx`). The stub returns provided `overrides` as-is; any access to an
+   unprovided property throws a clear error like `"test stub: ctx.model not
+   provided — add it to makeContext() overrides"`. This forces downstream
+   epics (identity-injection needs `ctx.model`, mode-composition needs
+   `ctx.getSystemPrompt()`) to explicitly supply the fields they read,
+   instead of silently getting `undefined` from a loose cast. The no-op
+   handler reads no `ctx` field, so its tests pass without overrides.
 3. **`makePi()` → `{ pi: ExtensionAPI; calls: RecordedCall[] }`** — a
    recording stub that captures every registration call
    (`on`, `registerTool`, `registerCommand`, `registerShortcut`,
@@ -367,17 +386,23 @@ when splicing begins:
    seed* the full-form test inherits.
 
 ```ts
-// 1. No mutation
+// 1. No mutation — Object.freeze makes any mutation a thrown TypeError,
+//    stronger than a JSON snapshot (catches deep/sibling-field mutation too).
 const e = makeEvent("line1\nline2\n<project_context>...</project_context>");
-const before = JSON.stringify(e);
-handleBeforeAgentStart(e, makeContext());
-expect(JSON.stringify(e)).toBe(before);
+Object.freeze(e);
+handleBeforeAgentStart(e, makeContext());   // throws if it mutates
 
-// 2. No cross-call cache leak
-const a = handleBeforeAgentStart(makeEvent("PROMPT_A"), makeContext());
-const b = handleBeforeAgentStart(makeEvent("PROMPT_B"), makeContext());
-expect(b.systemPrompt).toBe("PROMPT_B");   // NOT "PROMPT_A"
-expect(b.systemPrompt).not.toBe(a.systemPrompt);
+// 2. No cross-call cache leak — A→B→C→A sequence catches more module-state
+//    bugs than a simple A→B (catches "always returns first", "returns last",
+//    "returns Nth", etc.). Each return must equal THAT call's input.
+const a1 = handleBeforeAgentStart(makeEvent("PROMPT_A"), makeContext());
+const b  = handleBeforeAgentStart(makeEvent("PROMPT_B"), makeContext());
+const c  = handleBeforeAgentStart(makeEvent("PROMPT_C"), makeContext());
+const a2 = handleBeforeAgentStart(makeEvent("PROMPT_A"), makeContext());
+expect(a1.systemPrompt).toBe("PROMPT_A");
+expect(b.systemPrompt).toBe("PROMPT_B");
+expect(c.systemPrompt).toBe("PROMPT_C");
+expect(a2.systemPrompt).toBe("PROMPT_A");   // NOT leaked from a1 or c
 ```
 
 The file carries a header comment marking it the **SCAFFOLDING FORM** of
