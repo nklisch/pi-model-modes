@@ -1,7 +1,7 @@
 ---
 id: epic-scaffold-handler-noop-handler
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-scaffold-handler
 depends_on: [epic-scaffold-handler-package-skeleton]
