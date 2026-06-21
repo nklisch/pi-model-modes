@@ -1,0 +1,12 @@
+node_modules/
+*.tsbuildinfo
+dist/
+build/
+coverage/
+*.lcov
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+.DS_Store

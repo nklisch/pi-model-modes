@@ -1,7 +1,7 @@
 ---
 id: epic-scaffold-handler-package-skeleton
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-scaffold-handler
 depends_on: []
@@ -398,3 +398,93 @@ After creating the files: `npm install` (resolves + writes
 confirmed by inspection / a one-off `pi -e ./extensions/index.ts` smoke run.
 
 **No `depends_on` added** — this feature has none (cycle-check: clean).
+
+## Implementation notes
+
+Implemented inline per design, 2026-06-21. All six files created exactly
+as specified; no deviations.
+
+### Files created (all new)
+
+- `package.json` — manifest + npm metadata per contract.
+- `tsconfig.json` — strict ESM/NodeNext/noEmit per contract.
+- `vitest.config.ts` — node env, `globals: true`, `passWithNoTests: true`,
+  `include: ["tests/**/*.test.ts"]` per contract.
+- `extensions/index.ts` — default-export factory shell. **Body confirmed
+  empty** (`grep -nE "pi\\.(on|registerTool|registerCommand|registerShortcut|registerFlag)\\s*\\("`
+  → no matches). Param `_pi`, type-only `ExtensionAPI` import. Sibling
+  `noop-handler` feature extends this body; it does not replace the file.
+- `.gitignore` — Node/TS artifacts (first in repo).
+- `README.md` — minimal stub with scaffold-status note.
+
+`npm install --ignore-scripts` materialized 188 packages (0 vulnerabilities)
+and wrote `package-lock.json`, which is committed (only `node_modules/` is
+ignored — the lockfile is tracked per design).
+
+### Acceptance criteria — results
+
+- **(1) pi-discoverable.** Structural: `keywords: ["pi-package"]`,
+  `pi.extensions: ["./extensions/index.ts"]` → file exists. ✓
+  (The live `pi install` / `pi list` and `pi -e ./extensions/index.ts`
+  smoke run are operator-confirmed at review; not run inline because they
+  open an interactive session. The structural shape matches pi's own
+  "Package with dependencies" example.)
+- **(2) Factory loads.** Deferred to operator smoke run (see (1));
+  typecheck proves the module compiles and the default export is a
+  callable function taking `ExtensionAPI`.
+- **(3) No handler registered.** `grep` for all five registration calls
+  in `extensions/index.ts` → no matches. Body is the literal
+  `// handler registered in the noop-handler feature` comment only. ✓
+- **(4) `npm test` green, zero tests.** `vitest --run` →
+  `No test files found, exiting with code 0` (exit 0 via
+  `passWithNoTests`). No placeholder test shipped. ✓
+- **(5) `npm run typecheck` green.** `tsc --noEmit` → exit 0, no
+  diagnostics. `ExtensionAPI` resolves via the installed
+  `@earendil-works/pi-coding-agent` peer; `vitest/globals` types resolve. ✓
+- **(6) Peer deps correct.** `peerDependencies` = exactly
+  `{ "@earendil-works/pi-coding-agent": "*", "typebox": "*" }`;
+  `dependencies` and `bundledDependencies` absent. ✓
+- **(7) Manifest is only pi-coupling.** Only `extensions/index.ts`
+  imports from the pi package or `typebox` (no other `.ts` files exist
+  yet). ✓
+
+### Verification command output (tails)
+
+```
+$ npm install --ignore-scripts
+added 188 packages, and audited 189 packages in 7s
+found 0 vulnerabilities
+
+$ npm run typecheck
+> tsc --noEmit
+(exit 0, no output)
+
+$ npm test
+> vitest --run
+ RUN  v4.1.9 /home/nathan/dev/pi-model-modes
+No test files found, exiting with code 0
+include: tests/**/*.test.ts
+(exit 0)
+```
+
+### Notes for the sibling `noop-handler` feature
+
+- The factory param is `_pi` (unused, per `noUnusedParameters`). Rename to
+  `pi` when wiring `pi.on("before_agent_start", …)`. The existing doc
+  comment already documents this contract.
+- Edit the body in place — do not replace the file or the `export default`
+  line.
+- Once real tests exist under `tests/`, `passWithNoTests` becomes a no-op
+  (it only triggers when literally zero tests match). Consider dropping it
+  in that feature so a future discovery regression cannot silently green
+  an empty suite.
+
+### Reality vs. design
+
+No divergence. Every verified fact held:
+- `ExtensionAPI` is exported from `@earendil-works/pi-coding-agent`
+  (`dist/index.d.ts`) — typecheck resolves it.
+- pi's own `engines.node` is `">=22.19.0"` — matches the pinned floor.
+- `npm view` latest: vitest 4.1.9, typescript 6.0.3, @types/node 26.0.0 —
+  matches the design's note. `@types/node` correctly pinned to `^22.19.0`
+  (engine floor), not latest 26.
