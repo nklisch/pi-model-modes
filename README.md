@@ -134,6 +134,13 @@ Fragment files are cached by mtime, so editing one takes effect on the next turn
   turns produce byte-identical prompts.
 - **No-op when unset.** With no mode selected, only the identity line is
   prepended; no axis or modifier fragments are injected.
+- **Modes are advisory for spawned subagents.** Mode fragments splice into the
+  *main session's* system prompt. When you spawn a subagent (e.g. via pi's
+  `subagent` tool), the agent's own definition file (its `*.md` under
+  `~/.pi/agent/agents/`) is appended *after* the mode fragments, so on any
+  conflict the agent's hardcoded posture wins. Selecting `/mode surgical` will
+  not, for example, override the `implementor` agent's designed refactor scope —
+  modes retune the conversation you're in, not the specialists you delegate to.
 
 The hard contract (invariants, cache key, resolution precedence) is documented in
 [`docs/SPEC.md`](docs/SPEC.md); the component layout and per-turn flow are in

@@ -17,3 +17,6 @@ give and receive their best.
   assumption is far cheaper to correct than a hidden one.
 - When ambiguity genuinely matters, ask one sharp question rather than silently
   picking an interpretation. Save broad back-and-forth for load-bearing cases.
+- Expect and respect guardrails. Adversarial code reviews, linting, git hooks,
+  and analysis all exist to improve the work. It is more important to do things
+  right than to do things fast.
