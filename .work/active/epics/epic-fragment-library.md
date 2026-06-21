@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library
 kind: epic
-stage: drafting
+stage: implementing
 tags: [docs, patterns]
 parent: null
 depends_on: [epic-mode-composition]
@@ -98,3 +98,28 @@ Do not treat these as commitments. -->
   The feature-design pass should either rename the preset (e.g.
   `refactor-safe`) or confirm the coexistence is intentional and documented.
   Not blocking; surfaced for the design pass.
+
+## Decomposition (realized)
+
+Six features, refined by a codex decomposition advisory. The five content
+features parallelize; `preset-bundles` depends on all of them.
+
+- `epic-fragment-library-base-overlays` — `prompts/base/` thin overlays + `base.json`
+  [prose] — depends on: `[]`
+- `epic-fragment-library-agency-axis` — 4 agency fragments [prose] — depends on: `[]`
+- `epic-fragment-library-quality-axis` — 3 quality fragments [prose] — depends on: `[]`
+- `epic-fragment-library-scope-axis` — 3 scope fragments [prose] — depends on: `[]`
+- `epic-fragment-library-modifiers` — ~11 modifier fragments [prose] — depends on: `[]`
+- `epic-fragment-library-preset-bundles` — `presets.json` curated 8 (data/catalog,
+  feature-design — NOT prose) — depends on:
+  `[base-overlays, agency-axis, quality-axis, scope-axis, modifiers]`
+
+### Other agent review (codex)
+Accepted: the five fragment-authoring features are `[prose]` → prose-author, but
+`preset-bundles` is data/catalog integration (schema + resolver existence
+validation), so it routes through `feature-design`, NOT prose-author. It DEPENDS on
+all five content features — `loadPresets()` validates shape only; a preset
+referencing a not-yet-authored fragment fails at `setActiveMode`, so presets must
+ship after the fragments. Its acceptance: every shipped preset must be
+`setActiveMode`-able against the bundled tree. The `refactor` preset is renamed
+**`refactor-safe`** to avoid colliding with the load-bearing `[refactor]` routing tag.

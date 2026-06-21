@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths
 kind: epic
-stage: drafting
+stage: implementing
 tags: []
 parent: null
 depends_on: [epic-mode-composition]
@@ -89,3 +89,29 @@ Do not treat these as commitments. -->
 - **Resolution precedence** (confirmed from SPEC): session override (`/mode`)
   > config default > unset. Override is ephemeral (module state, not disk);
   config default is durable; a new session restarts from the config default.
+
+## Decomposition (realized)
+
+Three features, refined by a codex decomposition advisory. DAG:
+`config-default → {mode-command, keybinding-cycle}` (the two consumers parallelize).
+
+- `epic-switching-paths-config-default` — plugin-owned config read/merge + the
+  **effective-mode state layer** (distinct default vs override; effective =
+  `override ?? default ?? unset`) + session-start seeding; owns the SPEC/ARCHITECTURE
+  roll-forward (plugin config supersedes the closed-`Settings` assumption) —
+  depends on: `[]`
+- `epic-switching-paths-mode-command` — the `/mode` family (no-arg shows effective
+  mode + source + presets; `<preset>` sets override; `off` falls back to default);
+  owns command-output doc semantics — depends on: `[config-default]`
+- `epic-switching-paths-keybinding-cycle` — Ctrl+M forward / Shift+Ctrl+M backward
+  cycle relative to the effective mode; closes the Ctrl+M SPEC open question —
+  depends on: `[config-default]`
+
+### Other agent review (codex)
+Accepted: `config-default` must own a REAL default/override seam, not just config
+reads — the resolver's single `activeSpec` would make `/mode off` unable to fall
+back if default were seeded via `setActiveMode`. So config-default introduces the
+distinct-tier effective-mode layer. The shared effective-mode source/formatter
+(needed by `/mode` no-arg, the cycle start, and the `/mode:inspect` preset-name
+line) lives in this layer. Doc roll-forward split: config-default owns config +
+precedence; keybinding owns Ctrl+M docs; mode-command owns command-output semantics.
