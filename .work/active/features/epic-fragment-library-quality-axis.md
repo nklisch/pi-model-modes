@@ -1,7 +1,7 @@
 ---
 id: epic-fragment-library-quality-axis
 kind: feature
-stage: drafting
+stage: review
 tags: [prose]
 parent: epic-fragment-library
 depends_on: []
@@ -45,3 +45,32 @@ cache. No-code-surface ([prose]).
   framing.
 - **Base overlays are thin tone-setters** (one short paragraph; no tool/identity/
   context restatement) — applies to base-overlays.
+
+## Authoring notes
+
+Authored the three quality-axis fragments at `prompts/axis/quality/`:
+`architect.md`, `pragmatic.md` (overwrote the minimal starter), and `minimal.md`.
+
+- **Adapt-port from `../claude-code-modes/prompts/axis/quality/`.** Each reference
+  file was a multi-section Claude-Code brief (Code structure / Error handling /
+  Documentation and types / Output communication, naming JSDoc, tool framing,
+  Claude-Code self-references). Distilled each to ONE focused behavioral brief —
+  heading + one short paragraph — matching the voice/length of the existing
+  `pragmatic` starter and pi's transform-not-replace model (additive; restates no
+  tools/identity/context). Filename sans `.md` is the value name
+  (`architect`/`pragmatic`/`minimal`), exactly per `src/fragments.ts` discovery
+  and the `docs/SPEC.md` quality set.
+- **Behavioral essence preserved.** architect = build for years (right
+  abstractions, cohesive modules, real edge cases, WHY-comments, explain
+  structural calls); pragmatic = match the codebase, improve where contained,
+  abstract only at a clear immediate payoff, ship-over-perfect; minimal =
+  smallest correct change, no speculative work, guard only real boundaries.
+- **No dynamic text/timestamps** — byte-stable splice (SPEC Invariant 2).
+- **Verification:** `npm test` green (199 passing). The shared
+  `tests/fragments.test.ts` "starter-set sanity" block was being concurrently
+  updated by sibling axis/overlay workers (the shared-index race the brief
+  flagged). Reconciled the quality slice honestly: pinned the per-axis exact name
+  list to `[architect, minimal, pragmatic]` (filename-sorted) and updated the
+  total-paths literal to the SPEC-complete `24`. Per the race-safe commit
+  instruction, this test file is NOT included in this feature's commit (committed
+  separately by the worker that owns the shared file).
