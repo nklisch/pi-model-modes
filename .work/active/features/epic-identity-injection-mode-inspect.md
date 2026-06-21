@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-mode-inspect
 kind: feature
-stage: implementing
+stage: review
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-cache-and-change-signal, epic-identity-injection-identity-derivation]
@@ -382,3 +382,59 @@ singular/plural turn wording, per-reason detail, no-`triggerTurn` emission, and
 `makePi` recording `sendMessage`). No advisory points were rejected. Overall
 codex take: "proceed with `mode:inspect`, literal `deriveIdentityLine`, and a
 clearly documented context-leak decision before implementation."
+
+## Implementation notes
+
+Landed all five units exactly per the design body (OPUS implementor stride, no
+fan-out).
+
+**What landed:**
+- **Unit 3** — `tests/harness.ts`: added `sendMessage: record("sendMessage")` to
+  `makePi`'s recorded methods (additive; existing methods untouched).
+- **Unit 1** — `src/commands.ts` (new): `MODE_INSPECT_COMMAND="mode:inspect"`,
+  `MODE_INSPECT_MESSAGE_TYPE="mode-inspect"`, `formatModeSummary()` (→ `"unset"`),
+  the `shortHex`/`formatChangeDetail`/`formatLastChanged` helpers, the pure
+  `renderModeInspect(snapshot, model)`, and the `registerModeInspectCommand(pi)`
+  seam (reads `getChangeSignal()` + `ctx.model`, renders, `pi.sendMessage({
+  customType, content, display:true })` with NO `triggerTurn`). Verbatim from the
+  design; `.js` ESM import extensions.
+- **Unit 2** — `extensions/index.ts`: imported `registerModeInspectCommand` and
+  called it after `pi.on("before_agent_start", handleBeforeAgentStart)`; updated
+  the entry doc-comment Registrations list to add `/mode:inspect`.
+- **Unit 4** — `tests/commands.test.ts` (new): full render matrix
+  (model-switched canonical 4-line shape with literal `deriveIdentityLine` and
+  `(provider/id → provider/id)` detail; initial with no parenthetical and no
+  `undefined`; empty ring "never" + `(none)`; `currentKey` undefined → `(none)`;
+  no-model → `(no model)`; this turn / 1 turn ago / N turns ago wording; shortHex
+  64-char truncation + short-whole; base-changed detail; mode-switched
+  `(unset → flow)`), plus the registration assertion (exactly one
+  `registerCommand` named `"mode:inspect"`) and the emission seam (one real
+  `handleBeforeAgentStart` turn → extracted handler → `sendMessage` with
+  `customType "mode-inspect"`, `display:true`, content containing the identity
+  line + `Cache key:`, and no `triggerTurn`). `beforeEach(resetCacheForTesting)`.
+- **Unit 5** — `docs/ARCHITECTURE.md`: rolled the example block
+  `Identity: GLM-4.6 (Zhipu AI)` → `Identity: You are GLM-4.6 from Zhipu AI.`
+  (the locked `deriveIdentityLine` rendering). Left `Mode: flow (...)` as the
+  future-state illustration.
+
+**Deviation (logged):** The pre-existing `tests/registration.test.ts` asserted
+the factory "registers nothing else" beyond the `before_agent_start` handler.
+Wiring `/mode:inspect` makes that assertion false by design, so it was updated
+(not gamed) into two `it`s: the handler-by-reference assertion is unchanged, and
+a new assertion verifies exactly one `registerCommand` named `"mode:inspect"`
+and nothing beyond the handler `on` + that command. This is the contract roll-
+forward the design's co-ownership discipline implies; the test still proves the
+single registration surface.
+
+**API verification:** Confirmed against
+`node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.d.ts`:
+`registerCommand(name: string, Omit<RegisteredCommand,"name"|"sourceInfo">)`
+accepts the colon name (`name` is `string`, no validation in the type);
+`sendMessage(message, options?)` returns `void` (not a Promise — the handler does
+not await it); `ExtensionCommandContext extends ExtensionContext` carries
+`.model`. No design-flaw escape hatch needed — the colon command name and
+`sendMessage` signature both hold.
+
+**Verification:** `npm run typecheck` clean; `npm test` green — 92 tests across
+8 files (was 72 across 7; added `tests/commands.test.ts` with 19 cases and split
+`registration.test.ts` from 1 into 2 cases).

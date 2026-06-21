@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { handleBeforeAgentStart } from "../src/handler.js";
+import { registerModeInspectCommand } from "../src/commands.js";
 
 /**
  * pi extension entry. The default export is the factory pi discovers and
@@ -10,6 +11,9 @@ import { handleBeforeAgentStart } from "../src/handler.js";
  *     cache-aware handler from `src/handler.ts`). Registered by reference so the
  *     unit tests can assert the registered handler is the same function object
  *     they import.
+ *   - `/mode:inspect` → registered via `registerModeInspectCommand` (the
+ *     plain-text status panel from `src/commands.ts` that reads the change
+ *     signal + current identity).
  *
  * Downstream epics extend this factory (register `/mode`, keybindings, etc.)
  * by adding more `pi.on(...)` / `pi.registerCommand(...)` calls — edit, don't
@@ -22,4 +26,5 @@ import { handleBeforeAgentStart } from "../src/handler.js";
  */
 export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", handleBeforeAgentStart);
+  registerModeInspectCommand(pi);
 }

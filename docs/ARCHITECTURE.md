@@ -129,7 +129,7 @@ buffer. `/mode:inspect` reads that buffer to render:
 
 ```
 Mode: flow  (base:chill • agency:autonomous • scope:adjacent • +flow)
-Identity: GLM-4.6 (Zhipu AI)
+Identity: You are GLM-4.6 from Zhipu AI.
 Effective prompt last changed: 3 turns ago — reason: model switched
                                          (zai/glm-4.5 → zai/glm-4.6)
 Cache key: 9f3a...c1e2

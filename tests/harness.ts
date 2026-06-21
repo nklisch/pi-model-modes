@@ -119,6 +119,7 @@ export function makePi(): { pi: ExtensionAPI; calls: RecordedCall[] } {
     registerFlag: record("registerFlag"),
     registerMessageRenderer: record("registerMessageRenderer"),
     registerProvider: record("registerProvider"),
+    sendMessage: record("sendMessage"),
   } as unknown as ExtensionAPI;
   return { pi, calls };
 }
