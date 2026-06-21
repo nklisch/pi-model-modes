@@ -68,3 +68,33 @@ transform-not-replace model).
 
 <!-- The design pass on each child feature fills in real specifics.
 Do not treat these as commitments. -->
+
+## Design decisions
+
+- **Voice and source**: Adapt-port from `../claude-code-modes`. Port the
+  proven fragment bodies, adapting them to pi's transform-not-replace model
+  and stripping Claude-Code-specific framing (tool lists, "Claude Code"
+  self-references, CC-specific mechanics). The creative adaptation work is
+  the base overlays — the reference's bases are full skeletons, ours are
+  thin overlays (next decision), so base content is written fresh in the
+  overlay voice rather than ported verbatim.
+- **Base overlay semantics**: Thin tone-setter. A base overlay is ONE short
+  paragraph that shifts register and emphasis (e.g. calm pacing for `chill`,
+  calm-plus-engaged for `flow`). It does NOT restate tools, identity, or
+  context — pi owns all of that. This is the minimal form that respects
+  transform-not-replace and avoids redundancy against pi's assembled content.
+- **Preset set (v1)**: Curated 8 presets — `{ create, explore, safe, refactor,
+  debug, flow, partner, muse }`. Director dropped; `muse`, `flow`, `partner`
+  explicitly included. Each preset maps to
+  `{ base, agency, quality, scope, modifiers[] }` (concrete axis/modifier
+  assignments resolved at feature-design time). The remainder of the
+  reference's ~14 presets can land in a later pass.
+
+## Decomposition risks
+
+- **`refactor` preset vs `[refactor]` tag name clash.** The preset named
+  `refactor` (a disposition bundle) shares its name with the `[refactor]`
+  routing tag (behavior-preserving structural change → `refactor-design`).
+  The feature-design pass should either rename the preset (e.g.
+  `refactor-safe`) or confirm the coexistence is intentional and documented.
+  Not blocking; surfaced for the design pass.

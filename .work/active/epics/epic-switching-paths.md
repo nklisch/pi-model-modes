@@ -65,3 +65,27 @@ signal).
 
 <!-- The design pass on each child feature fills in real specifics.
 Do not treat these as commitments. -->
+
+## Design decisions
+
+- **Config storage**: Plugin-owned config file. The plugin reads
+  `~/.pi/agent/pi-model-modes.json` (global) and `.pi/pi-model-modes.json`
+  (project, overrides global) for `{ defaultMode, injectIdentity, ... }`,
+  merging them itself. Fully plugin-owned, namespaced, no collision, no
+  dependence on pi's closed `Settings` type.
+
+  **This decision SUPERSEDES `docs/SPEC.md`'s "Switching paths" section**,
+  which assumed a `mode` key in `settings.json`. Grounding showed pi's
+  `Settings` interface is closed (fixed keys, no index signature, no
+  plugin-namespace hook — verified in `dist/core/settings-manager.d.ts`);
+  `settings.json` passthrough is unsupported, untyped, and collision-prone.
+  The feature-design pass MUST roll `SPEC.md` and `ARCHITECTURE.md` forward to
+  reflect plugin-owned config (rolling-foundation: docs describe current
+  truth, not past).
+- **Default keybinding**: `Ctrl+M` cycles forward through the preset list,
+  `Shift+Ctrl+M` backward. User-rebindable via `~/.pi/agent/keybindings.json`.
+  Low-stakes and reversible, so defaulted here rather than asked; revisit if a
+  collision is detected in the user's keymap (SPEC open question, now closed).
+- **Resolution precedence** (confirmed from SPEC): session override (`/mode`)
+  > config default > unset. Override is ephemeral (module state, not disk);
+  config default is durable; a new session restarts from the config default.
