@@ -1,7 +1,7 @@
 ---
 id: epic-scaffold-handler-package-skeleton
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-scaffold-handler
 depends_on: []
@@ -488,3 +488,13 @@ No divergence. Every verified fact held:
 - `npm view` latest: vitest 4.1.9, typescript 6.0.3, @types/node 26.0.0 —
   matches the design's note. `@types/node` correctly pinned to `^22.19.0`
   (engine floor), not latest 26.
+
+## Review (2026-06-21)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+**Nits**: none
+
+**Notes**: Substrate feature review delegated by active autopilot as a cross-model pass (Codex reviewing GLM implementation). Used a standard/deep-calibrated direct review because the feature is a small scaffold with no runtime logic. Verified pi package discoverability against pi `docs/packages.md`; peer dependencies are exactly the documented pi-bundled peers (`@earendil-works/pi-coding-agent`, `typebox`) at `"*"` and are not duplicated in `dependencies` or `bundledDependencies`; `extensions/index.ts` exports a synchronous `ExtensionAPI` factory and registers no handlers/tools/commands/flags; no `src/`, `prompts/`, or `tests/` scope creep was present in commit `847f2eb`; config uses strict NodeNext/noEmit and Vitest globals/passWithNoTests. Re-ran `npm run typecheck` and `npm test`; both exited 0. No follow-up items filed.
