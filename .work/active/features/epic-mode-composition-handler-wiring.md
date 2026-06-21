@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-handler-wiring
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-mode-resolver, epic-mode-composition-deterministic-splice]
@@ -263,3 +263,21 @@ All 5 units landed exactly per the design; no deviations.
 `git diff`) and pass unchanged, proving the unset byte contract (Invariant 3) is
 preserved. No real bugs surfaced; the dep contracts (resolver/assemble/cache)
 held as specified.
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), cross-model review via codex
+(peeragent, --effort high). NO defects found.
+
+Codex verified every integration seam: the unset MISS is byte-identical to the
+pre-wiring handler (`identity + "\n" + base`, NO_MODE_SIGNATURE key; the
+noop/clean-base/handler test files are byte-unchanged vs `5535064^` and pass);
+`resolveActiveModePlan()` runs once before the cache check and `getCachedResult`
+is not reached if resolution throws; the active-mode MISS routes through
+`assembleSystemPrompt`; HIT returns cached bytes wholesale; `/mode:inspect`
+catches resolver errors and still emits exactly one display message with no
+`triggerTurn` and does not perturb the turn counter; `formatChangeDetail` shortens
+real mode signatures and renders empty as `unset` with no `undefined →`; the
+handler-mode smoke tests honestly prove the active/unset byte + key separation and
+reset module state. 172 tests pass; ARCHITECTURE enforcement table + fragment-cache
+wording match the implementation. Advanced review → done.
