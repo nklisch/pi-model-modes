@@ -141,6 +141,17 @@ sub-agents, so type grounding was done by direct inspection of pi's installed
   never destroys deliberate casing in practice. Edge cases: `""` -> `""`,
   `"foo--bar"` -> `"Foo Bar"` (repeated separators collapse),
   `"my-custom"` -> `"My Custom"` (the delegation brief's example).
+
+  **REVISED per codex consult**: the original `toUpperCase()+toLowerCase()`
+  mangled already-mixed-case ids (`"OpenAI"` -> `"Openai"`, `"NVIDIA"` ->
+  `"Nvidia"`). The fallback now preserves any segment containing an uppercase
+  letter as-is, and only title-cases all-lowercase segments. So custom ids
+  like `"OpenAI"`, `"NVIDIA"`, `"gpt5"` render correctly, while `"openai"` /
+  `"my-custom"` still title-case to `"Openai"` / `"My Custom"`. Added test
+  cases: `providerDisplayName("OpenAI")` === `"OpenAI"`,
+  `providerDisplayName("NVIDIA")` === `"NVIDIA"`,
+  `providerDisplayName("gpt5-Mini")` === `"gpt5 Mini"` (mixed segment
+  preserved, lowercase segment title-cased).
 - **`openai-codex` maps to `"OpenAI"`.** The delegation brief's example list
   omitted `openai-codex`, but it IS a member of pi's canonical
   `KnownProvider` union — and Codex is OpenAI's product line. Filling it is
@@ -231,15 +242,26 @@ export const PROVIDER_DISPLAY_NAMES: Readonly<Record<KnownProvider, string>> = {
 /**
  * Title-case an unknown/custom provider id so it renders sensibly in the
  * identity line. Splits on whitespace, dash, underscore, and dot; drops
- * empty segments (collapsing repeated separators); uppercases the first
- * character and lowercases the tail of each segment; joins with a single
- * space. `""` -> `""`.
+ * empty segments (collapsing repeated separators).
+ *
+ * Per-segment casing rule (REVISED per codex consult — the original
+ * `toUpperCase()+toLowerCase()` mangled already-mixed-case ids like
+ * `"OpenAI"` → `"Openai"` and all-caps `"NVIDIA"` → `"Nvidia"`):
+ *   - segment already contains an uppercase letter (e.g. "OpenAI", "NVIDIA",
+ *     "gpt5") → preserved AS-IS (assume the id author chose the casing);
+ *   - segment is all-lowercase (e.g. "openai", "my-custom" → ["my","custom"])
+ *     → title-cased (first char upper, tail lower).
+ * `""` -> `""`.
  */
 function titleCaseId(id: string): string {
   return id
     .split(/[\s\-_.]+/)
     .filter((segment) => segment.length > 0)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .map((segment) =>
+      /[A-Z]/.test(segment)
+        ? segment                      // preserve mixed-case / all-caps segments
+        : segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase(),
+    )
     .join(" ");
 }
 
