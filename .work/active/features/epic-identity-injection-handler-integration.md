@@ -103,3 +103,27 @@ byte-identity), any new handler tests (identity presence + correctness;
 always-return through both paths; hit returns the prior miss's bytes), and
 confirms clean-base still holds (splice sources from `e.systemPrompt`, never
 `lastResult`). -->
+
+## Codex consult requirements (folded in from decomposition review)
+
+- **Roll the foundation docs forward** (OWNED HERE, not elsewhere). The
+  locked decision "always inject identity" means Invariant 3 is no longer
+  literally "returns `e.systemPrompt` unchanged" — it's "returns `e.systemPrompt`
+  with identity prepended, and NO mode fragments when unset." `docs/SPEC.md`
+  ("The three invariants" → Invariant 3, and "Identity line") and
+  `docs/ARCHITECTURE.md` ("Where each invariant is enforced" + per-turn flow)
+  must be updated as part of this feature's implement pass (rolling-foundation:
+  docs describe current truth). Flag this in the feature body so the
+  implementor doesn't miss it.
+- **Evolved `noop.test.ts` assertions** (be specific): (a) the identity line
+  is the FIRST line and matches `deriveIdentityLine(model)`; (b) the
+  REMAINDER after the identity line is byte-identical to the input
+  `e.systemPrompt`; (c) across repeated calls with the same input, there is
+  exactly ONE identity line (no duplication from caching); (d) the result
+  always has a present `systemPrompt` (never undefined).
+- **Always-return through both cache paths** — explicit test: first call
+  (MISS) returns a present string; second identical call (HIT) returns the
+  cached present string; a call with changed input (MISS) still returns a
+  present string. A regression where the MISS path returns `undefined` would
+  silently drop identity+mode — this is the worst failure mode and must be
+  caught.

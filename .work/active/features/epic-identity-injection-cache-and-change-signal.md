@@ -97,3 +97,27 @@ how it compares prev-vs-new inputs, the turn-accounting model, the exact read
 API surface, and the tests (hit/miss correctness, byte-stability of the key
 for identical inputs, change-detection on each input flipping, ring-buffer
 eviction, reason classification). -->
+
+## Codex consult requirements (folded in from decomposition review)
+
+The stability test (in `cache-stability-test`) only proves the NO-CHANGE
+direction; it cannot prove the `hash(e.systemPrompt)` term in the key is
+necessary. THIS feature must ship change-detection tests that would FAIL if
+any key term were omitted. Specifically:
+
+- **Base-change invalidation**: same `model` + same `mode.signature` +
+  DIFFERENT `e.systemPrompt` → different key (proves the `hash(e.systemPrompt)`
+  term matters).
+- **Miss-after-base-change**: after storing result A, changing only
+  `e.systemPrompt` is a MISS (not a HIT), and the returned/stored result is
+  newly assembled — NOT the prior `lastResult`.
+- **Model-change invalidation**: same `mode.signature` + same `e.systemPrompt`
+  + different `model.id`/`provider` → different key (proves model terms matter).
+- **Mode-change invalidation** (forward-looking, may be a no-op sentinel now):
+  same model + same base + different `mode.signature` → different key.
+- **Change-signal reason classification**: each of the above records the
+  correct `reason` (`base-changed` / `model-switched` / `mode-switched` /
+  `initial`) with useful detail.
+- **Uninitialized state cannot HIT**: before the first MISS populates state,
+  the cache reports a MISS (never surfaces an undefined `lastResult`). This
+  protects the always-return discipline on the hit path.

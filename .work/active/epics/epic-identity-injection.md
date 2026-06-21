@@ -150,6 +150,16 @@ foundations → handler-integration → cache-stability-test.
   contracts; `handler-integration`'s design verifies identity-leading and
   always-return through both hit and miss paths.
 
+## Handoff obligations
+
+- **Roll `docs/SPEC.md` + `docs/ARCHITECTURE.md` forward when identity lands.**
+  The locked decision "always inject identity" means Invariant 3 is no longer
+  literally "returns `e.systemPrompt` unchanged" — it becomes "returns
+  `e.systemPrompt` with identity prepended; NO mode fragments when unset."
+  The roll-forward is OWNED by `epic-identity-injection-handler-integration`
+  (its body carries the explicit codex-consult requirement). Flagged at epic
+  level so it survives child rework. (From codex decomposition review.)
+
 ## Design decisions
 
 - **Identity injection scope**: ALWAYS inject the identity line, even when

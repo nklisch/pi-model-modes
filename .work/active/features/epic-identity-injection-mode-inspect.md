@@ -90,3 +90,16 @@ plain-text render function, how the minimal no-mode `Mode:` line renders for
 v1, the edge case when no turn has run yet (empty ring buffer / no lastResult),
 and the test (invokes the command against a stubbed cache read API; asserts
 the rendered text matches the canonical shape). -->
+
+## Codex consult requirements (folded in from decomposition review)
+
+- **Unset wording must be precise** (avoid rework when modes land). Identity
+  is NOT a mode, so the output must not imply it is. Render `Mode: unset`
+  (or `Mode: none`) when no mode is active — NOT `Mode: identity` or anything
+  that conflates identity with a mode. Design the `Mode:` line around a
+  **mode-summary formatter** that currently returns `unset`/`none` and later
+  fills in axes/modifiers when `epic-mode-composition` lands, so this feature
+  doesn't need rework.
+- The `Identity:` field uses `deriveIdentityLine` (reuses identity-derivation).
+  Render it on every inspect call (identity is always active), independent of
+  whether a mode is set.
