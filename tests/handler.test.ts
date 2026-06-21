@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { deriveIdentityLine } from "../src/identity.js";
-import { resetCacheForTesting } from "../src/cache.js";
+import { resetCacheForTesting, getChangeSignal } from "../src/cache.js";
 import { makeContext, makeEvent, makeModel } from "./harness.js";
 
 describe("handleBeforeAgentStart — cache-path coverage (always-return on HIT and MISS)", () => {
@@ -81,11 +81,26 @@ describe("handleBeforeAgentStart — undefined ctx.model (acceptance: skip ident
     expect(r.systemPrompt.startsWith("\n")).toBe(false);
   });
 
-  it("undefined model still caches: second identical call is a HIT returning the same bytes", () => {
+  it("undefined model still engages the cache: a MISS records one change entry with empty model id/provider; the HIT records none", () => {
     const base = "base";
     const r1 = handleBeforeAgentStart(makeEvent(base), makeContext({ model: undefined }));
+    // After the first (MISS) call the change signal recorded an entry whose
+    // model components are the empty-string sentinels — proving the handler ran
+    // the full key/cache path, not a no-model short-circuit.
+    const afterMiss = getChangeSignal();
+    expect(afterMiss.entries.length).toBe(1);
+    expect(afterMiss.entries[0].reason).toBe("initial");
+    expect(afterMiss.entries[0].detail.modelId.to).toBe("");
+    expect(afterMiss.entries[0].detail.modelProvider.to).toBe("");
+
     const r2 = handleBeforeAgentStart(makeEvent(base), makeContext({ model: undefined }));
+    // Second identical call is a HIT: same bytes, and NO new change entry
+    // (a skip-the-cache impl would never reach setCachedResult and this would
+    // still be 1 — but then the bytes-equality alone wouldn't prove caching;
+    // the MISS-side assertions above close that gap).
+    const afterHit = getChangeSignal();
     expect(r1.systemPrompt).toBe(base);
-    expect(r2.systemPrompt).toBe(base); // HIT path also returns a present string
+    expect(r2.systemPrompt).toBe(base);
+    expect(afterHit.entries.length).toBe(1); // unchanged → the second call was a HIT, not a re-store
   });
 });

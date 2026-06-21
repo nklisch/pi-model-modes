@@ -660,3 +660,33 @@ for module-scope cache isolation.
   (cache, clean-base, handler, identity, noop, registration).
 - `extensions/index.ts` unchanged — exactly one
   `pi.on("before_agent_start", handleBeforeAgentStart)`.
+
+## Cross-model implementation review (codex, 2 passes)
+
+A cross-model implementation review (codex via peeragent, `--effort high`,
+2 passes) ran on the landed commits. Five findings surfaced, all addressed —
+final suite 72 tests green, typecheck clean.
+
+- **Undefined-`ctx.model` acceptance case was unguarded** (should-fix). Added an
+  `undefined ctx.model` describe block: asserts no identity, no leading newline,
+  `result === e.systemPrompt`, and — after the tightening pass — that the cache
+  path actually engaged (the change-signal ring records one `initial` entry with
+  `detail.modelId.to === ""` / `modelProvider.to === ""`, and the second identical
+  call is a HIT that adds no new entry). Closes the gap where a skip-the-cache
+  impl would still have passed a bytes-only assertion.
+- **`modelId` cache-key wiring unproven** (should-fix). The model-switch test
+  shared a default `id` across both models, so it only proved provider drove the
+  key. Added a same-provider / distinct-id MISS case — a stale HIT if `modelId`
+  were dropped from `CacheKeyInputs`.
+- **Changed-input MISS asserted only presence** (should-fix). Now asserts the
+  exact assembled bytes (`${identity}\n${base}`).
+- **No `MISS → HIT → different-base MISS` stacking test** (folded in). Added —
+  asserts exactly one identity line on every path.
+- **`docs/ARCHITECTURE.md` enforcement-table drift** (should-fix, real doc
+  defect). The Clean-base / Cache-stability rows credited the not-yet-existing
+  `assemble.ts`; rewritten to `handler.ts` (+`cache.ts`) for current truth, with
+  a note that `epic-mode-composition` introduces `assemble.ts` and rolls these
+  rows forward then.
+
+Net new tests: 72 total (was 68). Commits: `1377f45` (initial), `3c4c2a4`
+(review fixes), plus the undefined-model cache-state tightening.
