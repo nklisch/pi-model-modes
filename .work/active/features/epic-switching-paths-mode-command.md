@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-mode-command
 kind: feature
-stage: drafting
+stage: implementing
 tags: []
 parent: epic-switching-paths
 depends_on: [epic-switching-paths-config-default]
@@ -49,3 +49,57 @@ keybinding (keybinding-cycle).
 - **`/mode off` falls back to the config default**, not unset (precedence layer).
 - Set-time validation (the resolver throws on a bad mode — surface it gracefully).
 - Plugin command registration is additive in `extensions/index.ts`.
+
+## Design decisions (resolved during feature-design)
+
+Resolved under autopilot (scope `--all`). Implementation tier: OPUS. Advisory
+skipped (well-grounded by the reference `../claude-code-modes` / pi's `preset.ts`
+example which shows the exact `registerCommand` + `ctx.ui.notify` patterns); codex
+at the implementation review (shared with keybinding-cycle).
+
+- **`registerModeCommand(pi)` in `src/commands.ts`** (alongside the existing
+  `registerModeInspectCommand`). Registers command `"mode"`; handler
+  `async (args, ctx) => {}`:
+  - **empty arg** → emit a panel (`pi.sendMessage({ customType:"mode", content,
+    display:true })`, no triggerTurn) showing the effective mode (name + source +
+    composed summary) and the available presets. Multi-line → message stream, not
+    a `notify` toast.
+  - **`"off"`** → `clearActiveMode()` (clears the OVERRIDE; effective falls back to
+    the config default per the precedence layer); `ctx.ui.notify` the new effective
+    state.
+  - **a preset/mode name** → `setActiveMode(arg)` in try/catch; success →
+    `ctx.ui.notify('mode set to "<arg>"')`; failure (unknown preset / missing
+    fragment — the resolver validates at set-time) → `ctx.ui.notify(err.message,
+    "error")`, leaving the prior override intact.
+- **Effective-mode display source**: `getEffectiveModeSource()` for the tier;
+  the effective spec name = `getActiveMode() ?? getDefaultMode()` (a string preset
+  name in the common case); the composed axes via `resolveActiveModePlan().mode`
+  (reuse `formatModeSummary`). Wrap the resolve in try/catch so a broken active
+  mode renders an error line rather than crashing the listing.
+- **Preset list** = `Object.keys(loadPresets()).sort()` (stable display + cycle
+  order shared with keybinding-cycle).
+- **Owns command-output doc semantics**: a short SPEC note on `/mode` behavior
+  (no-arg lists; `<preset>` sets; `off` → default).
+- **No child stories.**
+
+## Implementation Units
+### Unit 1: `src/commands.ts` — add `registerModeCommand(pi)`
+`registerCommand("mode", { description, handler })`. Helpers: `formatModeListing()`
+(effective state + preset list → string), reuse `formatModeSummary`. Imports:
+`setActiveMode, clearActiveMode, getActiveMode, getDefaultMode,
+getEffectiveModeSource, resolveActiveModePlan` from `./resolver.js`; `loadPresets`
+from `./presets.js`.
+### Unit 2: `extensions/index.ts` — `registerModeCommand(pi)` (additive).
+### Unit 3: `tests/mode-command.test.ts` — via `makePi`: command registered as
+`"mode"`; extract the handler; with a fixture prompts tree + presets, assert:
+no-arg emits a listing (effective + presets); `<preset>` sets the override
+(getActiveMode reflects it); `off` clears the override → effective = default;
+unknown preset → notify error, override unchanged. Reset resolver/cache/fragment/
+presets in `beforeEach`; extend `makePi` to record `registerCommand` (already does)
++ capture `ctx.ui.notify` via a stub ctx.
+### Unit 4: `docs/SPEC.md` — `/mode` command-output semantics note.
+
+## Acceptance criteria
+- [ ] `/mode <preset>` sets the override; `/mode off` falls back to the default;
+  `/mode` (no arg) lists effective + presets; unknown preset → graceful error,
+  prior override intact. typecheck clean; suite green.

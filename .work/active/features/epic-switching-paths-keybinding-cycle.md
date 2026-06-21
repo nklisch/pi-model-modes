@@ -1,7 +1,7 @@
 ---
 id: epic-switching-paths-keybinding-cycle
 kind: feature
-stage: drafting
+stage: implementing
 tags: []
 parent: epic-switching-paths
 depends_on: [epic-switching-paths-config-default]
@@ -42,3 +42,43 @@ command (mode-command); it reuses the same set-override seam.
 ## Inherited / epic design decisions (do not re-litigate)
 - **Ctrl+M forward / Shift+Ctrl+M backward**, user-rebindable; default chosen here
   (SPEC open question closed). Cycle relative to the effective mode.
+
+## Design decisions (resolved during feature-design)
+
+Resolved under autopilot (scope `--all`). Implementation tier: OPUS. Advisory
+skipped (the reference `preset.ts` shows the exact `registerShortcut(Key.ctrlShift(
+"u"), {handler})` + cycle pattern); codex at the implementation review (shared with
+mode-command).
+
+- **`registerModeKeybindings(pi)` in `src/keybinding.ts` (new)**. Registers
+  `Key.ctrl("m")` (forward) and `Key.ctrlShift("m")` (backward), each
+  `{ description, handler: async (ctx) => {} }`. `Key` is imported from
+  `@earendil-works/pi-tui` (per `preset.ts`; the implementor verifies the import is
+  resolvable — if `pi-tui` is not a dep, fall back to the `registerShortcut` KeyId
+  string form, documenting the choice).
+- **Cycle semantics**: `const names = Object.keys(loadPresets()).sort()` (shared
+  order with mode-command). Current index = `names.indexOf(<effective preset
+  name>)` where the effective name = `getActiveMode() ?? getDefaultMode()` (string
+  preset; -1 when unset or an explicit non-preset spec). Forward →
+  `names[(idx + 1) % len]`; backward → `names[(idx - 1 + len) % len]`; from
+  unset (idx -1) forward enters at `names[0]`, backward at `names[len-1]`.
+  `setActiveMode(next)` (the OVERRIDE) then `ctx.ui.notify('mode: <next>')`. Empty
+  preset list → notify "no presets" (no-op).
+- **Owns closing the SPEC "Open questions" Ctrl+M note**: document Ctrl+M /
+  Shift+Ctrl+M as the chosen default (user-rebindable via keybindings.json), the
+  open question resolved.
+- **No child stories.**
+
+## Implementation Units
+### Unit 1: `src/keybinding.ts` (new) — `registerModeKeybindings(pi)` + a pure
+`nextPresetName(names, current, dir)` helper (testable without pi).
+### Unit 2: `extensions/index.ts` — `registerModeKeybindings(pi)` (additive).
+### Unit 3: `tests/keybinding.test.ts` — unit-test `nextPresetName` (forward/back
+wrap; from unset; empty list) + a registration test via `makePi` (extend `makePi`
+to record `registerShortcut`) asserting two shortcuts registered with handlers.
+### Unit 4: `docs/SPEC.md` — close the Ctrl+M open question.
+
+## Acceptance criteria
+- [ ] Forward/backward cycle through the sorted preset list relative to the
+  effective mode, wrapping; from unset enters at the ends; sets the override.
+  `nextPresetName` covered (wrap, unset, empty). typecheck clean; suite green.
