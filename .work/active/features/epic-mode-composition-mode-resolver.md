@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-mode-resolver
 kind: feature
-stage: review
+stage: done
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-fragment-loader, epic-mode-composition-preset-table]
@@ -331,3 +331,18 @@ a failed set), clone-on-set (post-set caller mutation inert), seam basics.
 **Verification**: `npm run typecheck` clean; `npm test` green — 154 tests (139
 prior + 15 new resolver tests), 11 files. No deviations from the contract; no
 dependency-export mismatches surfaced.
+
+## Review record
+
+**Verdict: Approve** — deep lane (feature), cross-model review via codex
+(peeragent, --effort high).
+
+Codex confirmed the signature materialization is correct: content edits (mtime
+bump) move the signature, base:pi participates via the virtual entry, model/base-
+prompt/identity are excluded, encoding is length-delimited, ordering is
+base→agency→quality→scope→modifiers, modifier dedup is first-wins, the no-mode
+fast path avoids discovery, and setActiveMode validates before assignment. One
+should-fix fixed: getActiveMode() returned activeSpec by reference (mutable-state
+leak) — now clones object specs (clone-on-read test added). Two test nits fixed
+(mislabeled explicit-spec test; base:pi test strengthened to distinguish from
+NO_MODE_SIGNATURE). 155 tests green, typecheck clean. Advanced review → done.
