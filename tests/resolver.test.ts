@@ -21,7 +21,6 @@ import {
   resetFragmentCacheForTesting,
 } from "../src/fragments.js";
 import {
-  loadPresets,
   resetPresetsForTesting,
   type ResolvedMode,
 } from "../src/presets.js";
@@ -75,11 +74,6 @@ function buildFixture(): string {
   return root;
 }
 
-/** A presets.json text exposing the named presets a test needs. */
-function presetsJson(presets: Record<string, ResolvedMode>): string {
-  return JSON.stringify(presets);
-}
-
 const PI_MODE: ResolvedMode = {
   base: "pi",
   agency: "autonomous",
@@ -126,22 +120,12 @@ describe("fast-path no-mode", () => {
   });
 });
 
-describe("preset resolution + ordered fragments", () => {
-  it("a preset resolves to base?→agency→quality→scope→modifiers with loaded trimmed content", () => {
+describe("explicit ResolvedMode spec — ordered fragment materialization", () => {
+  it("resolves to base?→agency→quality→scope→modifiers with loaded trimmed content", () => {
     buildFixture();
-    loadPresets({
-      json: presetsJson({
-        full: {
-          base: "chill",
-          agency: "autonomous",
-          quality: "pragmatic",
-          scope: "adjacent",
-          modifiers: ["tdd", "terse"],
-        },
-      }),
-    });
-    // setActiveMode resolves the string via the disk presets memo, so seed the
-    // memo by overriding: use an explicit spec instead to avoid disk coupling.
+    // An explicit ResolvedMode spec (not a preset name) so arbitrary axis combos
+    // can be exercised without disk coupling; the shipped-preset (string-spec)
+    // path is covered separately below.
     const spec: ResolvedMode = {
       base: "chill",
       agency: "autonomous",
@@ -205,15 +189,19 @@ describe("base:pi signature participation", () => {
       "scope",
     ]);
     const piSig = piPlan.signature;
+    // base:pi is a REAL mode, not no-mode: its signature is a content-hash, never
+    // the empty no-mode sentinel. (A resolver that treated base:pi as "no base
+    // participation" and collapsed toward the unset path would fail here.)
+    expect(piSig).not.toBe(NO_MODE_SIGNATURE);
+    expect(piSig.length).toBeGreaterThan(0);
 
-    // Same mode except a real base overlay.
+    // Same mode except a real base overlay → the base slot now carries a real
+    // fragment+hash instead of the virtual pi entry, so signatures differ.
     const realBase: ResolvedMode = { ...PI_MODE, base: "chill" };
     setActiveMode(realBase);
     const realPlan = resolveActiveModePlan();
     expect(realPlan.fragments[0].slot).toBe("base");
     expect(realPlan.fragments[0].value).toBe("chill");
-
-    // The virtual base:pi entry participates → signatures differ.
     expect(realPlan.signature).not.toBe(piSig);
   });
 });
@@ -354,6 +342,25 @@ describe("setActiveMode validation + clone-on-set", () => {
     );
     expect(after.mode?.base).toBe("pi");
     expect(after.mode?.modifiers).toEqual(["tdd"]);
+  });
+
+  it("getActiveMode returns a CLONE: mutating it does not corrupt active state", () => {
+    buildFixture();
+    const spec: ResolvedMode = { ...PI_MODE, modifiers: ["tdd"] };
+    setActiveMode(spec);
+    const before = resolveActiveModePlan().signature;
+
+    // Mutate the value returned by getActiveMode (object + its modifiers array).
+    const got = getActiveMode();
+    expect(typeof got).not.toBe("string");
+    const gotMode = got as ResolvedMode;
+    gotMode.base = "chill";
+    gotMode.agency = "does-not-exist";
+    gotMode.modifiers.push("terse");
+
+    // Active state is untouched — the next resolve matches the original.
+    expect(resolveActiveModePlan().signature).toBe(before);
+    expect(getActiveMode()).toEqual({ ...PI_MODE, modifiers: ["tdd"] });
   });
 });
 

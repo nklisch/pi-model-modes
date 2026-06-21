@@ -208,9 +208,17 @@ export function setActiveMode(spec: ModeSpec | undefined): void {
   activeSpec = typeof spec === "string" ? spec : normalized;
 }
 
-/** The currently-active mode spec, or `undefined` when no mode is active. */
+/**
+ * The currently-active mode spec, or `undefined` when no mode is active. Object
+ * (`ResolvedMode`) specs are returned as a CLONE (fresh `modifiers` array too) so
+ * a caller cannot mutate the resolver's active state through the returned value;
+ * string specs are immutable and returned as-is.
+ */
 export function getActiveMode(): ModeSpec | undefined {
-  return activeSpec;
+  if (activeSpec === undefined || typeof activeSpec === "string") {
+    return activeSpec;
+  }
+  return { ...activeSpec, modifiers: [...activeSpec.modifiers] };
 }
 
 /** Clear the active mode (equivalent to `setActiveMode(undefined)`). */
