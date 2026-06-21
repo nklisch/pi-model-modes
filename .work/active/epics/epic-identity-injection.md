@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection
 kind: epic
-stage: implementing
+stage: done
 tags: [tests]
 parent: null
 depends_on: [epic-scaffold-handler]
@@ -182,3 +182,54 @@ foundations → handler-integration → cache-stability-test.
   (not a custom editor-replacing UI overlay) for v1 — reads the change-signal
   ring buffer; format per ARCHITECTURE's example block. (Folded into this
   epic per the epicize decision — it consumes only this epic's change signal.)
+
+## Epic completion
+
+All five child features are `done`. The decomposition was realized exactly as
+planned (clean DAG; critical path foundations → handler-integration →
+cache-stability-test):
+
+- `epic-identity-injection-identity-derivation` — done (`deriveIdentityLine` +
+  `src/provider-names.ts` display-name map).
+- `epic-identity-injection-cache-and-change-signal` — done (`src/cache.ts`:
+  cache key, per-turn result cache, change-signal ring + read API).
+- `epic-identity-injection-handler-integration` — done (handler rewired to
+  cache-aware identity injection; always-return preserved through HIT/MISS;
+  predecessor `noop.test.ts`/`clean-base.test.ts` evolved; SPEC + ARCHITECTURE
+  rolled forward). 2-pass codex implementation review + fresh-context deep
+  review, both approved.
+- `epic-identity-injection-mode-inspect` — done (`/mode:inspect` command:
+  pure `renderModeInspect` + thin registration; reads the change signal +
+  identity). codex design advisory + codex implementation review + fresh-context
+  review, all approved.
+- `epic-identity-injection-cache-stability-test` — done
+  (`tests/cache-stability.test.ts`: Invariant-2 — HIT-path stability +
+  forced-MISS determinism + exact-shape anchor + negative control).
+
+**Headline behavior delivered:** the model is told what it is, by name and
+provider, on every turn (`You are {name} from {provider}.`), derived live from
+`ctx.model` so `/model` updates the line on the next turn; the cache key +
+change-signal ring buffer that the rest of the plugin depends on are born here;
+`/mode:inspect` surfaces identity, last-change reason, and cache key.
+
+**Decomposition-risk outcomes:** (1) the Invariant-3 scaffolding test break was
+handled as planned (evolved in handler-integration, not preserved). (2)
+change-detection vs no-change stability split across cache-and-change-signal's
+tests and the stability test, as designed. (3) identity-leads + always-return
+verified through both cache paths.
+
+**Handoff obligation discharged:** SPEC + ARCHITECTURE rolled forward when
+identity landed (owned by handler-integration; mode-inspect rolled the
+`/mode:inspect` example + context-history note forward too).
+
+**Verification:** `npm run typecheck` clean; `npm test` green — 8 files / 92
+tests. No open blockers; no follow-ups beyond the two pre-existing backlog
+items (`followup-cache-key-include-model-name`,
+`followup-cache-model-mode-priority-test`) which remain out of autopilot scope.
+
+## Epic review record
+
+**Verdict: Approve.** Every child feature reached `done` through its own review
+(three of them via cross-model codex passes). The realized decomposition matches
+the planned DAG; foundation docs describe current truth; the epic's headline
+behavior is delivered and tested. Advanced implementing → done.
