@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition-deterministic-splice
 kind: feature
-stage: implementing
+stage: done
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-mode-resolver]
@@ -210,3 +210,11 @@ clean-base is STILL enforced in `handler.ts` (the identity-only path). Rolling t
 table to credit `assemble.ts` now would assert a not-yet-true enforcement location,
 violating rolling-foundation (docs = current truth). The roll-forward moves to
 `handler-wiring`, where `assemble.ts` actually becomes the live enforcement point.
+
+## Review record
+
+**Verdict: Approve** — cross-model codex review (peeragent). One should-fix:
+empty fragment content was kept (inconsistent with identity/base), which would
+produce a stray doubled blank line for a whitespace-only fragment; fixed (drop
+empty fragment content) + test added. Order/purity/determinism confirmed correct.
+Suite green, typecheck clean. Advanced review → done.
