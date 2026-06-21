@@ -1,7 +1,7 @@
 ---
 id: epic-mode-composition
 kind: epic
-stage: implementing
+stage: done
 tags: [tests]
 parent: null
 depends_on: [epic-scaffold-handler]
@@ -199,3 +199,44 @@ advisory points were rejected. Sizing confirmed at 6 features. Overall codex
 take: "the decomposition is viable, but the signature/materialization seam and
 fragment-cache invalidation policy need to be made explicit before
 implementation" — both now explicit above.
+
+## Epic completion
+
+All six child features are `done`. The realized DAG drained cleanly along its
+critical path (foundations → resolver → splice → handler-wiring → tests):
+
+- `fragment-loader` — done (`src/fragments.ts`: convention discovery +
+  stat/mtime-invalidated content cache + package-relative root + starter set).
+- `preset-table` — done (`src/presets.ts` + `presets.json`: the `ResolvedMode`
+  contract + `PI_BASE` sentinel + depth-aware duplicate-key validation).
+- `mode-resolver` — done (`src/resolver.ts`: the **ModePlan** seam — name/preset →
+  ordered materialized plan + content-hash `mode.signature`; internal active-mode
+  seam; set-time + resolve-time validation).
+- `deterministic-splice` — done (`src/assemble.ts`: SPEC fixed-order, blank-line
+  join, consumes the plan — no re-load/re-order).
+- `handler-wiring` — done (handler resolves the plan, keys on `plan.signature`,
+  two-path MISS preserving Invariant 3 when unset; `/mode:inspect` Mode line
+  populated; ARCHITECTURE enforcement table + fragment-cache doc rolled forward).
+- `engine-invariant-tests` — done (full mode-set Invariant 1 + mode cache-stability
+  + deterministic ordering).
+
+**Behavioral core delivered:** a mode resolves to a content-hashed, ordered
+fragment plan and splices deterministically into pi's prompt; `mode.signature`
+enters the cache key so a mode switch (like a model switch) forces a re-assemble;
+Invariant 2 holds byte-for-byte across no-change turns with a mode set. The engine
+fixes the contract `epic-fragment-library` (content) and `epic-switching-paths`
+(selection) build against — both now unblocked.
+
+**Codex cross-model review** ran at the epic-decomposition design and at every
+child's design and/or implementation (advisory + adversarial), each converging.
+
+**Verification:** `npm run typecheck` clean; `npm test` green — 14 files, 178
+tests. No open blockers.
+
+## Epic review record
+
+**Verdict: Approve.** Every child reached `done` through its own review (most via
+cross-model codex passes). The ModePlan/materialization seam (the decisive
+codex-advised refinement) held across the splice + handler integration; foundation
+docs describe current truth; the engine's invariants are tested. Advanced
+implementing → done.
