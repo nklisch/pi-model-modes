@@ -58,3 +58,28 @@ loading, or any user-facing command. It is pure integration scaffolding.
 
 <!-- The design pass on each child feature fills in real specifics.
 Do not treat these as commitments. -->
+
+## Design decisions
+
+Grounded in pi's installed source (no user input needed — these fall out of
+how pi loads and runs extensions):
+
+- **Language and build**: Ship TypeScript source; no compile/build step.
+  pi loads `.ts` extensions directly via `jiti` (on-the-fly transpile —
+  verified in `dist/core/extensions/loader.js`, `createJiti` import at line
+  13, `jiti.import` at line 299). Matches the `.ts`-native layout already in
+  `docs/ARCHITECTURE.md`.
+- **Runtime**: Node ≥ 22.19.0 (pi's `engines`). The extension itself adds no
+  Bun dependency.
+- **Test framework**: `vitest` (`vitest --run`), matching pi's own test
+  script. Tests are pure-unit against the handler and pure modules — no live
+  pi session required (per ARCHITECTURE's unit-testability property).
+- **Imports**: The extension imports the `ExtensionAPI` and types from
+  `@earendil-works/pi-coding-agent`, declared as `peerDependencies: "*"` and
+  NOT bundled; `typebox` is likewise a peer per pi's packages doc.
+- **Handler return contract**: The no-op handler ALWAYS returns
+  `{ systemPrompt: e.systemPrompt }` — never `undefined`. pi reverts to its
+  base prompt when an extension returns `undefined` (verified in
+  `dist/core/agent-session.js`), which would defeat Invariant 3; the
+  always-return discipline is established here and inherited by every
+  downstream epic.
