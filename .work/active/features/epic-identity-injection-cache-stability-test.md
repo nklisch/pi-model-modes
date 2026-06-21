@@ -1,7 +1,7 @@
 ---
 id: epic-identity-injection-cache-stability-test
 kind: feature
-stage: drafting
+stage: implementing
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-handler-integration]
@@ -89,3 +89,101 @@ direct compare across the N returned prompts), a negative control if useful
 (flipping one input between two sub-sequences and asserting the bytes *do*
 change there — guarded as a separate assertion, not a pollution of the
 stability check), and any harness extension needed to drive N turns. -->
+
+## Design decisions
+
+Resolved under autopilot delegation (scope `--all`). Implementation tier: **OPUS**.
+**Cross-model design advisory skipped** — per the advisory-review policy, this is
+small, low-risk, mechanical test design (one test file, no architectural choice,
+fully determined by the landed handler + cache). The codex budget is reserved for
+the larger sibling designs and the final completion review.
+
+- **N = 10 turns.** Enough to expose drift (a turn counter or accumulating
+  state would diverge within a handful of turns); cheap to run. Not a magic
+  number — any N ≥ 3 works; 10 is a comfortable margin.
+- **Two complementary stability assertions, not one.**
+  1. **HIT-path stability** (the realistic flow): reset once, run N turns with
+     identical inputs. Turn 1 is a MISS that assembles + stores; turns 2..N are
+     HITs returning the cached bytes. Assert all N returns are byte-identical.
+  2. **Forced-MISS determinism** (the load-bearing direction): reset the cache
+     *before each* of N turns so every turn re-assembles from scratch, then
+     assert all N re-assembled outputs are byte-identical. This is what actually
+     catches nondeterminism in assembly (a timestamp, turn counter, random id,
+     or unordered-iteration leak) — the HIT path alone is near-tautological
+     because the cache just replays a stored string.
+- **Exact-bytes assertion, not just self-equality.** Assert the stable output
+  equals exactly `${deriveIdentityLine(model)}\n${base}` — proving not only that
+  the bytes are stable but that NOTHING dynamic (timestamp/counter) was injected
+  in the first place. Self-equality across turns + an exact-shape anchor together
+  close the "stably wrong" gap.
+- **Negative control (guards the test itself).** A separate assertion flips one
+  input across two reset sub-sequences (model A vs model B; base X vs base Y) and
+  asserts the bytes DO differ. This proves the byte-comparison would actually
+  catch a change — a stability test that can't fail on a real change is worthless.
+  Kept as its own `it(...)`, never interleaved into the stability checks.
+- **No harness extension, no child stories.** `makeEvent`, `makeContext({model})`,
+  `makeModel`, `resetCacheForTesting` already exist. One cohesive test file; the
+  feature IS the unit.
+
+## Architectural choice
+
+A single pure-unit test file driving the real `handleBeforeAgentStart` through
+the existing harness with synthetic events — no live pi session. Byte-stability
+is checked by direct `toBe` comparison across the collected returns (best
+failure diff), anchored to the exact expected shape.
+
+## Implementation Units
+
+### Unit 1: `tests/cache-stability.test.ts`
+
+**File**: `tests/cache-stability.test.ts` (new). Imports: `handleBeforeAgentStart`
+from `../src/handler.js`, `deriveIdentityLine` from `../src/identity.js`,
+`resetCacheForTesting` from `../src/cache.js`, `makeEvent / makeContext /
+makeModel` from `./harness.js`. `beforeEach(() => resetCacheForTesting())`.
+
+```ts
+const N = 10;
+const model = makeModel({ name: "GLM-4.6", provider: "zai" });
+const base =
+  "You are an expert coding assistant operating inside pi.\n\n" +
+  "Available tools:\n- read\n- bash\n\n<project_context>...</project_context>";
+const expected = `${deriveIdentityLine(model)}\n${base}`;
+```
+
+- **`it("returns byte-identical systemPrompt across N no-change turns (HIT path)")`**
+  — reset once (via `beforeEach`); run N turns with the same
+  `makeEvent(base)` + `makeContext({ model })`; collect `r.systemPrompt`; assert
+  every element `=== expected` (and therefore `=== returns[0]`).
+- **`it("re-assembles byte-identically when forced to MISS every turn (assembly determinism)")`**
+  — loop N times: `resetCacheForTesting()` then run one turn; collect bytes;
+  assert all `=== expected`. Catches any nondeterministic value in the assembled
+  prompt (the real Invariant-2 risk).
+- **`it("produces no dynamic content — output is exactly identity + base, nothing appended")`**
+  — single turn; assert `r.systemPrompt === expected` and that it contains no
+  extra trailing/leading bytes (length check `=== expected.length`).
+- **`it("negative control: a real input change DOES change the bytes")`**
+  — reset → model A bytes; reset → model B (`anthropic`/different name) bytes;
+  assert `!==`. Reset → base X bytes; reset → base Y bytes; assert `!==`. Proves
+  the comparison can fail on a real change.
+
+## Implementation Order
+
+1. Unit 1 — the single test file. Run `npm test` (full suite) + `npm run
+   typecheck`. One OPUS stride.
+
+## Testing
+
+This feature IS tests. Verification = the new file passing plus the whole suite
+staying green. No production code changes, so no risk of regressing other
+features; the only dependency is the landed `handleBeforeAgentStart` (done).
+
+## Risks
+
+- **HIT-path test is near-tautological** on its own (the cache replays a stored
+  string). Mitigated by the forced-MISS determinism test (the load-bearing one)
+  + the exact-shape anchor; the HIT test still documents the realistic flow.
+- **`cache-stability` cannot prove base-change invalidation** (it holds base
+  constant) — by design. That direction is owned by `cache-and-change-signal`'s
+  change-detection tests (done). The negative control here only proves the test
+  *can* observe a change, not that the handler invalidates on a base change in
+  production (that is the sibling's contract). Documented so the split is clear.
