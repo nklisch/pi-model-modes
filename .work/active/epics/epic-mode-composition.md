@@ -92,3 +92,12 @@ Do not treat these as commitments. -->
   iteration, no unordered object keys). Convention discovery yields
   deterministic file orderings (sorted by filename) so the splice is
   reproducible across turns; the base manifest pins base ordering explicitly.
+
+## Handoff obligations inherited
+
+- **Upgrade `clean-base.test.ts` to the full SPEC Invariant 1.** The test
+  scaffolded under `epic-scaffold-handler-noop-handler` is the *scaffolding
+  form* (no mutation, no cached previous output) — it cannot test "across N
+  turns with a mode set" until modes exist. When this epic lands the splice,
+  upgrade that test to the real form. (From codex design review of
+  epic-scaffold-handler's decomposition.)
