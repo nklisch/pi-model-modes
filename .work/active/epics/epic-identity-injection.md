@@ -65,3 +65,26 @@ mode composition, or fragment loading. Identity is name + provider only.
 
 <!-- The design pass on each child feature fills in real specifics.
 Do not treat these as commitments. -->
+
+## Design decisions
+
+- **Identity injection scope**: ALWAYS inject the identity line, even when
+  the user has a custom `SYSTEM.md` or passes `--system-prompt`. Identity is
+  purely additive — prepended as the first line, never overriding or removing
+  the user's custom content. The model knowing what it is applies regardless
+  of who authored the prompt body.
+- **Provider display-name source**: Ship a plugin-owned
+  `provider → display-name` map in `src/provider-names.ts`, keyed on pi's
+  `KnownProvider` union, with a title-case fallback (`"openai"` → `"Openai"`)
+  for unknown/custom provider ids. `Provider` is a bare string id with no
+  display field (verified in `@earendil-works/pi-ai` types), so there is
+  nothing to derive at runtime — the map is the source of truth and the
+  maintenance surface.
+- **Identity format**: `You are {model.name} from {providerDisplayName}.` —
+  one line, leads the prompt (most-stable element, longest-lived cached
+  prefix per ARCHITECTURE). Name + provider only for v1; capability metadata
+  deferred (per SPEC out-of-scope).
+- **`/mode:inspect` output**: Plain text rendered to the message stream
+  (not a custom editor-replacing UI overlay) for v1 — reads the change-signal
+  ring buffer; format per ARCHITECTURE's example block. (Folded into this
+  epic per the epicize decision — it consumes only this epic's change signal.)
