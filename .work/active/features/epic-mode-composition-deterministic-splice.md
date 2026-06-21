@@ -194,3 +194,19 @@ temporarily credited to `handler.ts` roll forward:
 - **Cache stability** → `assemble.ts` + `cache.ts` (ordered-array assembly, no
   dynamic text; key covers all inputs).
 Remove the "no `assemble.ts` yet" parenthetical added by handler-integration.
+
+## Implementation notes
+
+Landed `src/assemble.ts` (the pure `assembleSystemPrompt(identity, plan, base)`)
+and `tests/assemble.test.ts` (8 tests: fixed order + blank-line join, order
+preservation, empty-identity/empty-base/empty-plan handling, frozen-input purity,
+determinism). Verification: `npm run typecheck` clean; `npm test` green — 12 files,
+163 tests (was 155; +8).
+
+**Deviation — Unit 2 (ARCHITECTURE enforcement-table roll-forward) DEFERRED to
+`handler-wiring`.** `assemble.ts` now exists as a pure module, but the handler does
+not route the MISS path through it until `handler-wiring` lands — so at this point
+clean-base is STILL enforced in `handler.ts` (the identity-only path). Rolling the
+table to credit `assemble.ts` now would assert a not-yet-true enforcement location,
+violating rolling-foundation (docs = current truth). The roll-forward moves to
+`handler-wiring`, where `assemble.ts` actually becomes the live enforcement point.
