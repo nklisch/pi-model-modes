@@ -110,3 +110,14 @@ Accepted review finding fixed before approval:
 
 - `/mode default off` and `off --global` now surface `no default set in <scope>`
   and return before footer refresh when the writer reports `noop`.
+
+## Post-approval grouped review follow-up (2026-06-22)
+
+Follow-up from the requested GLM 5.2 + Opus grouped reviews:
+
+- Hardened `/mode:inspect --prompt` graceful degradation for broken resolver
+  state.
+- Polished `/mode default` clear/no-op notification wording around active
+  overrides and surviving cross-scope defaults.
+
+Verification: `npm run typecheck`; `npm test` (367/367).

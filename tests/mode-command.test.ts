@@ -377,6 +377,23 @@ describe("/mode default [...] — durable default subcommand", () => {
     expect(ui.statusCalls).toHaveLength(0); // no footer refresh on noop
   });
 
+  it("noop project clear mentions a surviving global default", async () => {
+    buildFixture();
+    const { cwd, projectPath, globalPath } = setupDirs();
+    mkdirSync(dirname(globalPath), { recursive: true });
+    writeFileSync(globalPath, JSON.stringify({ defaultMode: "extend" }));
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+    await handler("default off", ctx);
+
+    expect(existsSync(projectPath)).toBe(false);
+    expect(notifies.at(-1)).toEqual({
+      message: 'no default set in project; effective default remains "extend" (global)',
+      type: "info",
+    });
+  });
+
   it("CLEAR-WHEN-EMPTY blocker: `/mode default off --global` on missing global target writes nothing", async () => {
     buildFixture();
     const { cwd, globalPath } = setupDirs();

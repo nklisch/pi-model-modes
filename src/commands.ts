@@ -292,9 +292,46 @@ export function formatDefaultListing(
   ].join("\n");
 }
 
+function formatOverrideLabel(
+  activeOverride: string | { base: string } | undefined,
+): string | undefined {
+  if (activeOverride === undefined) {
+    return undefined;
+  }
+  return typeof activeOverride === "string" ? activeOverride : activeOverride.base;
+}
+
+function formatOverrideSuffix(
+  activeOverride: string | { base: string } | undefined,
+): string {
+  const ovLabel = formatOverrideLabel(activeOverride);
+  return ovLabel === undefined ? "" : ` — override "${ovLabel}" still active`;
+}
+
+function formatEffectiveDefault(
+  effective: { value: string | undefined; source: "global" | "project" | "unset" },
+): string {
+  return effective.source === "unset"
+    ? "(unset)"
+    : `"${effective.value}" (${effective.source})`;
+}
+
+export function formatDefaultNoopNotify(args: {
+  scope: DefaultScope;
+  effective: { value: string | undefined; source: "global" | "project" | "unset" };
+  activeOverride: string | { base: string } | undefined;
+}): string {
+  const base = `no default set in ${args.scope}`;
+  const effectiveSuffix =
+    args.effective.source === "unset"
+      ? ""
+      : `; effective default remains ${formatEffectiveDefault(args.effective)}`;
+  return `${base}${effectiveSuffix}${formatOverrideSuffix(args.activeOverride)}`;
+}
+
 /**
  * PURE: build the override-still-wins notify string from the post-write
- * effective default + the active override. Three shapes:
+ * effective default + the active override. Four shapes:
  *   - cleared, no surviving default → "default cleared (<scope>); effective default is (unset)"
  *   - cleared, surviving default    → "default cleared (<scope>); effective default is now \"<v>\" (<source>)"
  *   - set, override masks it        → "default set to \"<v>\" (<scope>) — override \"<ov>\" still active; /mode off to use it now"
@@ -312,27 +349,35 @@ export function formatDefaultNotify(args: {
   const scopeLabel = writtenScope;
 
   if (writtenValue === undefined) {
-    // Cleared.
-    if (effective.source === "unset") {
-      return `default cleared (${scopeLabel}); effective default is (unset)`;
-    }
-    return `default cleared (${scopeLabel}); effective default is now "${effective.value}" (${effective.source})`;
-  }
-
-  // Set.
-  if (activeOverride !== undefined) {
-    const ovLabel =
-      typeof activeOverride === "string"
-        ? activeOverride
-        : (activeOverride as { base: string }).base;
-    return `default set to "${writtenValue}" (${scopeLabel}) — override "${ovLabel}" still active; /mode off to use it now`;
+    // Cleared. This reports the durable default state, plus an override suffix
+    // when the session override still masks the newly exposed default/unset
+    // state (GLM grouped-review nit).
+    const head =
+      effective.source === "unset"
+        ? `default cleared (${scopeLabel}); effective default is (unset)`
+        : `default cleared (${scopeLabel}); effective default is now ${formatEffectiveDefault(effective)}`;
+    return `${head}${formatOverrideSuffix(activeOverride)}`;
   }
 
   // No override, but a higher-precedence default scope still masks the write
   // (today this means: wrote global while project has a default). Surface the
   // scope win explicitly; otherwise the user sees no immediate mode change and
   // has no clue why.
-  if (effective.source !== "unset" && effective.source !== writtenScope) {
+  const higherPrecedenceDefaultWins =
+    effective.source !== "unset" && effective.source !== writtenScope;
+
+  // Set + override. If a project default would still mask a global write after
+  // `/mode off`, avoid promising that `/mode off` alone will use the new global
+  // default (Opus grouped-review nit).
+  const ovLabel = formatOverrideLabel(activeOverride);
+  if (ovLabel !== undefined) {
+    if (higherPrecedenceDefaultWins) {
+      return `default set to "${writtenValue}" (${scopeLabel}) — override "${ovLabel}" still active; ${effective.source} default "${effective.value}" would still win after /mode off`;
+    }
+    return `default set to "${writtenValue}" (${scopeLabel}) — override "${ovLabel}" still active; /mode off to use it now`;
+  }
+
+  if (higherPrecedenceDefaultWins) {
     return `default set to "${writtenValue}" (${scopeLabel}) — ${effective.source} default "${effective.value}" still wins; /mode default off to use it now`;
   }
 
@@ -422,7 +467,14 @@ export function registerModeCommand(pi: ExtensionAPI): void {
           return;
         }
         if (result.noop === true) {
-          ctx.ui.notify(`no default set in ${result.writtenScope}`, "info");
+          ctx.ui.notify(
+            formatDefaultNoopNotify({
+              scope: result.writtenScope,
+              effective: result.effective,
+              activeOverride: getActiveMode(),
+            }),
+            "info",
+          );
           return;
         }
         refreshModeFooter(ctx);
@@ -513,10 +565,23 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
       let assembledPrompt: string | undefined;
       if (includePrompt) {
         const base = getLastBaseSystemPrompt();
-        assembledPrompt =
-          base === undefined
-            ? "(no turn has run yet — run a turn to populate the base prompt)"
-            : assembleForInspect(ctx.model, base);
+        if (base === undefined) {
+          assembledPrompt =
+            "(no turn has run yet — run a turn to populate the base prompt)";
+        } else if (modeError !== undefined) {
+          // Match the bare inspect command's graceful degradation. The point of
+          // `--prompt` is diagnostics; a missing fragment should not replace the
+          // panel with an opaque command error.
+          assembledPrompt = `(could not assemble — ${modeError})`;
+        } else {
+          try {
+            assembledPrompt = assembleForInspect(ctx.model, base);
+          } catch (err) {
+            const msg = (err as Error).message;
+            modeError = modeError ?? msg;
+            assembledPrompt = `(could not assemble — ${msg})`;
+          }
+        }
       }
 
       const content = renderModeInspect(

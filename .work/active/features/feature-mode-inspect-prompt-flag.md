@@ -164,3 +164,15 @@ Accepted non-blocking finding fixed before approval:
 - Codex noted that a fixed triple-backtick fence could be closed early by a
   system prompt containing fenced code. Fixed with `formatFencedBlock`, which
   chooses a fence longer than any backtick run in the prompt; tests cover this.
+
+## Post-approval grouped review follow-up (2026-06-22)
+
+Additional requested GLM 5.2 + Opus grouped reviews over the five feature/story
+items found no blockers. Accepted GLM's important graceful-degradation finding:
+
+- `/mode:inspect --prompt` now matches bare inspect when the active mode no
+  longer resolves. Instead of throwing from `assembleForInspect`, it emits the
+  diagnostic panel with `Mode: (unresolvable — ...)` and a prompt-block sentinel
+  `(could not assemble — ...)`.
+
+Verification after the follow-up: `npm run typecheck`; `npm test` (367/367).

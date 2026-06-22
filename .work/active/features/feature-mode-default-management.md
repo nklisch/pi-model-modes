@@ -317,3 +317,17 @@ Rejected/parked nits:
   a future docs hygiene pass if desired.
 - The commit-message glitch in `3681216` is message-only; rewrite blocked by the
   harness history-mutation guard, and code/substrate state are unaffected.
+
+## Post-approval grouped review follow-up (2026-06-22)
+
+Additional requested GLM 5.2 + Opus grouped reviews over the five feature/story
+items found no blockers. Accepted low-cost notification polish nits:
+
+- No-op clears now mention a surviving cross-scope default when one remains
+  effective, while still skipping footer refresh and config writes.
+- Cleared-default notifications now mention an active override when it still
+  masks the exposed default/unset state.
+- Setting a global default while both an override and project default mask it no
+  longer implies `/mode off` alone will make the global default effective.
+
+Verification after the follow-up: `npm run typecheck`; `npm test` (367/367).

@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   renderModeInspect,
   registerModeInspectCommand,
@@ -7,6 +10,7 @@ import {
   parseModeDefaultArgs,
   formatDefaultListing,
   formatDefaultNotify,
+  formatDefaultNoopNotify,
   formatFencedBlock,
 } from "../src/commands.js";
 import { deriveIdentityLine } from "../src/identity.js";
@@ -26,6 +30,10 @@ import {
   resetHandlerForTesting,
 } from "../src/handler.js";
 import { setActiveMode, resetResolverForTesting } from "../src/resolver.js";
+import {
+  resetFragmentCacheForTesting,
+  setFragmentRootForTesting,
+} from "../src/fragments.js";
 import { makeContext, makeEvent, makeModel, makePi, makeUi } from "./harness.js";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { RecordedCall } from "./harness.js";
@@ -425,10 +433,42 @@ describe("assembleForInspect — single-source-of-truth splice", () => {
 });
 
 describe("registerModeInspectCommand — `--prompt` flag handling", () => {
+  const validPiMode: ResolvedMode = {
+    base: "pi",
+    agency: "autonomous",
+    quality: "pragmatic",
+    scope: "adjacent",
+    modifiers: [],
+  };
+
+  function writeFragment(root: string, rel: string, content: string): void {
+    const abs = join(root, rel);
+    mkdirSync(join(abs, ".."), { recursive: true });
+    writeFileSync(abs, content, "utf8");
+  }
+
+  function switchToBrokenFragmentRoot(): void {
+    const root = mkdtempSync(join(tmpdir(), "inspect-broken-"));
+    // Keep the axis dir non-empty so resolve fails on the selected VALUE rather
+    // than on missing fixture infrastructure.
+    writeFragment(root, "axis/agency/other.md", "OTHER");
+    writeFragment(root, "axis/quality/pragmatic.md", "QUALITY");
+    writeFragment(root, "axis/scope/adjacent.md", "SCOPE");
+    mkdirSync(join(root, "modifiers"), { recursive: true });
+    writeFileSync(join(root, "base.json"), JSON.stringify({ overlays: [] }));
+    resetFragmentCacheForTesting();
+    setFragmentRootForTesting(root);
+  }
+
   beforeEach(() => {
     resetCacheForTesting();
     resetResolverForTesting();
     resetHandlerForTesting();
+    resetFragmentCacheForTesting();
+  });
+
+  afterEach(() => {
+    resetFragmentCacheForTesting();
   });
 
   function getHandler() {
@@ -487,6 +527,27 @@ describe("registerModeInspectCommand — `--prompt` flag handling", () => {
     const msg = send.args[0] as { content: string };
     expect(msg.content).toContain(
       "(no turn has run yet — run a turn to populate the base prompt)",
+    );
+  });
+
+  it("`--prompt` degrades to the diagnostic panel when the active mode no longer resolves", async () => {
+    const model = makeModel({ name: "GLM-5.2", provider: "zai" });
+    handleBeforeAgentStart(makeEvent("memoized-base"), makeContext({ model }));
+    setActiveMode(validPiMode);
+    switchToBrokenFragmentRoot();
+
+    const { calls, handler } = getHandler();
+    const { ctx, notifies } = ctxWithNotify();
+    await handler("--prompt", ctx);
+
+    expect(notifies).toEqual([]);
+    const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
+    const msg = send.args[0] as { content: string };
+    expect(msg.content).toContain(
+      'Mode: (unresolvable — mode agency "autonomous" has no fragment file)',
+    );
+    expect(msg.content).toContain(
+      '(could not assemble — mode agency "autonomous" has no fragment file)',
     );
   });
 
@@ -654,6 +715,19 @@ describe("formatDefaultNotify — override-still-wins wording", () => {
     );
   });
 
+  it("set + override + higher-precedence default avoids promising `/mode off` will use the write", () => {
+    expect(
+      formatDefaultNotify({
+        writtenScope: "global",
+        writtenValue: "flow",
+        effective: { value: "extend", source: "project" },
+        activeOverride: "safe",
+      }),
+    ).toBe(
+      'default set to "flow" (global) — override "safe" still active; project default "extend" would still win after /mode off',
+    );
+  });
+
   it("set global while project default wins → names the winning scope and next step", () => {
     expect(
       formatDefaultNotify({
@@ -680,6 +754,19 @@ describe("formatDefaultNotify — override-still-wins wording", () => {
     );
   });
 
+  it("cleared + active override → names both default state and masking override", () => {
+    expect(
+      formatDefaultNotify({
+        writtenScope: "project",
+        writtenValue: undefined,
+        effective: { value: "flow", source: "global" },
+        activeOverride: "safe",
+      }),
+    ).toBe(
+      'default cleared (project); effective default is now "flow" (global) — override "safe" still active',
+    );
+  });
+
   it("cleared + no surviving default → unset wording", () => {
     expect(
       formatDefaultNotify({
@@ -689,5 +776,39 @@ describe("formatDefaultNotify — override-still-wins wording", () => {
         activeOverride: undefined,
       }),
     ).toBe("default cleared (project); effective default is (unset)");
+  });
+});
+
+describe("formatDefaultNoopNotify — unset scope wording", () => {
+  it("keeps the compact wording when nothing else is effective", () => {
+    expect(
+      formatDefaultNoopNotify({
+        scope: "project",
+        effective: { value: undefined, source: "unset" },
+        activeOverride: undefined,
+      }),
+    ).toBe("no default set in project");
+  });
+
+  it("mentions a surviving cross-scope default", () => {
+    expect(
+      formatDefaultNoopNotify({
+        scope: "project",
+        effective: { value: "flow", source: "global" },
+        activeOverride: undefined,
+      }),
+    ).toBe('no default set in project; effective default remains "flow" (global)');
+  });
+
+  it("mentions the active override when it still masks the default", () => {
+    expect(
+      formatDefaultNoopNotify({
+        scope: "project",
+        effective: { value: "flow", source: "global" },
+        activeOverride: "safe",
+      }),
+    ).toBe(
+      'no default set in project; effective default remains "flow" (global) — override "safe" still active',
+    );
   });
 });
