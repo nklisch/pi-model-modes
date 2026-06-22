@@ -15,7 +15,7 @@ import {
 } from "../src/resolver.js";
 import {
   setFragmentRootForTesting,
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting, type ResolvedMode } from "../src/presets.js";
 import { NO_MODE_SIGNATURE } from "../src/cache.js";
@@ -70,7 +70,7 @@ const OVERRIDE_MODE: ResolvedMode = { ...DEFAULT_MODE, agency: "surgical" };
 
 beforeEach(() => {
   resetResolverForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
 });
 
@@ -80,7 +80,7 @@ afterEach(() => {
     tmp = undefined;
   }
   resetResolverForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
 });
 

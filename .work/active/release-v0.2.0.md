@@ -71,8 +71,13 @@ updated: 2026-06-22
 - `gate-cruft-footer-source-unused-field` (story, gate-cruft) — Remove unused footer source field
 - `gate-cruft-mode-default-message-type-export` (story, gate-cruft) — Unexport local mode-default message type
 
+- `gate-patterns-v0.2.0` (story, gate-patterns) — Patterns extracted for v0.2.0
+
+- `gate-patterns-reset-fragments-reset-name` (story, gate-patterns) — Align fragment reset seam with resetForTesting pattern
+
 ## Gate runs
 
+- **gate-patterns** (2026-06-22) — 5 patterns codified, 1 inconsistency fixed
 - **gate-cruft** (2026-06-22) — 6 findings fixed (2 high, 1 medium, 3 low)
 - **gate-tests** (2026-06-22) — 5 findings fixed (1 high, 1 medium, 3 low)
 - **gate-security** (2026-06-22) — 0 findings

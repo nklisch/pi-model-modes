@@ -4,7 +4,7 @@ import { deriveIdentityLine } from "../src/identity.js";
 import { resetCacheForTesting } from "../src/cache.js";
 import { MODE_FOOTER_KEY, refreshModeFooter, resetFooterForTesting } from "../src/footer.js";
 import { resetResolverForTesting, setActiveMode } from "../src/resolver.js";
-import { resetFragmentCacheForTesting } from "../src/fragments.js";
+import { resetFragmentsForTesting } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import { makeContext, makeEvent, makeModel, makeUi } from "./harness.js";
 
@@ -39,7 +39,7 @@ describe("cache stability — SPEC Invariant 2 (byte-identical across no-change 
     resetCacheForTesting();
     resetResolverForTesting();
     resetFooterForTesting();
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
     resetPresetsForTesting();
   });
 

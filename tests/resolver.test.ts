@@ -18,7 +18,7 @@ import {
 } from "../src/resolver.js";
 import {
   setFragmentRootForTesting,
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 import {
   resetPresetsForTesting,
@@ -84,7 +84,7 @@ const PI_MODE: ResolvedMode = {
 
 beforeEach(() => {
   resetResolverForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
 });
 
@@ -94,7 +94,7 @@ afterEach(() => {
     tmp = undefined;
   }
   resetResolverForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
 });
 
@@ -274,7 +274,7 @@ describe("fail-fast: missing / ambiguous fragments", () => {
     setActiveMode(PI_MODE);
     rmSync(join(tmp!, "axis/agency/autonomous.md"));
     write(tmp!, "axis/agency/other.md", "OTHER");
-    resetFragmentCacheForTesting(); // also clears the root override
+    resetFragmentsForTesting(); // also clears the root override
     setFragmentRootForTesting(tmp!);
     expect(() => resolveActiveModePlan()).toThrow(
       /agency "autonomous" has no fragment file/,

@@ -24,7 +24,7 @@ import {
 } from "../src/resolver.js";
 import {
   setFragmentRootForTesting,
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 
@@ -74,7 +74,7 @@ function buildFragments(): void {
 beforeEach(() => {
   resetResolverForTesting();
   resetConfigForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
 });
 
@@ -86,7 +86,7 @@ afterEach(() => {
   fragRoot = undefined;
   resetResolverForTesting();
   resetConfigForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
   vi.restoreAllMocks();
 });

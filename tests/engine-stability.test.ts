@@ -11,7 +11,7 @@ import {
 } from "../src/resolver.js";
 import {
   setFragmentRootForTesting,
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import type { ResolvedMode } from "../src/presets.js";
@@ -92,7 +92,7 @@ function runTurn(base: string = PI_BASE_TEXT): string {
 beforeEach(() => {
   resetCacheForTesting();
   resetResolverForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
   buildFixture();
   setActiveMode(FIXTURE_MODE);
@@ -103,7 +103,7 @@ afterEach(() => {
     rmSync(tmp, { recursive: true, force: true });
     tmp = undefined;
   }
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetResolverForTesting();
 });
 

@@ -17,7 +17,7 @@ import {
 } from "../src/resolver.js";
 import {
   setFragmentRootForTesting,
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import { resetCacheForTesting } from "../src/cache.js";
@@ -111,7 +111,7 @@ function makeNotifyCtx(opts: { cwd?: string } = {}): {
 
 beforeEach(() => {
   resetResolverForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
   resetCacheForTesting();
   resetConfigForTesting();
@@ -123,7 +123,7 @@ afterEach(() => {
     tmp = undefined;
   }
   resetResolverForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
   resetPresetsForTesting();
   resetCacheForTesting();
   resetConfigForTesting();

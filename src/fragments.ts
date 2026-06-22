@@ -172,7 +172,7 @@ export function setFragmentRootForTesting(absRoot: string | undefined): void {
 }
 
 /** TEST-ONLY: clear the content cache AND reset the root override. */
-export function resetFragmentCacheForTesting(): void {
+export function resetFragmentsForTesting(): void {
   contentCache.clear();
   rootOverride = undefined;
 }

@@ -16,13 +16,13 @@ import {
   discoverBaseOverlays,
   loadFragment,
   setFragmentRootForTesting,
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 
 /**
  * Tests for `src/fragments.ts` — convention-directory discovery + the
  * stat/mtime-invalidated content cache. Mirrors `cache.test.ts` idioms:
- * `beforeEach(resetFragmentCacheForTesting)` isolates module state, and every
+ * `beforeEach(resetFragmentsForTesting)` isolates module state, and every
  * behavioral case runs against a temp fixture root via
  * `setFragmentRootForTesting`. The starter-set sanity case alone uses the REAL
  * package root (no override). No module mocking — the no-re-read half of the
@@ -48,7 +48,7 @@ function write(root: string, rel: string, content: string): string {
 }
 
 beforeEach(() => {
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
 });
 
 afterEach(() => {
@@ -56,7 +56,7 @@ afterEach(() => {
     rmSync(tmp, { recursive: true, force: true });
     tmp = undefined;
   }
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
 });
 
 describe("discoverAxis — determinism + sorting", () => {
@@ -247,12 +247,12 @@ describe("loadFragment — trimming + mtime invalidation", () => {
 });
 
 describe("reset isolation", () => {
-  it("resetFragmentCacheForTesting restores the package default root and empties the cache", () => {
+  it("resetFragmentsForTesting restores the package default root and empties the cache", () => {
     const root = freshRoot();
     const p = write(root, "axis/agency/x.md", "fixture");
     expect(loadFragment(p)).toBe("fixture");
 
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
 
     // Override cleared → discovery now resolves against the REAL package root,
     // which has a populated starter set (proves the override was reset).

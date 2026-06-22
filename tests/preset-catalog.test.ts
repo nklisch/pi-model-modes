@@ -5,7 +5,7 @@ import {
   resolveActiveModePlan,
   resetResolverForTesting,
 } from "../src/resolver.js";
-import { resetFragmentCacheForTesting } from "../src/fragments.js";
+import { resetFragmentsForTesting } from "../src/fragments.js";
 
 /**
  * Catalog-integration acceptance — the load-bearing proof that the curated
@@ -23,7 +23,7 @@ import { resetFragmentCacheForTesting } from "../src/fragments.js";
 beforeEach(() => {
   resetResolverForTesting();
   resetPresetsForTesting();
-  resetFragmentCacheForTesting();
+  resetFragmentsForTesting();
 });
 
 describe("preset catalog — every shipped preset is settable against the real prompts/ tree", () => {

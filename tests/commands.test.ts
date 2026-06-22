@@ -31,7 +31,7 @@ import {
 } from "../src/handler.js";
 import { setActiveMode, resetResolverForTesting } from "../src/resolver.js";
 import {
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
   setFragmentRootForTesting,
 } from "../src/fragments.js";
 import { makeContext, makeEvent, makeModel, makePi, makeUi } from "./harness.js";
@@ -459,7 +459,7 @@ describe("registerModeInspectCommand — `--prompt` flag handling", () => {
     writeFragment(root, "axis/scope/adjacent.md", "SCOPE");
     mkdirSync(join(root, "modifiers"), { recursive: true });
     writeFileSync(join(root, "base.json"), JSON.stringify({ overlays: [] }));
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
     setFragmentRootForTesting(root);
   }
 
@@ -467,11 +467,11 @@ describe("registerModeInspectCommand — `--prompt` flag handling", () => {
     resetCacheForTesting();
     resetResolverForTesting();
     resetHandlerForTesting();
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
   });
 
   afterEach(() => {
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
   });
 
   function getHandler() {

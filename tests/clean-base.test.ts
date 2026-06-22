@@ -11,7 +11,7 @@ import {
 } from "../src/resolver.js";
 import {
   setFragmentRootForTesting,
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import type { ResolvedMode } from "../src/presets.js";
@@ -135,7 +135,7 @@ describe("Invariant 1 — full form (mode set: exactly one identity + one copy o
   beforeEach(() => {
     resetCacheForTesting();
     resetResolverForTesting();
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
     resetPresetsForTesting();
     buildFixture();
     setActiveMode(FIXTURE_MODE);
@@ -146,7 +146,7 @@ describe("Invariant 1 — full form (mode set: exactly one identity + one copy o
       rmSync(tmp, { recursive: true, force: true });
       tmp = undefined;
     }
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
     resetResolverForTesting();
   });
 

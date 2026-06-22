@@ -30,7 +30,7 @@ import {
 } from "../src/config.js";
 import { resetCacheForTesting } from "../src/cache.js";
 import {
-  resetFragmentCacheForTesting,
+  resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import { makeContext, makeEvent, makeModel, makePi, makeUi } from "./harness.js";
@@ -130,7 +130,7 @@ describe("footer refresh wiring", () => {
     resetFooterForTesting();
     resetCacheForTesting();
     resetConfigForTesting();
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
     resetPresetsForTesting();
   });
 
@@ -143,7 +143,7 @@ describe("footer refresh wiring", () => {
     resetFooterForTesting();
     resetCacheForTesting();
     resetConfigForTesting();
-    resetFragmentCacheForTesting();
+    resetFragmentsForTesting();
     resetPresetsForTesting();
   });
 
