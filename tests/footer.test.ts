@@ -3,8 +3,10 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   MODE_FOOTER_KEY,
   formatModeFooter,
+  glyphForBase,
   refreshModeFooter,
   resetFooterForTesting,
+  selectModeGlyph,
   setCycleHintEnabled,
   type ModeFooterInputs,
 } from "../src/footer.js";
@@ -44,13 +46,13 @@ function inputs(overrides: Partial<ModeFooterInputs> = {}): ModeFooterInputs {
 describe("formatModeFooter", () => {
   it("renders a preset name for a string preset spec", () => {
     expect(formatModeFooter(inputs({ specName: "partner" }))).toBe(
-      "mode: partner",
+      "◆ mode: partner",
     );
   });
 
   it("renders compact axes for an explicit object spec", () => {
     expect(formatModeFooter(inputs())).toBe(
-      "mode: pi/autonomous/architect/unrestricted",
+      "◆ mode: pi/autonomous/architect/unrestricted",
     );
   });
 
@@ -59,15 +61,15 @@ describe("formatModeFooter", () => {
 
     expect(
       formatModeFooter(inputs({ specName: "refactor", mode: withMods })),
-    ).toBe("mode: refactor +2");
+    ).toBe("◆ mode: refactor +2");
     expect(formatModeFooter(inputs({ mode: withMods }))).toBe(
-      "mode: pi/autonomous/architect/unrestricted +2",
+      "◆ mode: pi/autonomous/architect/unrestricted +2",
     );
   });
 
   it("renders unset when no mode resolves", () => {
     expect(formatModeFooter(inputs({ source: "unset", mode: undefined }))).toBe(
-      "mode: unset",
+      "◆ mode: unset",
     );
   });
 
@@ -81,7 +83,7 @@ describe("formatModeFooter", () => {
           modeError: 'mode agency "ghost" has no fragment file',
         }),
       ),
-    ).toBe("mode: (unresolvable)");
+    ).toBe("✕ mode: (unresolvable)");
   });
 
   it("appends the cycle hint in every state when enabled", () => {
@@ -92,25 +94,25 @@ describe("formatModeFooter", () => {
       formatModeFooter(
         inputs({ specName: "partner", cycleHintEnabled: true }),
       ),
-    ).toBe(`mode: partner${hint}`);
+    ).toBe(`◆ mode: partner${hint}`);
     expect(formatModeFooter(inputs({ cycleHintEnabled: true }))).toBe(
-      `mode: pi/autonomous/architect/unrestricted${hint}`,
+      `◆ mode: pi/autonomous/architect/unrestricted${hint}`,
     );
     expect(
       formatModeFooter(
         inputs({ mode: withMods, cycleHintEnabled: true }),
       ),
-    ).toBe(`mode: pi/autonomous/architect/unrestricted +1${hint}`);
+    ).toBe(`◆ mode: pi/autonomous/architect/unrestricted +1${hint}`);
     expect(
       formatModeFooter(
         inputs({ source: "unset", mode: undefined, cycleHintEnabled: true }),
       ),
-    ).toBe(`mode: unset${hint}`);
+    ).toBe(`◆ mode: unset${hint}`);
     expect(
       formatModeFooter(
         inputs({ modeError: "broken", cycleHintEnabled: true }),
       ),
-    ).toBe(`mode: (unresolvable)${hint}`);
+    ).toBe(`✕ mode: (unresolvable)${hint}`);
   });
 
   it("omits the cycle hint when disabled", () => {
@@ -135,7 +137,56 @@ describe("formatModeFooter", () => {
           cycleBackwardKey: "a+b+c",
         }),
       ),
-    ).toBe("mode: unset · x+y/a+b+c cycle");
+    ).toBe("◆ mode: unset · x+y/a+b+c cycle");
+  });
+});
+
+describe("selectModeGlyph", () => {
+  // The default fixture uses base "pi"; override base per-case to exercise the
+  // per-voice map without rebuilding the whole inputs() helper.
+  const glyphFor = (base: string, overrides: Partial<ModeFooterInputs> = {}) =>
+    selectModeGlyph(inputs({ mode: { ...mode, base }, ...overrides }));
+
+  it("maps each known base voice to its Catppuccin-harmonic glyph", () => {
+    expect(glyphFor("pi")).toBe("◆");
+    expect(glyphFor("pi-direct")).toBe("◆");
+    expect(glyphFor("chill")).toBe("◇");
+    expect(glyphFor("flow")).toBe("⬡");
+  });
+
+  it("falls back to the default glyph for an unknown future base", () => {
+    expect(glyphFor("some-new-voice")).toBe("◆");
+  });
+
+  it("returns the default glyph when no mode is active", () => {
+    expect(selectModeGlyph(inputs({ source: "unset", mode: undefined }))).toBe(
+      "◆",
+    );
+  });
+
+  it("returns the unresolvable glyph when modeError is set, winning over mode", () => {
+    expect(
+      selectModeGlyph(
+        inputs({ mode, modeError: 'agency "ghost" has no fragment file' }),
+      ),
+    ).toBe("✕");
+  });
+});
+
+describe("glyphForBase", () => {
+  it("maps known bases the same way selectModeGlyph does", () => {
+    expect(glyphForBase("pi")).toBe("◆");
+    expect(glyphForBase("pi-direct")).toBe("◆");
+    expect(glyphForBase("chill")).toBe("◇");
+    expect(glyphForBase("flow")).toBe("⬡");
+  });
+
+  it("returns the default glyph for undefined (unset / virtual none)", () => {
+    expect(glyphForBase(undefined)).toBe("◆");
+  });
+
+  it("falls back to the default glyph for an unknown base", () => {
+    expect(glyphForBase("future-voice")).toBe("◆");
   });
 });
 
@@ -175,7 +226,7 @@ describe("refreshModeFooter", () => {
 
     refreshModeFooter(ctx);
 
-    expect(calls).toEqual([[MODE_FOOTER_KEY, "mode: unset"]]);
+    expect(calls).toEqual([[MODE_FOOTER_KEY, "◆ mode: unset"]]);
   });
 
   it("uses the module cycle-hint signal when rendering through the seam", () => {
@@ -195,7 +246,7 @@ describe("refreshModeFooter", () => {
     expect(calls).toEqual([
       [
         MODE_FOOTER_KEY,
-        `mode: unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
+        `◆ mode: unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
       ],
     ]);
   });

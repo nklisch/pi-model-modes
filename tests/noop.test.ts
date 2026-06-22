@@ -79,7 +79,7 @@ describe("handleBeforeAgentStart — Invariant 3 evolved (identity-prepended, re
     expect(ui.statusCalls).toEqual([
       {
         key: MODE_FOOTER_KEY,
-        text: `mode: unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
+        text: `◆ mode: unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
       },
     ]);
     expect(result.systemPrompt).toBe(`${identity}\n${input}`);

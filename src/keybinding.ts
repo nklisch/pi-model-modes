@@ -6,9 +6,10 @@ import {
   setActiveMode,
   getActiveMode,
   getDefaultMode,
+  resolveActiveModePlan,
 } from "./resolver.js";
 import { listPresetNames } from "./presets.js";
-import { refreshModeFooter } from "./footer.js";
+import { glyphForBase, refreshModeFooter } from "./footer.js";
 
 /**
  * Mode-cycle keybindings — the keyboard switching path. `Ctrl+Shift+U` cycles
@@ -86,7 +87,19 @@ export function registerModeKeybindings(pi: ExtensionAPI): void {
     }
     setActiveMode(next);
     refreshModeFooter(ctx);
-    ctx.ui.notify(`mode: ${next}`, "info");
+    // Match the footer's leading glyph so the toast and the footer agree. The
+    // resolver is the same path `refreshModeFooter` uses; for the virtual `none`
+    // preset (or any spec without a base) `mode` is undefined and we fall back
+    // to the default glyph, exactly as the footer does for unset.
+    let base: string | undefined;
+    try {
+      base = resolveActiveModePlan().mode?.base;
+    } catch {
+      // Resolver broken — footer will show the unresolvable marker; the toast
+      // uses the default glyph rather than throwing mid-cycle.
+      base = undefined;
+    }
+    ctx.ui.notify(`${glyphForBase(base)} mode: ${next}`, "info");
   };
 
   pi.registerShortcut(CYCLE_FORWARD_KEY, {

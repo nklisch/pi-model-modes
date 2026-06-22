@@ -18,3 +18,4 @@ google-cloud-cli-*
 # pi session-local config
 .pi/
 .reviewtmp/
+.peeragent/
