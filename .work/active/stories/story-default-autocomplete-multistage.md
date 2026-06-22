@@ -1,7 +1,7 @@
 ---
 id: story-default-autocomplete-multistage
 kind: story
-stage: implementing
+stage: review
 tags: [tests]
 parent: feature-mode-default-management
 depends_on: [story-default-command-surface]

@@ -7,9 +7,13 @@ import type {
 import type { AutocompleteProvider } from "@earendil-works/pi-tui";
 import {
   MODE_OFF_ARG,
+  MODE_DEFAULT_ARG,
+  MODE_DEFAULT_GLOBAL_FLAG,
   registerModeAutocomplete,
   extractModeArgToken,
   buildModeArgItems,
+  buildModeTopLevelItems,
+  buildDefaultGlobalFlagItems,
   filterModeArgItems,
   getModeArgSuggestions,
 } from "../src/autocomplete.js";
@@ -48,6 +52,8 @@ const FIXTURE_JSON = JSON.stringify({
 
 const NONE_DESCRIPTION = "explicit no-mode override — wins over default";
 const OFF_DESCRIPTION = "clear override — fall back to default";
+const DEFAULT_DESCRIPTION = "manage the durable default — writes pi-model-modes.json";
+const GLOBAL_FLAG_DESCRIPTION = "target the global (~/.pi/agent) config file";
 
 function fixtureRegistry(): PresetRegistry {
   return loadPresets({ json: FIXTURE_JSON });
@@ -169,6 +175,40 @@ describe("buildModeArgItems", () => {
   });
 });
 
+describe("buildModeTopLevelItems", () => {
+  it("adds default as a top-level subcommand WITHOUT changing buildModeArgItems", () => {
+    const registry = fixtureRegistry();
+    const names = listPresetNames(registry);
+    const argItems = buildModeArgItems(registry);
+    const topItems = buildModeTopLevelItems(registry);
+
+    // Opus regression guard: buildModeArgItems remains preset names + off only.
+    expect(argItems.map((item) => item.value)).toEqual([...names, MODE_OFF_ARG]);
+    expect(topItems.map((item) => item.value)).toEqual([
+      ...names,
+      MODE_OFF_ARG,
+      MODE_DEFAULT_ARG,
+    ]);
+    expect(topItems.at(-1)).toEqual({
+      value: MODE_DEFAULT_ARG,
+      label: MODE_DEFAULT_ARG,
+      description: DEFAULT_DESCRIPTION,
+    });
+  });
+});
+
+describe("buildDefaultGlobalFlagItems", () => {
+  it("returns the single --global flag suggestion", () => {
+    expect(buildDefaultGlobalFlagItems()).toEqual([
+      {
+        value: MODE_DEFAULT_GLOBAL_FLAG,
+        label: MODE_DEFAULT_GLOBAL_FLAG,
+        description: GLOBAL_FLAG_DESCRIPTION,
+      },
+    ]);
+  });
+});
+
 describe("filterModeArgItems", () => {
   it("uses a case-insensitive prefix match", () => {
     const items = buildModeArgItems(fixtureRegistry());
@@ -185,9 +225,9 @@ describe("filterModeArgItems", () => {
 });
 
 describe("getModeArgSuggestions", () => {
-  it("returns prefix-scoped mode argument suggestions for `/mode <partial>`", () => {
+  it("stage 1: returns prefix-scoped top-level suggestions for `/mode <partial>`", () => {
     const registry = fixtureRegistry();
-    const flowItem = buildModeArgItems(registry).find(
+    const flowItem = buildModeTopLevelItems(registry).find(
       (item) => item.value === "flow",
     );
     expect(flowItem).toBeDefined();
@@ -198,8 +238,71 @@ describe("getModeArgSuggestions", () => {
     });
   });
 
+  it("stage 1: `/mode ` includes preset names, off, and default", () => {
+    const registry = fixtureRegistry();
+    const result = getModeArgSuggestions("/mode ", registry);
+
+    expect(result?.prefix).toBe("");
+    expect(result?.items.map((item) => item.value)).toEqual(
+      buildModeTopLevelItems(registry).map((item) => item.value),
+    );
+    expect(result?.items).toContainEqual(
+      expect.objectContaining({ value: MODE_DEFAULT_ARG }),
+    );
+  });
+
+  it("stage 2: `/mode default <partial>` suggests presets + off (no `default`)", () => {
+    const registry = fixtureRegistry();
+    const flowItem = buildModeArgItems(registry).find(
+      (item) => item.value === "flow",
+    );
+    expect(getModeArgSuggestions("/mode default fl", registry)).toEqual({
+      prefix: "fl",
+      items: [flowItem],
+    });
+  });
+
+  it("stage 2: `/mode default ` returns the full preset + off list", () => {
+    const registry = fixtureRegistry();
+    const result = getModeArgSuggestions("/mode default ", registry);
+
+    expect(result?.prefix).toBe("");
+    expect(result?.items.map((item) => item.value)).toEqual(
+      buildModeArgItems(registry).map((item) => item.value),
+    );
+    expect(result?.items.map((item) => item.value)).not.toContain(MODE_DEFAULT_ARG);
+  });
+
+  it("stage 2: `/mode default o` suggests off", () => {
+    const result = getModeArgSuggestions("/mode default o", fixtureRegistry());
+    expect(result).toEqual({
+      prefix: "o",
+      items: [expect.objectContaining({ value: MODE_OFF_ARG })],
+    });
+  });
+
+  it("stage 3: after an action, leading-dash token suggests --global", () => {
+    expect(getModeArgSuggestions("/mode default flow -", fixtureRegistry())).toEqual({
+      prefix: "-",
+      items: [expect.objectContaining({ value: MODE_DEFAULT_GLOBAL_FLAG })],
+    });
+    expect(getModeArgSuggestions("/mode default off --", fixtureRegistry())).toEqual({
+      prefix: "--",
+      items: [expect.objectContaining({ value: MODE_DEFAULT_GLOBAL_FLAG })],
+    });
+  });
+
+  it("stage 3: non-matching flag prefix returns an empty flag suggestion list", () => {
+    expect(getModeArgSuggestions("/mode default flow --x", fixtureRegistry())).toEqual({
+      prefix: "--x",
+      items: [],
+    });
+  });
+
   it("returns null when the trigger does not match", () => {
     expect(getModeArgSuggestions("/mode", fixtureRegistry())).toBeNull();
+    // Existing multi-token non-default case remains delegated.
+    expect(getModeArgSuggestions("/mode flow extra", fixtureRegistry())).toBeNull();
   });
 });
 
