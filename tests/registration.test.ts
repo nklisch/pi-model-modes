@@ -19,9 +19,10 @@ import { makeContext, makePi } from "./harness.js";
 /**
  * Registration wiring — the factory registers the `before_agent_start` handler
  * exactly once, by reference (the same function object the unit tests import),
- * the `session_start` config-seed once, and the `/mode:inspect` command once.
+ * the `session_start` config-seed + autocomplete handlers once each, and the
+ * `/mode:inspect` command once.
  * Proves the "single registration surface" property from ARCHITECTURE.md: the
- * factory wires the handler, the session-start seed, and the command, and
+ * factory wires the handler, the session-start handlers, and the command, and
  * nothing more.
  */
 let dir: string | undefined;
@@ -100,15 +101,16 @@ describe("factory registration wiring", () => {
     expect(call.args[1]).toBe(handleBeforeAgentStart);
   });
 
-  it("registers a session_start handler exactly once", () => {
+  it("registers the session_start handlers exactly once each", () => {
     const { pi, calls } = makePi();
     factory(pi);
 
     const registrations = calls.filter(
       (c) => c.method === "on" && c.args[0] === "session_start",
     );
-    expect(registrations).toHaveLength(1);
+    expect(registrations).toHaveLength(2);
     expect(typeof registrations[0].args[1]).toBe("function");
+    expect(typeof registrations[1].args[1]).toBe("function");
   });
 
   it("registers the /mode + /mode:inspect commands and nothing unexpected", () => {
@@ -121,12 +123,17 @@ describe("factory registration wiring", () => {
       .sort();
     expect(commands).toEqual([MODE_COMMAND, MODE_INSPECT_COMMAND].sort());
 
-    // The only `on` registrations are before_agent_start + session_start.
+    // The only `on` registrations are before_agent_start + two session_start
+    // handlers (autocomplete + config seed).
     const events = calls
       .filter((c) => c.method === "on")
       .map((c) => c.args[0])
       .sort();
-    expect(events).toEqual(["before_agent_start", "session_start"]);
+    expect(events).toEqual([
+      "before_agent_start",
+      "session_start",
+      "session_start",
+    ]);
 
     // Nothing beyond the `on` registrations and the two commands (no automatic
     // shortcuts, tools, flags, renderers, providers, no emit at registration).

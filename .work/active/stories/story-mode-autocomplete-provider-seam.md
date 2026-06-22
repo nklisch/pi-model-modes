@@ -1,7 +1,7 @@
 ---
 id: story-mode-autocomplete-provider-seam
 kind: story
-stage: implementing
+stage: review
 tags: [tests]
 parent: feature-mode-command-autocomplete
 depends_on: [story-mode-autocomplete-suggestion-helpers]
@@ -129,6 +129,18 @@ semantics or the cache contract.
   these as deliberate additions (the harness docstring names `ctx.ui` as a
   real surface tests must supply). A recording `ui.addAutocompleteProvider`
   stub captures the provider closure for offline inspection.
+
+## Implementation log
+
+- Appended `registerModeAutocomplete(pi)` to `src/autocomplete.ts`; it
+  registers one `session_start` handler, gates on `ctx.mode === "tui"`,
+  delegates non-`/mode`/aborted/failing suggestions to the current provider,
+  and delegates completion/file-trigger behavior.
+- Wired `registerModeAutocomplete(pi)` into `extensions/index.ts`.
+- Added seam coverage for lazy registration, TUI gating, provider delegation,
+  `/mode fl` interception, and defensive fallback when preset loading throws.
+- Updated factory registration expectations for two `session_start` handlers
+  and documented TUI autocomplete discoverability in `docs/SPEC.md`.
 
 ## Acceptance criteria
 

@@ -190,6 +190,8 @@ Two built-in paths converge on one resolver, with one global keybinding opt-in:
    `base:… • agency:… • quality:… • scope:…` plus any `+modifier`s; a broken
    active mode degrades to an `(unresolvable — …)` line) and the **available
    presets** (the sorted `presets.json` names plus the virtual `none` mode).
+   In TUI mode, the `<preset>` argument is discoverable via autocomplete:
+   preset names from `loadPresets()` plus the literal `off`.
    With a **`<preset>`** argument `/mode` sets the session override and confirms
    via a toast (`mode set to "<name>"`); an unknown preset / missing fragment
    surfaces the resolver's error as an error toast and leaves the prior override

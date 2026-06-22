@@ -1,3 +1,7 @@
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import {
   type AutocompleteItem,
   type AutocompleteSuggestions,
@@ -64,4 +68,35 @@ export function getModeArgSuggestions(
     prefix: token,
     items: filterModeArgItems(buildModeArgItems(registry), token),
   };
+}
+
+export function registerModeAutocomplete(pi: ExtensionAPI): void {
+  pi.on("session_start", (_event, ctx: ExtensionContext) => {
+    if (ctx.mode !== "tui") return;
+    ctx.ui.addAutocompleteProvider((current) => ({
+      triggerCharacters: ["/"],
+      async getSuggestions(lines, line, col, options) {
+        const beforeCursor = (lines[line] ?? "").slice(0, col);
+        let suggestions;
+        try {
+          suggestions = getModeArgSuggestions(beforeCursor);
+        } catch {
+          return current.getSuggestions(lines, line, col, options);
+        }
+        if (suggestions === null) {
+          return current.getSuggestions(lines, line, col, options);
+        }
+        if (options.signal?.aborted) {
+          return current.getSuggestions(lines, line, col, options);
+        }
+        return suggestions;
+      },
+      applyCompletion(lines, line, col, item, prefix) {
+        return current.applyCompletion(lines, line, col, item, prefix);
+      },
+      shouldTriggerFileCompletion(lines, line, col) {
+        return current.shouldTriggerFileCompletion?.(lines, line, col) ?? true;
+      },
+    }));
+  });
 }

@@ -1,6 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import type {
+  AutocompleteProviderFactory,
+  ExtensionContext,
+  SessionStartEvent,
+} from "@earendil-works/pi-coding-agent";
+import type { AutocompleteProvider } from "@earendil-works/pi-tui";
 import {
   MODE_OFF_ARG,
+  registerModeAutocomplete,
   extractModeArgToken,
   buildModeArgItems,
   filterModeArgItems,
@@ -13,6 +20,7 @@ import {
   type PresetRegistry,
 } from "../src/presets.js";
 import { formatModeSummary } from "../src/commands.js";
+import { makeContext, makePi } from "./harness.js";
 
 const FIXTURE_JSON = JSON.stringify({
   flow: {
@@ -43,6 +51,71 @@ const OFF_DESCRIPTION = "clear override — fall back to default";
 
 function fixtureRegistry(): PresetRegistry {
   return loadPresets({ json: FIXTURE_JSON });
+}
+
+const SESSION_START_EVENT: SessionStartEvent = {
+  type: "session_start",
+  reason: "startup",
+};
+
+function registeredModeAutocompleteHandler(
+  piCalls: ReturnType<typeof makePi>["calls"],
+): (event: SessionStartEvent, ctx: ExtensionContext) => void {
+  const registrations = piCalls.filter(
+    (call) => call.method === "on" && call.args[0] === "session_start",
+  );
+  expect(registrations).toHaveLength(1);
+  return registrations[0].args[1] as (
+    event: SessionStartEvent,
+    ctx: ExtensionContext,
+  ) => void;
+}
+
+function recordingAutocompleteContext(): {
+  ctx: ExtensionContext;
+  factories: AutocompleteProviderFactory[];
+} {
+  const factories: AutocompleteProviderFactory[] = [];
+  const ctx = makeContext({
+    mode: "tui",
+    ui: {
+      addAutocompleteProvider: (factory: AutocompleteProviderFactory) => {
+        factories.push(factory);
+      },
+    },
+  } as unknown as Partial<ExtensionContext>);
+  return { ctx, factories };
+}
+
+function currentProvider(): {
+  current: AutocompleteProvider;
+  calls: { getSuggestions: number; applyCompletion: number; shouldTrigger: number };
+} {
+  const calls = { getSuggestions: 0, applyCompletion: 0, shouldTrigger: 0 };
+  return {
+    calls,
+    current: {
+      async getSuggestions() {
+        calls.getSuggestions += 1;
+        return {
+          prefix: "sentinel",
+          items: [{ value: "sentinel", label: "sentinel" }],
+        };
+      },
+      applyCompletion(lines, _line, _col, item) {
+        calls.applyCompletion += 1;
+        return {
+          lines: [...lines, item.value],
+          cursorLine: lines.length,
+          cursorCol: item.value.length,
+        };
+      },
+      shouldTriggerFileCompletion() {
+        calls.shouldTrigger += 1;
+        return false;
+      },
+    },
+  };
 }
 
 describe("extractModeArgToken", () => {
@@ -127,5 +200,104 @@ describe("getModeArgSuggestions", () => {
 
   it("returns null when the trigger does not match", () => {
     expect(getModeArgSuggestions("/mode", fixtureRegistry())).toBeNull();
+  });
+});
+
+describe("registerModeAutocomplete", () => {
+  it("registers exactly one session_start handler and no other pi surface", () => {
+    const { pi, calls } = makePi();
+
+    registerModeAutocomplete(pi);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("on");
+    expect(calls[0].args[0]).toBe("session_start");
+    expect(typeof calls[0].args[1]).toBe("function");
+  });
+
+  it("registers a TUI autocomplete provider that delegates completion behavior", () => {
+    const { pi, calls } = makePi();
+    registerModeAutocomplete(pi);
+    const handler = registeredModeAutocompleteHandler(calls);
+    const { ctx, factories } = recordingAutocompleteContext();
+
+    handler(SESSION_START_EVENT, ctx);
+
+    expect(factories).toHaveLength(1);
+    const { current, calls: providerCalls } = currentProvider();
+    const provider = factories[0](current);
+    expect(provider.triggerCharacters).toEqual(["/"]);
+
+    const completion = provider.applyCompletion(
+      ["/mode fl"],
+      0,
+      8,
+      { value: "flow", label: "flow" },
+      "fl",
+    );
+    expect(providerCalls.applyCompletion).toBe(1);
+    expect(completion).toEqual({
+      lines: ["/mode fl", "flow"],
+      cursorLine: 1,
+      cursorCol: 4,
+    });
+
+    expect(provider.shouldTriggerFileCompletion?.(["/mode fl"], 0, 8)).toBe(false);
+    expect(providerCalls.shouldTrigger).toBe(1);
+  });
+
+  it("does not add a provider outside TUI mode", () => {
+    const { pi, calls } = makePi();
+    registerModeAutocomplete(pi);
+    const handler = registeredModeAutocompleteHandler(calls);
+    const addAutocompleteProvider = vi.fn();
+    const ctx = makeContext({
+      mode: "print",
+      ui: { addAutocompleteProvider },
+    } as unknown as Partial<ExtensionContext>);
+
+    handler(SESSION_START_EVENT, ctx);
+
+    expect(addAutocompleteProvider).not.toHaveBeenCalled();
+  });
+
+  it("delegates suggestions when the line is not a `/mode <partial>` invocation", async () => {
+    const { pi, calls } = makePi();
+    registerModeAutocomplete(pi);
+    const handler = registeredModeAutocompleteHandler(calls);
+    const { ctx, factories } = recordingAutocompleteContext();
+    handler(SESSION_START_EVENT, ctx);
+    const { current, calls: providerCalls } = currentProvider();
+    const provider = factories[0](current);
+
+    const result = await provider.getSuggestions(["hello"], 0, 5, {
+      signal: new AbortController().signal,
+    });
+
+    expect(providerCalls.getSuggestions).toBe(1);
+    expect(result).toEqual({
+      prefix: "sentinel",
+      items: [{ value: "sentinel", label: "sentinel" }],
+    });
+  });
+
+  it("returns `/mode` suggestions without delegating when the trigger matches", async () => {
+    const { pi, calls } = makePi();
+    registerModeAutocomplete(pi);
+    const handler = registeredModeAutocompleteHandler(calls);
+    const { ctx, factories } = recordingAutocompleteContext();
+    handler(SESSION_START_EVENT, ctx);
+    const { current, calls: providerCalls } = currentProvider();
+    const provider = factories[0](current);
+
+    const result = await provider.getSuggestions(["/mode fl"], 0, 8, {
+      signal: new AbortController().signal,
+    });
+
+    expect(providerCalls.getSuggestions).toBe(0);
+    expect(result?.prefix).toBe("fl");
+    expect(result?.items).toEqual([
+      expect.objectContaining({ value: "flow", label: "flow" }),
+    ]);
   });
 });

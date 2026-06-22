@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { registerModeAutocomplete } from "../src/autocomplete.js";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { registerModeCommand, registerModeInspectCommand } from "../src/commands.js";
 import { applySessionStart, loadGlobalPluginConfig } from "../src/config.js";
@@ -42,6 +43,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", handleBeforeAgentStart);
   registerModeCommand(pi);
   registerModeInspectCommand(pi);
+  registerModeAutocomplete(pi);
   pi.on("session_start", (e, ctx) => applySessionStart(e.reason, ctx.cwd));
 
   const { cycleKeybinding } = loadGlobalPluginConfig();
