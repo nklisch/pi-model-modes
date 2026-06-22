@@ -14,15 +14,17 @@ import { refreshModeFooter } from "./footer.js";
  * Mode-cycle keybindings — the keyboard switching path. `Ctrl+Shift+U` cycles
  * FORWARD through the sorted preset list and `Ctrl+Shift+Alt+U` cycles BACKWARD,
  * each setting the session OVERRIDE (via the resolver seam) relative to the
- * current EFFECTIVE mode. This helper is not auto-registered by the extension
- * factory; callers must opt in deliberately.
+ * current EFFECTIVE mode. The package factory registers these shortcuts only
+ * when the global `cycleKeybinding` config flag is `true`; otherwise callers
+ * must opt in explicitly.
  *
  * The cycle math (`nextPresetName`) is a PURE helper — fully unit-testable
  * without pi. `registerModeKeybindings` is the thin pi seam.
  *
  * `Key` import note: pi examples import `Key` from `@earendil-works/pi-tui`.
- * That package is nested under `pi-coding-agent`, not a direct dependency here,
- * so this module uses equivalent `KeyId` strings.
+ * That package is a direct dev-dependency of this plugin (added when the
+ * autocomplete seam landed), but this module still uses equivalent `KeyId`
+ * strings to keep the runtime import surface minimal.
  *
  * `Ctrl+M` is intentionally avoided: terminal legacy input encodes it as
  * carriage return, so it collides with Enter.

@@ -14,6 +14,7 @@ import {
 } from "./resolver.js";
 import { listPresetNames } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
+import { MODE_OFF_ARG } from "./autocomplete.js";
 
 /**
  * `/mode:inspect` — the epic's one user-facing command surface.
@@ -195,7 +196,7 @@ export function registerModeCommand(pi: ExtensionAPI): void {
       }
 
       // `off` → clear the override; effective falls back to the config default.
-      if (arg === "off") {
+      if (arg === MODE_OFF_ARG) {
         clearActiveMode();
         refreshModeFooter(ctx);
         const source = getEffectiveModeSource();

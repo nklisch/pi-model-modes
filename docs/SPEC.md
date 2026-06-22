@@ -191,7 +191,7 @@ Two built-in paths converge on one resolver, with one global keybinding opt-in:
    active mode degrades to an `(unresolvable — …)` line) and the **available
    presets** (the sorted `presets.json` names plus the virtual `none` mode).
    In TUI mode, the `<preset>` argument is discoverable via autocomplete:
-   preset names from `loadPresets()` plus the literal `off`.
+   preset names (including the virtual `none`) plus the literal `off`.
    With a **`<preset>`** argument `/mode` sets the session override and confirms
    via a toast (`mode set to "<name>"`); an unknown preset / missing fragment
    surfaces the resolver's error as an error toast and leaves the prior override
@@ -212,6 +212,11 @@ Two built-in paths converge on one resolver, with one global keybinding opt-in:
    `false`, or non-boolean values do not register shortcuts; non-boolean values
    warn and are treated as `false`. Project-level `cycleKeybinding` is not used
    because keybindings are registered at package load and are global in pi.
+
+   The keybinding is opt-in/default-off because package-level default shortcuts
+   can collide with normal terminal entry — the chosen `Ctrl+Shift+U` /
+   `Ctrl+Shift+Alt+U` binding deliberately avoids `Ctrl+M`, which terminal
+   legacy input encodes as carriage return (indistinguishable from Enter).
 
 Resolution precedence: session override (`/mode`) > config default > unset.
 The resolver holds this as two distinct tiers (override + default); the
@@ -241,4 +246,6 @@ state, not written to disk). A new session restarts from the config default.
   proves the line updates on the next MISS. The cache key includes
   `model.id`/`model.provider`, so a model switch forces a MISS and re-derive.
 - **Default cycle keybinding:** Resolved — no default shortcut is registered.
-  `Ctrl+M` is not safe in terminal input because it collides with Enter.
+  `Ctrl+M` was avoided because terminal legacy input encodes it as carriage
+  return (collides with Enter); the actual opt-in binding is `Ctrl+Shift+U` /
+  `Ctrl+Shift+Alt+U`, exposed via the global `cycleKeybinding` flag.
