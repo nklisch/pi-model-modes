@@ -3,7 +3,7 @@ import { registerModeAutocomplete } from "../src/autocomplete.js";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { registerModeCommand, registerModeInspectCommand } from "../src/commands.js";
 import { applySessionStart, loadGlobalPluginConfig } from "../src/config.js";
-import { setCycleHintEnabled } from "../src/footer.js";
+import { refreshModeFooter, setCycleHintEnabled } from "../src/footer.js";
 import { registerModeKeybindings } from "../src/keybinding.js";
 
 /**
@@ -41,10 +41,14 @@ import { registerModeKeybindings } from "../src/keybinding.js";
  */
 export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", handleBeforeAgentStart);
+  pi.on("before_agent_start", (_e, ctx) => refreshModeFooter(ctx));
   registerModeCommand(pi);
   registerModeInspectCommand(pi);
   registerModeAutocomplete(pi);
-  pi.on("session_start", (e, ctx) => applySessionStart(e.reason, ctx.cwd));
+  pi.on("session_start", (e, ctx) => {
+    applySessionStart(e.reason, ctx.cwd);
+    refreshModeFooter(ctx);
+  });
 
   const { cycleKeybinding } = loadGlobalPluginConfig();
   setCycleHintEnabled(cycleKeybinding === true);

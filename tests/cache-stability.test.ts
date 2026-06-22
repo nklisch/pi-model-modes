@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { deriveIdentityLine } from "../src/identity.js";
 import { resetCacheForTesting } from "../src/cache.js";
-import { makeContext, makeEvent, makeModel } from "./harness.js";
+import { MODE_FOOTER_KEY, refreshModeFooter, resetFooterForTesting } from "../src/footer.js";
+import { resetResolverForTesting, setActiveMode } from "../src/resolver.js";
+import { resetFragmentCacheForTesting } from "../src/fragments.js";
+import { resetPresetsForTesting } from "../src/presets.js";
+import { makeContext, makeEvent, makeModel, makeUi } from "./harness.js";
 
 /**
  * SPEC Invariant 2 — the assembled `systemPrompt` is byte-identical across N
@@ -31,7 +35,13 @@ function runTurn(b: string = base, m = model): string {
 }
 
 describe("cache stability — SPEC Invariant 2 (byte-identical across no-change turns)", () => {
-  beforeEach(() => resetCacheForTesting());
+  beforeEach(() => {
+    resetCacheForTesting();
+    resetResolverForTesting();
+    resetFooterForTesting();
+    resetFragmentCacheForTesting();
+    resetPresetsForTesting();
+  });
 
   it("returns byte-identical systemPrompt across N no-change turns (HIT path)", () => {
     // Reset happened in beforeEach. Turn 1 is a MISS that assembles + stores;
@@ -104,5 +114,32 @@ describe("cache stability — SPEC Invariant 2 (byte-identical across no-change 
     resetCacheForTesting();
     const bytesBaseY = runTurn(baseY, model);
     expect(bytesBaseX).not.toBe(bytesBaseY);
+  });
+
+  it("footer refresh fires every turn while a mode-set prompt stays byte-identical", () => {
+    setActiveMode("safe");
+    const ui = makeUi();
+    let currentSystemPrompt = "";
+    const ctx = makeContext({
+      model,
+      hasUI: true,
+      ui,
+      getSystemPrompt: () => currentSystemPrompt,
+    });
+    const prompts: string[] = [];
+
+    for (let i = 0; i < N; i++) {
+      refreshModeFooter(ctx);
+      currentSystemPrompt = handleBeforeAgentStart(makeEvent(base), ctx)
+        .systemPrompt;
+      prompts.push(ctx.getSystemPrompt());
+    }
+
+    expect(prompts).toHaveLength(N);
+    expect(new Set(prompts).size).toBe(1);
+    expect(ui.statusCalls).toHaveLength(N);
+    for (const call of ui.statusCalls) {
+      expect(call).toEqual({ key: MODE_FOOTER_KEY, text: "mode: safe" });
+    }
   });
 });

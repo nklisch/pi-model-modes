@@ -2,6 +2,7 @@ import type {
   BeforeAgentStartEvent,
   ExtensionAPI,
   ExtensionContext,
+  ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 
@@ -97,6 +98,27 @@ export function makeModel(
 }
 
 export type RecordedCall = { method: string; args: unknown[] };
+
+export interface RecordingUi extends ExtensionUIContext {
+  statusCalls: { key: string; text: string | undefined }[];
+  notifyCalls: { message: string; type?: "info" | "warning" | "error" }[];
+}
+
+export function makeUi(overrides: Partial<ExtensionUIContext> = {}): RecordingUi {
+  const statusCalls: RecordingUi["statusCalls"] = [];
+  const notifyCalls: RecordingUi["notifyCalls"] = [];
+  return {
+    ...overrides,
+    statusCalls,
+    notifyCalls,
+    setStatus: (key: string, text: string | undefined) => {
+      statusCalls.push({ key, text });
+    },
+    notify: (message: string, type?: "info" | "warning" | "error") => {
+      notifyCalls.push({ message, type });
+    },
+  } as RecordingUi;
+}
 
 /**
  * Build a recording `ExtensionAPI` stub that captures every registration

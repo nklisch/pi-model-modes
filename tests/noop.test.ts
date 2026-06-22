@@ -2,13 +2,25 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { deriveIdentityLine } from "../src/identity.js";
 import { resetCacheForTesting } from "../src/cache.js";
-import { makeContext, makeEvent, makeModel } from "./harness.js";
+import {
+  MODE_FOOTER_KEY,
+  refreshModeFooter,
+  resetFooterForTesting,
+  setCycleHintEnabled,
+} from "../src/footer.js";
+import { CYCLE_BACKWARD_KEY, CYCLE_FORWARD_KEY } from "../src/keybinding.js";
+import { resetResolverForTesting } from "../src/resolver.js";
+import { makeContext, makeEvent, makeModel, makeUi } from "./harness.js";
 
 describe("handleBeforeAgentStart — Invariant 3 evolved (identity-prepended, remainder byte-identical, never undefined)", () => {
   const model = makeModel({ name: "GLM-4.6", provider: "zai" });
   const identity = deriveIdentityLine(model);
 
-  beforeEach(() => resetCacheForTesting()); // module-scope cache state isolates per case
+  beforeEach(() => {
+    resetCacheForTesting(); // module-scope cache state isolates per case
+    resetResolverForTesting();
+    resetFooterForTesting();
+  });
 
   const fixtures: Record<string, string> = {
     typical: "You are an expert coding assistant...\n\nAvailable tools:\n- read",
@@ -49,5 +61,28 @@ describe("handleBeforeAgentStart — Invariant 3 evolved (identity-prepended, re
     // HIT path returns the prior miss's bytes (no re-assembly, no stacking).
     expect(r2.systemPrompt).toBe(r1.systemPrompt);
     expect(r3.systemPrompt).toBe(r1.systemPrompt);
+  });
+
+  it("footer unset rendering does not perturb the identity-only no-op splice", () => {
+    const input = "typical prompt body";
+    const ui = makeUi();
+    const ctx = makeContext({
+      model,
+      hasUI: true,
+      ui,
+    });
+
+    setCycleHintEnabled(true);
+    refreshModeFooter(ctx);
+    const result = handleBeforeAgentStart(makeEvent(input), ctx);
+
+    expect(ui.statusCalls).toEqual([
+      {
+        key: MODE_FOOTER_KEY,
+        text: `mode: unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
+      },
+    ]);
+    expect(result.systemPrompt).toBe(`${identity}\n${input}`);
+    expect(result.systemPrompt.split("\n")[0]).toBe(identity);
   });
 });

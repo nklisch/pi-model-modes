@@ -1,7 +1,7 @@
 ---
 id: feature-mode-footer-indicator-refresh-wiring
 kind: story
-stage: implementing
+stage: review
 tags: []
 parent: feature-mode-footer-indicator
 depends_on:
@@ -77,29 +77,42 @@ extended (so Unit 2 must land first to avoid a conflicting factory edit).
 
 ## Acceptance criteria
 
-- [ ] The factory registers a second `before_agent_start` handler (the footer
+- [x] The factory registers a second `before_agent_start` handler (the footer
   refresh) alongside the transform handler by-reference exactly once.
   `registration.test.ts` allows the second `before_agent_start` registration;
   still asserts the transform handler is registered by reference exactly once
   (not weakened).
-- [ ] After `/mode <preset>` the footer updates IMMEDIATELY — the command test
+- [x] After `/mode <preset>` the footer updates IMMEDIATELY — the command test
   asserts `ctx.ui.setStatus` was called with `MODE_FOOTER_KEY` and the new
   preset in the text, BEFORE any turn fires.
-- [ ] After `/mode off` the footer updates immediately (reflects the new
+- [x] After `/mode off` the footer updates immediately (reflects the new
   effective state — default or unset).
-- [ ] After a cycle keypress the footer updates immediately (keybinding
+- [x] After a cycle keypress the footer updates immediately (keybinding
   handler test asserts `ctx.ui.setStatus` reflects the next preset).
-- [ ] On `session_start` the footer refreshes AFTER `applySessionStart`
+- [x] On `session_start` the footer refreshes AFTER `applySessionStart`
   (post-reseed default reflected in the footer text).
-- [ ] On `before_agent_start` the footer refreshes (safety net; idempotent —
+- [x] On `before_agent_start` the footer refreshes (safety net; idempotent —
   repeated turns with no state change produce the same `setStatus` text).
-- [ ] Cache-stability regression: across N no-change turns with a mode set,
+- [x] Cache-stability regression: across N no-change turns with a mode set,
   `ctx.getSystemPrompt()` stays byte-identical AND `ctx.ui.setStatus` fires
   each turn (assert BOTH). The footer does NOT perturb SPEC Invariant 2.
-- [ ] No-op-unset regression: with mode unset, the footer renders
+- [x] No-op-unset regression: with mode unset, the footer renders
   `mode: unset` (+ hint if enabled) AND the handler's return is the
   identity-only splice unchanged (Invariant 3 preserved).
-- [ ] typecheck clean; tests green.
+- [x] typecheck clean; tests green.
+
+## Implementation notes
+
+- Wired `refreshModeFooter(ctx)` into the factory as a separate
+  `before_agent_start` handler returning `undefined`, and into the existing
+  config `session_start` handler after `applySessionStart`.
+- Added immediate refreshes after successful `/mode <preset>`, `/mode off`, and
+  cycle-keybinding mutations; display-only listing and unknown preset paths do
+  not refresh.
+- Added `makeUi(overrides?)` recording UI harness plus `footer-wiring` coverage.
+  Extended cache-stability and no-op-unset tests to prove footer refreshes do
+  not change prompt bytes or the identity-only unset splice.
+- Verified with `npm run typecheck` and `npm test`.
 
 ## Out of scope
 

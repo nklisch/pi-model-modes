@@ -20,7 +20,7 @@ import {
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import { resetCacheForTesting } from "../src/cache.js";
-import { makePi, makeContext } from "./harness.js";
+import { makePi, makeContext, makeUi } from "./harness.js";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -156,15 +156,12 @@ function getShortcutHandlers(): {
 type NotifyCall = { message: string; type?: string };
 
 function makeNotifyCtx(): { ctx: ExtensionContext; notifies: NotifyCall[] } {
-  const notifies: NotifyCall[] = [];
+  const ui = makeUi();
   const ctx = makeContext({
-    ui: {
-      notify: (message: string, type?: string) => {
-        notifies.push({ message, type });
-      },
-    },
+    hasUI: true,
+    ui,
   } as unknown as Partial<ExtensionContext>);
-  return { ctx, notifies };
+  return { ctx, notifies: ui.notifyCalls };
 }
 
 describe("registerModeKeybindings", () => {

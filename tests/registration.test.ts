@@ -14,7 +14,7 @@ import {
 import { CYCLE_BACKWARD_KEY, CYCLE_FORWARD_KEY } from "../src/keybinding.js";
 import { resetConfigForTesting, setConfigPathsForTesting } from "../src/config.js";
 import { resetResolverForTesting } from "../src/resolver.js";
-import { makeContext, makePi } from "./harness.js";
+import { makeContext, makePi, makeUi } from "./harness.js";
 
 /**
  * Registration wiring — the factory registers the `before_agent_start` handler
@@ -54,18 +54,14 @@ function setMissingConfig(): void {
 }
 
 function renderedFooterText(): string | undefined {
-  const calls: [string, string | undefined][] = [];
+  const ui = makeUi();
   const ctx = makeContext({
     hasUI: true,
-    ui: {
-      setStatus: (key: string, text: string | undefined) => {
-        calls.push([key, text]);
-      },
-    },
+    ui,
   } as unknown as Partial<ExtensionContext>);
   refreshModeFooter(ctx);
-  expect(calls[0]?.[0]).toBe(MODE_FOOTER_KEY);
-  return calls[0]?.[1];
+  expect(ui.statusCalls[0]?.key).toBe(MODE_FOOTER_KEY);
+  return ui.statusCalls[0]?.text;
 }
 
 describe("factory registration wiring", () => {
@@ -85,20 +81,29 @@ describe("factory registration wiring", () => {
     vi.restoreAllMocks();
   });
 
-  it("registers before_agent_start by reference exactly once", () => {
+  it("registers the transform before_agent_start by reference exactly once plus one footer refresh handler", () => {
     const { pi, calls } = makePi();
     factory(pi);
 
     const registrations = calls.filter(
       (c) => c.method === "on" && c.args[0] === "before_agent_start",
     );
-    expect(registrations).toHaveLength(1);
+    expect(registrations).toHaveLength(2);
 
-    const [call] = registrations;
-    expect(call.args[0]).toBe("before_agent_start");
+    const transformRegistrations = registrations.filter(
+      (call) => call.args[1] === handleBeforeAgentStart,
+    );
+    expect(transformRegistrations).toHaveLength(1);
+    expect(transformRegistrations[0].args[0]).toBe("before_agent_start");
     // Registered by reference: the registered handler IS the same function
     // object the unit tests import (not an inline arrow).
-    expect(call.args[1]).toBe(handleBeforeAgentStart);
+    expect(transformRegistrations[0].args[1]).toBe(handleBeforeAgentStart);
+
+    const footerRegistrations = registrations.filter(
+      (call) => call.args[1] !== handleBeforeAgentStart,
+    );
+    expect(footerRegistrations).toHaveLength(1);
+    expect(typeof footerRegistrations[0].args[1]).toBe("function");
   });
 
   it("registers the session_start handlers exactly once each", () => {
@@ -123,13 +128,15 @@ describe("factory registration wiring", () => {
       .sort();
     expect(commands).toEqual([MODE_COMMAND, MODE_INSPECT_COMMAND].sort());
 
-    // The only `on` registrations are before_agent_start + two session_start
-    // handlers (autocomplete + config seed).
+    // The only `on` registrations are two before_agent_start handlers
+    // (transform + footer refresh) and two session_start handlers
+    // (autocomplete + config seed/footer refresh).
     const events = calls
       .filter((c) => c.method === "on")
       .map((c) => c.args[0])
       .sort();
     expect(events).toEqual([
+      "before_agent_start",
       "before_agent_start",
       "session_start",
       "session_start",

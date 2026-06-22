@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 import type { Model } from "@earendil-works/pi-ai";
 import { deriveIdentityLine } from "./identity.js";
 import { getChangeSignal } from "./cache.js";
+import { refreshModeFooter } from "./footer.js";
 import type { ChangeSignalSnapshot, ChangeSignalEntry, ChangeReason } from "./cache.js";
 import {
   resolveActiveModePlan,
@@ -196,6 +197,7 @@ export function registerModeCommand(pi: ExtensionAPI): void {
       // `off` → clear the override; effective falls back to the config default.
       if (arg === "off") {
         clearActiveMode();
+        refreshModeFooter(ctx);
         const source = getEffectiveModeSource();
         const effectiveSpec = getActiveMode() ?? getDefaultMode();
         const specName = typeof effectiveSpec === "string" ? effectiveSpec : undefined;
@@ -210,6 +212,7 @@ export function registerModeCommand(pi: ExtensionAPI): void {
       // A name → set the override (validated at set-time by the resolver).
       try {
         setActiveMode(arg);
+        refreshModeFooter(ctx);
         ctx.ui.notify(`mode set to "${arg}"`, "info");
       } catch (err) {
         ctx.ui.notify((err as Error).message, "error");

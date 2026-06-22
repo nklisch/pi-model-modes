@@ -8,6 +8,7 @@ import {
   getDefaultMode,
 } from "./resolver.js";
 import { listPresetNames } from "./presets.js";
+import { refreshModeFooter } from "./footer.js";
 
 /**
  * Mode-cycle keybindings — the keyboard switching path. `Ctrl+Shift+U` cycles
@@ -82,6 +83,7 @@ export function registerModeKeybindings(pi: ExtensionAPI): void {
       return;
     }
     setActiveMode(next);
+    refreshModeFooter(ctx);
     ctx.ui.notify(`mode: ${next}`, "info");
   };
 

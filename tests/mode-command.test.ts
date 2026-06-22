@@ -20,7 +20,7 @@ import {
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import { resetCacheForTesting } from "../src/cache.js";
-import { makePi, makeContext, makeModel } from "./harness.js";
+import { makePi, makeContext, makeModel, makeUi } from "./harness.js";
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
@@ -93,16 +93,13 @@ function makeNotifyCtx(): {
   ctx: ExtensionCommandContext;
   notifies: NotifyCall[];
 } {
-  const notifies: NotifyCall[] = [];
+  const ui = makeUi();
   const ctx = makeContext({
     model: makeModel({ name: "claude-sonnet-4-5", provider: "anthropic" }),
-    ui: {
-      notify: (message: string, type?: string) => {
-        notifies.push({ message, type });
-      },
-    },
+    hasUI: true,
+    ui,
   } as unknown as Partial<ExtensionCommandContext>) as ExtensionCommandContext;
-  return { ctx, notifies };
+  return { ctx, notifies: ui.notifyCalls };
 }
 
 beforeEach(() => {
