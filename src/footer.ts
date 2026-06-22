@@ -8,8 +8,17 @@ import {
 } from "./resolver.js";
 import { CYCLE_FORWARD_KEY, CYCLE_BACKWARD_KEY } from "./keybinding.js";
 
-/** The setStatus key: one slot gives this plugin control over its footer blob. */
-export const MODE_FOOTER_KEY = "pi-model-modes";
+/**
+ * The setStatus key: one slot gives this plugin control over its footer blob.
+ *
+ * pi-bar (and any other footer that re-publishes extension statuses) renders
+ * each status as `${key}:${text}`, so this value is what shows up as the
+ * label prefix in the footer. `"mode"` reads as a clean label there
+ * (`mode:◆ create`) and lets the text below omit a redundant `"mode: "`.
+ * The value is also the slot id in pi's internal status map; it must be
+ * unique across installed extensions.
+ */
+export const MODE_FOOTER_KEY = "mode";
 
 /**
  * Leading marker glyph per base voice. Echoes pi-catppuccin-tui's ◆ vocabulary
@@ -77,20 +86,29 @@ export interface ModeFooterInputs {
   cycleBackwardKey: string;
 }
 
-/** PURE: build the one-line footer string. Always returns a string. */
+/**
+ * PURE: build the one-line footer string. Always returns a string.
+ *
+ * Returns just the value (e.g. `◆ create`, `✕ unresolvable`) — no `"mode: "`
+ * prefix. pi-bar prepends `${MODE_FOOTER_KEY}:` to every extension status, so
+ * the label is supplied by the key; baking `"mode: "` into the text would
+ * double up (`mode:◆ mode: create`). The native pi footer (without pi-bar)
+ * shows the text alone, so the glyph leads and the value still reads clearly
+ * (`◆ create`) even without the label.
+ */
 export function formatModeFooter(inputs: ModeFooterInputs): string {
   const glyph = selectModeGlyph(inputs);
-  let indicator: string;
+  let value: string;
   if (inputs.modeError !== undefined) {
-    indicator = "mode: (unresolvable)";
+    value = "unresolvable";
   } else if (inputs.mode === undefined) {
-    indicator = "mode: unset";
+    value = "unset";
   } else if (inputs.specName !== undefined) {
-    indicator = `mode: ${inputs.specName}`;
+    value = inputs.specName;
   } else {
-    indicator = `mode: ${inputs.mode.base}/${inputs.mode.agency}/${inputs.mode.quality}/${inputs.mode.scope}`;
+    value = `${inputs.mode.base}/${inputs.mode.agency}/${inputs.mode.quality}/${inputs.mode.scope}`;
   }
-  indicator = `${glyph} ${indicator}`;
+  let indicator = `${glyph} ${value}`;
 
   if (inputs.modeError === undefined && inputs.mode !== undefined && inputs.mode.modifiers.length > 0) {
     indicator += ` +${inputs.mode.modifiers.length}`;

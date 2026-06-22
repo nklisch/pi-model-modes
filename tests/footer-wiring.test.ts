@@ -156,7 +156,7 @@ describe("footer refresh wiring", () => {
     expect(getActiveMode()).toBe("safe");
     expect(ui.statusCalls).toContainEqual({
       key: MODE_FOOTER_KEY,
-      text: "◆ mode: safe",
+      text: "◆ safe",
     });
     expect(ui.notifyCalls).toEqual([
       { message: 'mode set to "safe"', type: "info" },
@@ -174,7 +174,7 @@ describe("footer refresh wiring", () => {
     expect(getActiveMode()).toBeUndefined();
     expect(ui.statusCalls.at(-1)).toEqual({
       key: MODE_FOOTER_KEY,
-      text: "◆ mode: safe",
+      text: "◆ safe",
     });
   });
 
@@ -201,9 +201,7 @@ describe("footer refresh wiring", () => {
     const active = getActiveMode();
     expect(typeof active).toBe("string");
     expect(ui.statusCalls.at(-1)).toEqual({
-      key: MODE_FOOTER_KEY,
-      text: `◆ mode: ${active as string}`,
-    });
+      key: MODE_FOOTER_KEY, text: `◆ ${active as string}` });
   });
 
   it("refreshes on session_start after config reseeding", () => {
@@ -218,7 +216,7 @@ describe("footer refresh wiring", () => {
     handler({ type: "session_start", reason: "startup" }, ctx);
 
     expect(ui.statusCalls).toEqual([
-      { key: MODE_FOOTER_KEY, text: "◆ mode: safe" },
+      { key: MODE_FOOTER_KEY, text: "◆ safe" },
     ]);
   });
 
@@ -233,8 +231,8 @@ describe("footer refresh wiring", () => {
     expect(r1).toBeUndefined();
     expect(r2).toBeUndefined();
     expect(ui.statusCalls).toEqual([
-      { key: MODE_FOOTER_KEY, text: "◆ mode: unset" },
-      { key: MODE_FOOTER_KEY, text: "◆ mode: unset" },
+      { key: MODE_FOOTER_KEY, text: "◆ unset" },
+      { key: MODE_FOOTER_KEY, text: "◆ unset" },
     ]);
   });
 });

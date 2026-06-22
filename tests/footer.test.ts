@@ -46,13 +46,13 @@ function inputs(overrides: Partial<ModeFooterInputs> = {}): ModeFooterInputs {
 describe("formatModeFooter", () => {
   it("renders a preset name for a string preset spec", () => {
     expect(formatModeFooter(inputs({ specName: "partner" }))).toBe(
-      "◆ mode: partner",
+      "◆ partner",
     );
   });
 
   it("renders compact axes for an explicit object spec", () => {
     expect(formatModeFooter(inputs())).toBe(
-      "◆ mode: pi/autonomous/architect/unrestricted",
+      "◆ pi/autonomous/architect/unrestricted",
     );
   });
 
@@ -61,15 +61,15 @@ describe("formatModeFooter", () => {
 
     expect(
       formatModeFooter(inputs({ specName: "refactor", mode: withMods })),
-    ).toBe("◆ mode: refactor +2");
+    ).toBe("◆ refactor +2");
     expect(formatModeFooter(inputs({ mode: withMods }))).toBe(
-      "◆ mode: pi/autonomous/architect/unrestricted +2",
+      "◆ pi/autonomous/architect/unrestricted +2",
     );
   });
 
   it("renders unset when no mode resolves", () => {
     expect(formatModeFooter(inputs({ source: "unset", mode: undefined }))).toBe(
-      "◆ mode: unset",
+      "◆ unset",
     );
   });
 
@@ -83,7 +83,7 @@ describe("formatModeFooter", () => {
           modeError: 'mode agency "ghost" has no fragment file',
         }),
       ),
-    ).toBe("✕ mode: (unresolvable)");
+    ).toBe("✕ unresolvable");
   });
 
   it("appends the cycle hint in every state when enabled", () => {
@@ -94,25 +94,25 @@ describe("formatModeFooter", () => {
       formatModeFooter(
         inputs({ specName: "partner", cycleHintEnabled: true }),
       ),
-    ).toBe(`◆ mode: partner${hint}`);
+    ).toBe(`◆ partner${hint}`);
     expect(formatModeFooter(inputs({ cycleHintEnabled: true }))).toBe(
-      `◆ mode: pi/autonomous/architect/unrestricted${hint}`,
+      `◆ pi/autonomous/architect/unrestricted${hint}`,
     );
     expect(
       formatModeFooter(
         inputs({ mode: withMods, cycleHintEnabled: true }),
       ),
-    ).toBe(`◆ mode: pi/autonomous/architect/unrestricted +1${hint}`);
+    ).toBe(`◆ pi/autonomous/architect/unrestricted +1${hint}`);
     expect(
       formatModeFooter(
         inputs({ source: "unset", mode: undefined, cycleHintEnabled: true }),
       ),
-    ).toBe(`◆ mode: unset${hint}`);
+    ).toBe(`◆ unset${hint}`);
     expect(
       formatModeFooter(
         inputs({ modeError: "broken", cycleHintEnabled: true }),
       ),
-    ).toBe(`✕ mode: (unresolvable)${hint}`);
+    ).toBe(`✕ unresolvable${hint}`);
   });
 
   it("omits the cycle hint when disabled", () => {
@@ -137,7 +137,7 @@ describe("formatModeFooter", () => {
           cycleBackwardKey: "a+b+c",
         }),
       ),
-    ).toBe("◆ mode: unset · x+y/a+b+c cycle");
+    ).toBe("◆ unset · x+y/a+b+c cycle");
   });
 });
 
@@ -226,7 +226,7 @@ describe("refreshModeFooter", () => {
 
     refreshModeFooter(ctx);
 
-    expect(calls).toEqual([[MODE_FOOTER_KEY, "◆ mode: unset"]]);
+    expect(calls).toEqual([[MODE_FOOTER_KEY, "◆ unset"]]);
   });
 
   it("uses the module cycle-hint signal when rendering through the seam", () => {
@@ -246,7 +246,7 @@ describe("refreshModeFooter", () => {
     expect(calls).toEqual([
       [
         MODE_FOOTER_KEY,
-        `◆ mode: unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
+        `◆ unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
       ],
     ]);
   });
