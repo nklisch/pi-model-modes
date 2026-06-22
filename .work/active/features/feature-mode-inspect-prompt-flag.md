@@ -1,7 +1,7 @@
 ---
 id: feature-mode-inspect-prompt-flag
 kind: feature
-stage: drafting
+stage: implementing
 tags: []
 parent: null
 depends_on: []
@@ -68,11 +68,62 @@ than fragmenting debug tooling across commands. The bare form stays terse
   untouched.
 - Mode-unset + `--prompt` shows identity + pi base only (no axis fragments).
 
-## Out of scope
+## Design (locked 2026-06-21)
 
-- A `/mode:inspect --cache` variant dumping the change-signal entry history
-  (separate future feature if needed).
-- Persisting the assembled prompt to a file (the panel is enough for debug).
+### Source-of-truth finding
+
+`ctx.getSystemPrompt()` returns the **already-spliced** prompt from the last
+successful turn (`session.systemPrompt`, set by `agent-session.js:819` to
+`result.systemPrompt` when our handler returned one). Re-assembling on top
+of it would double-splice identity + mode fragments. The clean source for
+pi's unspliced base is the `e.systemPrompt` argument the handler already
+receives every turn.
+
+### Locked approach
+
+1. **Module-side base-prompt memo in `src/handler.ts`.** The handler sets
+   `lastBaseSystemPrompt = e.systemPrompt` at the top of every invocation.
+   Getter `getLastBaseSystemPrompt(): string | undefined`. Undefined until
+   the first turn has run.
+2. **Pure `assembleForInspect(model, baseSystemPrompt)` in `src/handler.ts`.**
+   Same two-path splice as `handleBeforeAgentStart`: when `plan.mode ===
+   undefined` use the identity-only single-`\n` form, else call
+   `assembleSystemPrompt(identity, plan, base)`. This is the SINGLE source
+   of truth for the splice — the handler is refactored to call it too, so
+   the inspect view and the live turn can't drift.
+3. **Inspect command (`src/commands.ts`).** `renderModeInspect` gains an
+   optional `assembledPrompt?: string` param; when present, the panel
+   appends a blank line + `System prompt:` header + a fenced-code-block
+   containing the bytes. The handler:
+   - Parses `--prompt` (only flag accepted). Unknown flag → error toast,
+     bare panel not emitted, resolver untouched.
+   - When `--prompt`: read `getLastBaseSystemPrompt()`. If undefined (no
+     turn has run yet), append `System prompt: (no turn has run yet — run a
+     turn to populate)` instead of the fenced block. Otherwise call
+     `assembleForInspect(ctx.model, base)` and pass the result to
+     `renderModeInspect`.
+   - Bare `/mode:inspect` (no flag) is byte-for-byte unchanged.
+
+### Parser contract
+
+- Arg string is split on whitespace, trimmed. Empty → bare panel.
+- The only accepted token is `--prompt` (case-sensitive, no `=value` form).
+- Unknown token / extra token / repeated `--prompt` → error toast naming
+  the bad token, no panel emit, no resolver mutation.
+
+### Why this is byte-identical to the next turn
+
+The inspect view calls the SAME `assembleForInspect` the handler calls. The
+only approximation is the base prompt: the memo holds pi's base from the
+most recent turn, not from the not-yet-run next turn. For a debug surface
+this is the right approximation — it shows what the splice WOULD produce
+right now, and the base changes only when tools/skills/config do.
+
+### Out of scope
+
+- A `--cache` variant dumping change-signal entry history (separate feature).
+- Persisting the assembled prompt to a file.
+- Re-running the cache (would pollute cache state).
 
 ## Sizing
 
