@@ -1,7 +1,7 @@
 ---
 id: feature-mode-footer-indicator-footer-render
 kind: story
-stage: implementing
+stage: review
 tags: []
 parent: feature-mode-footer-indicator
 depends_on: []
@@ -83,3 +83,15 @@ and Unit 3 wires `refreshModeFooter` into the event/command/keybinding paths.
 - The `cycleKeybinding` config flag + factory wiring — Unit 2.
 - Any change to `commands.ts`, `keybinding.ts`, `resolver.ts`, `cache.ts`,
   `extensions/index.ts`, or the foundation docs.
+
+## Implementation log
+
+- Added `src/footer.ts` with `MODE_FOOTER_KEY`, pure `formatModeFooter`,
+  the cycle-hint module signal, test reset helper, and read-only
+  `refreshModeFooter(ctx)` seam.
+- Added `tests/footer.test.ts` covering preset/object/unset/unresolvable
+  footer rendering, `+N` modifiers, cycle hints in every state, verbatim key
+  tokens, `ctx.hasUI` guard, one `setStatus` call, and cache/resolver
+  read-only guarantees.
+- Kept registration, command/keybinding refresh call-sites, config opt-in, and
+  docs updates out of scope for the dependent Unit 2/Unit 3 stories.
