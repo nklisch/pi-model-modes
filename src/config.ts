@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { setDefaultMode, clearDefaultMode, clearActiveMode } from "./resolver.js";
 
 /**
@@ -36,7 +36,7 @@ let globalPathOverride: string | undefined;
 let projectPathOverride: string | undefined;
 
 /** The global config path: `~/.pi/agent/pi-model-modes.json`. */
-function globalConfigPath(): string {
+export function globalConfigPath(): string {
   return (
     globalPathOverride ??
     join(homedir(), ".pi", "agent", "pi-model-modes.json")
@@ -44,7 +44,7 @@ function globalConfigPath(): string {
 }
 
 /** The project config path: `<cwd>/.pi/pi-model-modes.json`. */
-function projectConfigPath(cwd: string): string {
+export function projectConfigPath(cwd: string): string {
   return projectPathOverride ?? join(cwd, ".pi", "pi-model-modes.json");
 }
 
@@ -170,6 +170,205 @@ export function applySessionStart(reason: SessionStartReason, cwd: string): void
     clearActiveMode();
   }
   applyDefaultFromConfig(cwd);
+}
+
+// ===========================================================================
+// Default-mode writer + scope reader (the `/mode default` surface).
+// ===========================================================================
+//
+// Below is the write-side counterpart to the tolerant read-side loader above.
+// Design locked post Codex (advisory) + Opus (adversarial) cross-review; see
+// `.work/active/features/feature-mode-default-management.md`.
+
+/** Which config file a `/mode default` write targets. */
+export type DefaultScope = "project" | "global";
+
+/**
+ * The value to write for `defaultMode`. `"off"` clears the key; `"none"` is
+ * the virtual no-mode default (a real persisted value the resolver accepts);
+ * any other string is a preset name validated upstream by the command layer.
+ */
+export type DefaultValue = string;
+
+/** Sentinel action meaning "clear the default". */
+export const DEFAULT_OFF = "off";
+
+/** Success: the writer reports the new effective default + which scope won. */
+export interface WriteDefaultOk {
+  ok: true;
+  /** The scope that was just written. */
+  writtenScope: DefaultScope;
+  /** The value just written (`undefined` when `off` cleared the only default). */
+  writtenValue: string | undefined;
+  /**
+   * The EFFECTIVE default after re-merge (project wins over global). `undefined`
+   * when no default remains in either scope. Used by the command layer to build
+   * a truthful notify without re-reading.
+   */
+  effective: { value: string | undefined; source: "global" | "project" | "unset" };
+}
+
+/** Failure: file unreadable, write failed, etc. The resolver is untouched. */
+export interface WriteDefaultErr {
+  ok: false;
+  /** The target path; included so the error toast can name it. */
+  path: string;
+  /** Human-readable failure reason. */
+  error: string;
+}
+
+export type WriteDefaultResult = WriteDefaultOk | WriteDefaultErr;
+
+/**
+ * STRICT read-for-write: parse the file at `path` as a JSON object. Unlike the
+ * tolerant `readConfigFile`, this NEVER silently returns `{}` for malformed
+ * input — that would let a `/mode default` write blow away a hand-edited
+ * broken file (Codex high finding). Missing file → `{}`. Anything else →
+ * throws with a clear message naming the path + parse error.
+ */
+function readObjectForWrite(path: string): Record<string, unknown> {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
+    throw cause;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (cause) {
+    throw new Error(
+      `"${path}" is not valid JSON (${(cause as Error).message}) — refusing to overwrite`,
+    );
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`"${path}" is not a JSON object — refusing to overwrite`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+/**
+ * Write the durable default mode to the chosen scope's config file, then
+ * reconcile the resolver's default tier via the LIVE merge path
+ * (`applyDefaultFromConfig` — reloads + shallow-merges BOTH files). The merge
+ * matters: clearing a project default while a global default exists must
+ * fall back to the global value, not to `unset` (Opus blocker).
+ *
+ * Pipeline (validate → write → reconcile, NO early mutation):
+ *   1. Resolve `path` via the existing `globalConfigPath`/`projectConfigPath`
+ *      seams so `setConfigPathsForTesting` intercepts writes (Opus medium).
+ *   2. Strict-read the target file (malformed → fail, do NOT overwrite).
+ *   3. Mutate in memory: set or `delete` `defaultMode`; siblings preserved.
+ *   4. Serialize as `JSON.stringify(obj, null, 2) + "\n"` (Opus medium).
+ *   5. Atomic write: `writeFileSync(path.tmp)` + `renameSync(tmp, path)`
+ *      (both reviewers). The reader is tolerant, so a torn concurrent read
+ *      silently degrades to `{}` and drops the default for that session_start
+ *      — atomic rename is cheap insurance.
+ *   6. Bootstrap parent dir for BOTH scopes via `mkdirSync(recursive)`
+ *      (Codex medium; global may be absent on a fresh machine).
+ *   7. Reconcile via `applyDefaultFromConfig(cwd)` (Opus blocker — NOT
+ *      `applySessionStart`, which clears the override).
+ *   8. Return the effective default + source so the caller builds a truthful
+ *      notify without re-reading.
+ *
+ * NEVER touches the EPHEMERAL override tier — the precedence invariant
+ * (override > default > unset) is preserved exactly.
+ */
+export function writeDefaultToConfig(
+  cwd: string,
+  value: DefaultValue,
+  scope: DefaultScope,
+): WriteDefaultResult {
+  const path = scope === "global" ? globalConfigPath() : projectConfigPath(cwd);
+
+  let loaded: Record<string, unknown>;
+  try {
+    loaded = readObjectForWrite(path);
+  } catch (cause) {
+    return { ok: false, path, error: (cause as Error).message };
+  }
+
+  // Mutate in memory — siblings (cycleKeybinding, future keys) preserved.
+  const next: Record<string, unknown> = { ...loaded };
+  const cleared = value === DEFAULT_OFF;
+  if (cleared) {
+    delete next.defaultMode;
+  } else {
+    next.defaultMode = value;
+  }
+
+  const text = `${JSON.stringify(next, null, 2)}\n`;
+  const tmpPath = `${path}.tmp`;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(tmpPath, text);
+    renameSync(tmpPath, path);
+  } catch (cause) {
+    // Best-effort cleanup of the tmp file on a failed write/rename. If the
+    // tmp doesn't exist (writeFileSync threw before creating it) the unlink
+    // is a no-op; either way we surface the original fs error, not the cleanup.
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // intentional — best-effort
+    }
+    return { ok: false, path, error: (cause as Error).message };
+  }
+
+  // Reconcile via the live merge — picks up global/project precedence.
+  applyDefaultFromConfig(cwd);
+
+  return {
+    ok: true,
+    writtenScope: scope,
+    writtenValue: cleared ? undefined : value,
+    effective: effectiveDefaultSource(cwd),
+  };
+}
+
+/**
+ * Compute the effective default + which scope it came from, post-merge. Used
+ * both by the writer (for the result) and by the bare `/mode default` panel.
+ */
+export function effectiveDefaultSource(cwd: string): {
+  value: string | undefined;
+  source: "global" | "project" | "unset";
+} {
+  // Shallow-merge project-over-global — same path `applyDefaultFromConfig` uses.
+  const merged = loadPluginConfig(cwd);
+  if (merged.defaultMode !== undefined) {
+    // Project wins when both set; otherwise whatever's set.
+    const project = readConfigFile(projectConfigPath(cwd)).defaultMode;
+    const source = project !== undefined ? "project" : "global";
+    return { value: merged.defaultMode, source };
+  }
+  return { value: undefined, source: "unset" };
+}
+
+/**
+ * Read both raw scopes for the bare `/mode default` panel. Each entry is the
+ * `defaultMode` value from that file (or `undefined` if absent). A malformed
+ * file is surfaced as the string `"(unreadable)"` rather than crashing the
+ * panel — matches the reader's tolerant contract.
+ */
+export function readDefaultSources(cwd: string): {
+  global: string | undefined | "(unreadable)";
+  project: string | undefined | "(unreadable)";
+} {
+  const safe = (path: string): string | undefined | "(unreadable)" => {
+    try {
+      return readObjectForWrite(path).defaultMode as string | undefined;
+    } catch {
+      return "(unreadable)";
+    }
+  };
+  return {
+    global: safe(globalConfigPath()),
+    project: safe(projectConfigPath(cwd)),
+  };
 }
 
 /**

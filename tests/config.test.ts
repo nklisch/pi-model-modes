@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import {
   loadPluginConfig,
@@ -9,6 +9,10 @@ import {
   applySessionStart,
   setConfigPathsForTesting,
   resetConfigForTesting,
+  writeDefaultToConfig,
+  effectiveDefaultSource,
+  readDefaultSources,
+  DEFAULT_OFF,
 } from "../src/config.js";
 import {
   getDefaultMode,
@@ -358,5 +362,307 @@ describe("applySessionStart — ephemeral override clearing", () => {
 
     applySessionStart("reload", "/unused");
     expect(getDefaultMode()).toBe("extend"); // default seeded from config
+  });
+});
+
+describe("writeDefaultToConfig — write pipeline", () => {
+  beforeEach(() => {
+    buildFragments();
+  });
+
+  function setPaths(d: string): { global: string; project: string } {
+    const global = join(d, "global.json");
+    const project = join(d, "cwd", ".pi", "pi-model-modes.json");
+    setConfigPathsForTesting({ global, project });
+    return { global, project };
+  }
+
+  it("writes defaultMode to the project scope and reseeds the resolver", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+
+    const result = writeDefaultToConfig(d, "extend", "project");
+
+    expect(result).toEqual({
+      ok: true,
+      writtenScope: "project",
+      writtenValue: "extend",
+      effective: { value: "extend", source: "project" },
+    });
+    expect(getDefaultMode()).toBe("extend");
+    expect(getEffectiveModeSource()).toBe("default");
+    expect(loadPluginConfig(d).defaultMode).toBe("extend");
+    // File bootstrapped (the `.pi` dir + file did not exist before).
+    expect(existsSync(project)).toBe(true);
+  });
+
+  it("writes to the global scope when --global is selected", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+
+    const result = writeDefaultToConfig(d, "extend", "global");
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.writtenScope).toBe("global");
+    // Project file NOT created when writing global.
+    expect(existsSync(project)).toBe(false);
+    expect(loadPluginConfig(d).defaultMode).toBe("extend");
+    expect(getDefaultMode()).toBe("extend");
+  });
+
+  it("accepts and persists `none` as a real default value", () => {
+    const d = freshDir();
+    setPaths(d);
+
+    const result = writeDefaultToConfig(d, "none", "project");
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.writtenValue).toBe("none");
+    expect(loadPluginConfig(d).defaultMode).toBe("none");
+    expect(getDefaultMode()).toBe("none");
+  });
+
+  it("serializes as 2-space indented JSON with a trailing newline", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    writeDefaultToConfig(d, "extend", "project");
+
+    const text = readFileSync(project, "utf8");
+    expect(text.endsWith("\n")).toBe(true);
+    // Indented key — 2 spaces, not flat.
+    expect(text).toContain('\n  "defaultMode"');
+    expect(text).not.toContain('{"defaultMode');
+  });
+
+  it("PRESERVES sibling keys (cycleKeybinding + unknown future keys) on set", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    mkdirSync(dirname(project), { recursive: true });
+    writeFileSync(
+      project,
+      JSON.stringify({
+        cycleKeybinding: true,
+        futureKey: "preserve-me",
+        defaultMode: "safe",
+      }),
+    );
+
+    writeDefaultToConfig(d, "extend", "project");
+
+    const reloaded = loadPluginConfig(d) as Record<string, unknown>;
+    expect(reloaded.cycleKeybinding).toBe(true);
+    expect(reloaded.futureKey).toBe("preserve-me");
+    expect(reloaded.defaultMode).toBe("extend");
+  });
+
+  it("`off` removes the defaultMode key but PRESERVES siblings", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    mkdirSync(dirname(project), { recursive: true });
+    writeFileSync(
+      project,
+      JSON.stringify({ cycleKeybinding: true, defaultMode: "extend" }),
+    );
+
+    const result = writeDefaultToConfig(d, DEFAULT_OFF, "project");
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.writtenValue).toBeUndefined();
+    const reloaded = loadPluginConfig(d) as Record<string, unknown>;
+    expect("defaultMode" in reloaded).toBe(false);
+    expect(reloaded.cycleKeybinding).toBe(true);
+  });
+
+  it("the OPUS BLOCKER: project `off` with a global default falls back to global", () => {
+    const d = freshDir();
+    const { global, project } = setPaths(d);
+    mkdirSync(dirname(global), { recursive: true });
+    writeFileSync(global, JSON.stringify({ defaultMode: "extend" }));
+    mkdirSync(dirname(project), { recursive: true });
+    // Both values use `extend` (the only preset with full fragment coverage in
+    // buildFragments); the precedence is the point, not the value identity.
+    writeFileSync(project, JSON.stringify({ defaultMode: "extend" }));
+
+    // Project + global both `extend`. Effective is `extend` (project wins by
+    // shallow-merge).
+    applyDefaultFromConfig(d);
+    expect(getDefaultMode()).toBe("extend");
+
+    // Now clear the project default — effective must STILL be `extend`
+    // (falling back to global), NOT to unset. This is the bug Opus caught: a
+    // naive clearDefaultMode would leave the resolver at unset and the notify
+    // would lie.
+    const result = writeDefaultToConfig(d, DEFAULT_OFF, "project");
+
+    expect(result).toEqual({
+      ok: true,
+      writtenScope: "project",
+      writtenValue: undefined,
+      effective: { value: "extend", source: "global" },
+    });
+    expect(getDefaultMode()).toBe("extend");
+    expect(getEffectiveModeSource()).toBe("default");
+  });
+
+  it("DOES NOT touch the EPHEMERAL override tier (precedence preserved)", () => {
+    const d = freshDir();
+    setPaths(d);
+    setActiveMode({
+      base: "pi",
+      agency: "autonomous",
+      quality: "pragmatic",
+      scope: "adjacent",
+      modifiers: [],
+    });
+    expect(getEffectiveModeSource()).toBe("override");
+
+    writeDefaultToConfig(d, "extend", "project");
+
+    // Override still wins — writeDefaultToConfig never touched it.
+    expect(getActiveMode()).toBeDefined();
+    expect(getEffectiveModeSource()).toBe("override");
+    // But the default tier was still reseeded truthfully underneath.
+    expect(getDefaultMode()).toBe("extend");
+  });
+
+  it("STRICT read-for-write: a malformed target file → fail, no overwrite", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    mkdirSync(dirname(project), { recursive: true });
+    const original = "{ not valid json ";
+    writeFileSync(project, original);
+
+    const result = writeDefaultToConfig(d, "extend", "project");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.path).toBe(project);
+      expect(result.error).toMatch(/not valid JSON/);
+    }
+    // File byte-unchanged.
+    expect(readFileSync(project, "utf8")).toBe(original);
+    // Resolver untouched.
+    expect(getDefaultMode()).toBeUndefined();
+  });
+
+  it("STRICT read-for-write: a non-object (array) file → fail, no overwrite", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    mkdirSync(dirname(project), { recursive: true });
+    writeFileSync(project, "[1, 2, 3]");
+
+    const result = writeDefaultToConfig(d, "extend", "project");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/not a JSON object/);
+    }
+    expect(readFileSync(project, "utf8")).toBe("[1, 2, 3]");
+  });
+
+  it("leaves no .tmp file behind on a successful write", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    writeDefaultToConfig(d, "extend", "project");
+
+    expect(existsSync(`${project}.tmp`)).toBe(false);
+    expect(existsSync(project)).toBe(true);
+  });
+
+  it("bootstraps a missing parent dir for BOTH scopes", () => {
+    const d = freshDir();
+    const { global, project } = setPaths(d);
+    // Neither path's parent exists yet (fresh dir).
+
+    writeDefaultToConfig(d, "extend", "global");
+    expect(existsSync(global)).toBe(true);
+
+    writeDefaultToConfig(d, "safe", "project");
+    expect(existsSync(project)).toBe(true);
+  });
+
+  it("write-failure contract: surfaces a fs error and leaves the resolver untouched", () => {
+    const d = freshDir();
+    setPaths(d);
+    // Make renameSync throw by mocking the fs module's renameSync. Easiest:
+    // point the project path at a directory whose PARENT is a regular file
+    // so mkdirSync fails — but mkdirSync(recursive) tolerates that. Instead,
+    // make the project path itself live under a path whose final segment is a
+    // file: write a file at `<d>/cwd`, then set project to `<d>/cwd/.pi/x.json`
+    // so the writeFileSync(tmp) fails with ENOTDIR.
+    const cwdFile = join(d, "cwd");
+    writeFileSync(cwdFile, "i am a file, not a directory");
+    const project = join(cwdFile, ".pi", "pi-model-modes.json");
+    setConfigPathsForTesting({
+      global: join(d, "global.json"),
+      project,
+    });
+
+    const result = writeDefaultToConfig(d, "extend", "project");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.length).toBeGreaterThan(0);
+    }
+    expect(getDefaultMode()).toBeUndefined();
+  });
+});
+
+describe("readDefaultSources + effectiveDefaultSource", () => {
+  beforeEach(() => {
+    buildFragments();
+  });
+
+  it("returns both scopes' raw values with project-winning effective", () => {
+    const d = freshDir();
+    const global = join(d, "global.json");
+    const project = join(d, "project.json");
+    mkdirSync(dirname(global), { recursive: true });
+    writeFileSync(global, JSON.stringify({ defaultMode: "extend" }));
+    mkdirSync(dirname(project), { recursive: true });
+    writeFileSync(project, JSON.stringify({ defaultMode: "safe" }));
+    setConfigPathsForTesting({ global, project });
+
+    expect(readDefaultSources(d)).toEqual({
+      global: "extend",
+      project: "safe",
+    });
+    expect(effectiveDefaultSource(d)).toEqual({
+      value: "safe",
+      source: "project",
+    });
+  });
+
+  it("unset when neither scope has a default", () => {
+    const d = freshDir();
+    setConfigPathsForTesting({
+      global: join(d, "nope-g.json"),
+      project: join(d, "nope-p.json"),
+    });
+
+    expect(readDefaultSources(d)).toEqual({
+      global: undefined,
+      project: undefined,
+    });
+    expect(effectiveDefaultSource(d)).toEqual({
+      value: undefined,
+      source: "unset",
+    });
+  });
+
+  it("surfaces `(unreadable)` for a malformed file rather than crashing", () => {
+    const d = freshDir();
+    const global = join(d, "global.json");
+    mkdirSync(dirname(global), { recursive: true });
+    writeFileSync(global, "{ broken");
+    setConfigPathsForTesting({
+      global,
+      project: join(d, "nope.json"),
+    });
+
+    expect(readDefaultSources(d)).toEqual({
+      global: "(unreadable)",
+      project: undefined,
+    });
   });
 });

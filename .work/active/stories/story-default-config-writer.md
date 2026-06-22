@@ -1,7 +1,7 @@
 ---
 id: story-default-config-writer
 kind: story
-stage: implementing
+stage: review
 tags: [tests]
 parent: feature-mode-default-management
 depends_on: []
