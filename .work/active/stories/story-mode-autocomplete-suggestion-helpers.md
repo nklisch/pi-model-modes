@@ -1,7 +1,7 @@
 ---
 id: story-mode-autocomplete-suggestion-helpers
 kind: story
-stage: implementing
+stage: review
 tags: [tests]
 parent: feature-mode-command-autocomplete
 depends_on: []
@@ -128,3 +128,18 @@ Verify against the parent feature body's Unit 1 acceptance list. In short:
 
 None. `src/presets.ts` and `src/commands.ts` already export everything this
 story consumes.
+
+## Implementation log
+
+- Added `src/autocomplete.ts` with the pure `/mode <partial>` token extractor,
+  item builder, prefix filter, and top-level suggestion helper. The implementation
+  reuses `formatModeSummary` for real preset descriptions, short-circuits the
+  virtual `none` item before registry lookup, and appends the special `off`
+  literal after sorted presets.
+- Added `tests/autocomplete.test.ts` covering the trigger matrix, item ordering,
+  `none`/`off` descriptions, byte-exact real preset summaries, case-insensitive
+  prefix filtering, and null-vs-suggestion return shape.
+- Added `@earendil-works/pi-tui` as a direct dev dependency because the required
+  type-only import was otherwise only nested under `@earendil-works/pi-coding-agent`
+  and `tsc` could not resolve `@earendil-works/pi-tui` from this package.
+- Verification: `npm run typecheck` and `npm test` pass.
