@@ -69,7 +69,7 @@ describe("renderModeInspect — render core", () => {
     expect(lines[2]).toBe(
       "Effective prompt last changed: this turn — reason: model switched",
     );
-    expect(lines[3]).toBe("  (zai/glm-4.5 → zai/glm-4.6)");
+    expect(lines[3]).toBe("  (zai/glm-4.5 (GLM-4.5) → zai/glm-4.6 (GLM-4.6))");
     expect(lines[4]).toBe(`Cache key: ${snap.currentKey!.slice(0, 4)}...${snap.currentKey!.slice(-4)}`);
   });
 
@@ -125,6 +125,7 @@ describe("renderModeInspect — render core", () => {
         newKey: "k",
         reason: "initial",
         detail: {
+          modelName: { from: undefined, to: "name" },
           modelId: { from: undefined, to: "m" },
           modelProvider: { from: undefined, to: "p" },
           modeSignature: { from: undefined, to: "" },
@@ -191,6 +192,7 @@ describe("renderModeInspect — render core", () => {
   it("renders the mode-switched detail as `(from → to)` with 'unset' for empty signatures", () => {
     // Direct write path: model/base constant, only the mode signature moves.
     const base: CacheKeyInputs = {
+      modelName: "GLM-4.6",
       modelId: "glm-4.6",
       modelProvider: "zai",
       modeSignature: "",
@@ -249,6 +251,7 @@ describe("renderModeInspect — render core", () => {
       newKey: "k2",
       reason: "mode-switched",
       detail: {
+        modelName: { from: "GLM-4.6", to: "GLM-4.6" },
         modelId: { from: "glm-4.6", to: "glm-4.6" },
         modelProvider: { from: "zai", to: "zai" },
         modeSignature: { from, to },

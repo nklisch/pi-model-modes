@@ -66,6 +66,18 @@ describe("handleBeforeAgentStart — cache-path coverage (always-return on HIT a
     expect(rA.systemPrompt).toBe(`${deriveIdentityLine(modelA)}\nbase`);
     expect(rB.systemPrompt).toBe(`${deriveIdentityLine(modelB)}\nbase`); // not a stale HIT
   });
+
+  it("re-keys on modelName alone (same id + provider + base → MISS, fresh identity)", () => {
+    // The identity line reads model.name. If modelName is not part of the key,
+    // a registry-side display-name rename would return a stale HIT.
+    const modelA = makeModel({ id: "glm-4.6", name: "GLM-4.6", provider: "zai" });
+    const modelB = makeModel({ id: "glm-4.6", name: "GLM-4.7", provider: "zai" });
+    const rA = handleBeforeAgentStart(makeEvent("base"), makeContext({ model: modelA }));
+    const rB = handleBeforeAgentStart(makeEvent("base"), makeContext({ model: modelB }));
+    expect(rA.systemPrompt).toBe(`${deriveIdentityLine(modelA)}\nbase`);
+    expect(rB.systemPrompt).toBe(`${deriveIdentityLine(modelB)}\nbase`);
+    expect(getChangeSignal().lastEntry?.reason).toBe("model-switched");
+  });
 });
 
 describe("handleBeforeAgentStart — undefined ctx.model (acceptance: skip identity, still cache + return)", () => {
@@ -90,6 +102,7 @@ describe("handleBeforeAgentStart — undefined ctx.model (acceptance: skip ident
     const afterMiss = getChangeSignal();
     expect(afterMiss.entries.length).toBe(1);
     expect(afterMiss.entries[0].reason).toBe("initial");
+    expect(afterMiss.entries[0].detail.modelName.to).toBe("");
     expect(afterMiss.entries[0].detail.modelId.to).toBe("");
     expect(afterMiss.entries[0].detail.modelProvider.to).toBe("");
 

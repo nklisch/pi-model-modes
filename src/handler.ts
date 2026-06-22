@@ -87,7 +87,7 @@ function spliceSystemPrompt(
  *   1. Resolve the active mode into a `ModePlan` (BEFORE the cache check —
  *      `plan.signature` is part of the key). When no mode is active the plan
  *      is `{ mode: undefined, signature: NO_MODE_SIGNATURE, fragments: [] }`.
- *   2. Build cache-key inputs from `ctx.model` (empty id/provider when the
+ *   2. Build cache-key inputs from `ctx.model` (empty name/id/provider when the
  *      model is undefined) + `plan.signature` (NO_MODE_SIGNATURE when unset) +
  *      `e.systemPrompt` (pi's assembled base).
  *   3. `getCachedResult(key)` — advances the turn counter; returns the cached
@@ -129,6 +129,7 @@ export function handleBeforeAgentStart(
   const plan = resolveActiveModePlan();
 
   const inputs: CacheKeyInputs = {
+    modelName: model?.name ?? "",
     modelId: model?.id ?? "",
     modelProvider: model?.provider ?? "",
     modeSignature: plan.signature, // NO_MODE_SIGNATURE when unset

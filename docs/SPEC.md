@@ -99,6 +99,7 @@ turn and only re-assembles on a miss:
 
 ```
 key = hash(
+  model.name,                // human-facing name used in the identity line
   model.id,
   model.provider,
   mode.signature,            // "base:chill|agency:autonomous|quality:architect|scope:adjacent|mod:flow"
@@ -280,7 +281,8 @@ override; this preserves the two-tier model and the precedence invariant.
   next turn, or one turn later? Resolved — identity is derived fresh each
   MISS off live `ctx.model`; the model-switch test in `tests/handler.test.ts`
   proves the line updates on the next MISS. The cache key includes
-  `model.id`/`model.provider`, so a model switch forces a MISS and re-derive.
+  `model.name`/`model.id`/`model.provider`, so a model switch or registry-side
+  display-name rename forces a MISS and re-derive.
 - **Default cycle keybinding:** Resolved — no default shortcut is registered.
   `Ctrl+M` was avoided because terminal legacy input encodes it as carriage
   return (collides with Enter); the actual opt-in binding is `Ctrl+Shift+U` /

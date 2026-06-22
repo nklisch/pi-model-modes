@@ -198,10 +198,11 @@ describe("footer refresh wiring", () => {
 
     await forward(ctx);
 
-    const active = getActiveMode();
-    expect(typeof active).toBe("string");
+    expect(getActiveMode()).toBe("create");
     expect(ui.statusCalls.at(-1)).toEqual({
-      key: MODE_FOOTER_KEY, text: `◆ ${active as string}` });
+      key: MODE_FOOTER_KEY,
+      text: "◆ create",
+    });
   });
 
   it("refreshes on session_start after config reseeding", () => {

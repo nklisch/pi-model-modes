@@ -8,6 +8,7 @@ import {
   MODE_LISTING_MESSAGE_TYPE,
   registerModeCommand,
 } from "../src/commands.js";
+import { MODE_FOOTER_KEY } from "../src/footer.js";
 import {
   getActiveMode,
   getEffectiveModeSource,
@@ -510,7 +511,7 @@ describe("/mode default [...] — durable default subcommand", () => {
   it("refreshes the footer after a successful write", async () => {
     buildFixture();
     const { cwd } = setupDirs();
-    const { calls, handler } = getModeHandler();
+    const { handler } = getModeHandler();
     // Wire a setStatus capture onto the ui.
     const ui = makeUi();
     const ctx = makeContext({
@@ -522,9 +523,11 @@ describe("/mode default [...] — durable default subcommand", () => {
 
     await handler("default extend", ctx);
 
-    // Exactly one setStatus call (the footer refresh).
-    expect(ui.statusCalls.length).toBeGreaterThanOrEqual(1);
-    void calls;
+    // Exactly one setStatus call for the footer refresh, with the newly
+    // effective default rendered through the same footer seam users see.
+    expect(ui.statusCalls).toEqual([
+      { key: MODE_FOOTER_KEY, text: "◆ extend" },
+    ]);
   });
 
   it("written file is 2-space indented + trailing newline", async () => {

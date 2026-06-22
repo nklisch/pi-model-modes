@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
  * This is the foundation module for the identity-injection epic. It owns three
  * co-located concerns that share `lastKey` state and fire on the same event
  * (key replacement):
- *   1. The cache key — `sha256(modelId | modelProvider | modeSignature | sha256(baseSystemPrompt))`
+ *   1. The cache key — `sha256(modelName | modelId | modelProvider | modeSignature | sha256(baseSystemPrompt))`
  *      via a length-delimited canonical encoding.
  *   2. The per-turn result cache — module-scope `lastKey`/`lastResult` with a
  *      hit/miss decision the handler consults each turn.
@@ -26,9 +26,11 @@ import { createHash } from "node:crypto";
  *  replaces the caller's use of this with the real composed signature. */
 export const NO_MODE_SIGNATURE = "";
 
-/** The four inputs to the cache key. `baseSystemPrompt` is pi's
+/** The five inputs to the cache key. `baseSystemPrompt` is pi's
  *  fully-assembled `e.systemPrompt` for the turn. */
 export interface CacheKeyInputs {
+  /** Human-facing model name used in the identity line. */
+  modelName: string;
   modelId: string;
   modelProvider: string;
   modeSignature: string;
@@ -54,6 +56,7 @@ export interface ChangeSignalEntry {
   newKey: string;
   reason: ChangeReason;
   detail: {
+    modelName: { from: string | undefined; to: string };
     modelId: { from: string | undefined; to: string };
     modelProvider: { from: string | undefined; to: string };
     modeSignature: { from: string | undefined; to: string };
@@ -74,6 +77,7 @@ export interface ChangeSignalSnapshot {
 const RING_CAPACITY = 16;
 
 interface KeyComponents {
+  modelName: string;
   modelId: string;
   modelProvider: string;
   modeSignature: string;
@@ -96,6 +100,7 @@ function sha256Hex(s: string): string {
 
 function componentsOf(inputs: CacheKeyInputs): KeyComponents {
   return {
+    modelName: inputs.modelName,
     modelId: inputs.modelId,
     modelProvider: inputs.modelProvider,
     modeSignature: inputs.modeSignature,
@@ -105,14 +110,15 @@ function componentsOf(inputs: CacheKeyInputs): KeyComponents {
 
 /**
  * Length-delimited canonical encoding: `<byteLen>:<field>` joined by `|` over
- * `[modelId, modelProvider, modeSignature, baseHash]`. The byte-length prefix
- * (not char-length) nullifies cross-field ambiguity — so
+ * `[modelName, modelId, modelProvider, modeSignature, baseHash]`. The byte-length
+ * prefix (not char-length) nullifies cross-field ambiguity — so
  * `modelId="ab",provider="c"` and `modelId="a",provider="bc"` cannot collide.
  * Deterministic: same components always produce the same canonical string.
  */
 function encodeComponents(c: KeyComponents): string {
   const enc = (f: string): string => `${Buffer.byteLength(f, "utf8")}:${f}`;
   return [
+    enc(c.modelName),
     enc(c.modelId),
     enc(c.modelProvider),
     enc(c.modeSignature),
@@ -130,8 +136,13 @@ function classifyReason(
   curr: KeyComponents,
 ): ChangeReason {
   if (prev === undefined) return "initial";
-  if (prev.modelId !== curr.modelId || prev.modelProvider !== curr.modelProvider)
+  if (
+    prev.modelName !== curr.modelName ||
+    prev.modelId !== curr.modelId ||
+    prev.modelProvider !== curr.modelProvider
+  ) {
     return "model-switched";
+  }
   if (prev.modeSignature !== curr.modeSignature) return "mode-switched";
   return "base-changed";
 }
@@ -189,6 +200,7 @@ export function setCachedResult(
     newKey: key,
     reason,
     detail: {
+      modelName: { from: prevComponents?.modelName, to: curr.modelName },
       modelId: { from: prevComponents?.modelId, to: curr.modelId },
       modelProvider: { from: prevComponents?.modelProvider, to: curr.modelProvider },
       modeSignature: { from: prevComponents?.modeSignature, to: curr.modeSignature },

@@ -21,6 +21,7 @@ import type { CacheKeyInputs } from "../src/cache.js";
  */
 
 const BASE_INPUTS: CacheKeyInputs = {
+  modelName: "Claude Sonnet 4.6",
   modelId: "claude-sonnet-4-6",
   modelProvider: "anthropic",
   modeSignature: NO_MODE_SIGNATURE,
@@ -48,6 +49,7 @@ describe("computeCacheKey — purity + determinism", () => {
       baseSystemPrompt: BASE_INPUTS.baseSystemPrompt,
       modelProvider: BASE_INPUTS.modelProvider,
       modelId: BASE_INPUTS.modelId,
+      modelName: BASE_INPUTS.modelName,
     };
     expect(computeCacheKey(reordered)).toBe(computeCacheKey(BASE_INPUTS));
   });
@@ -65,6 +67,12 @@ describe("computeCacheKey — change-detection (term necessity; codex-required)"
   it("model-change: different modelId (same provider+mode+base) → different key", () => {
     const a = computeCacheKey({ ...BASE_INPUTS, modelId: "claude-sonnet-4-6" });
     const b = computeCacheKey({ ...BASE_INPUTS, modelId: "gpt-5" });
+    expect(a).not.toBe(b);
+  });
+
+  it("model-change: different modelName (same id+provider+mode+base) → different key", () => {
+    const a = computeCacheKey({ ...BASE_INPUTS, modelName: "Claude Sonnet 4.6" });
+    const b = computeCacheKey({ ...BASE_INPUTS, modelName: "Claude Sonnet 4.7" });
     expect(a).not.toBe(b);
   });
 
@@ -94,12 +102,14 @@ describe("computeCacheKey — change-detection (term necessity; codex-required)"
     const sig = "sig";
     const base = "base";
     const a = computeCacheKey({
+      modelName: "name",
       modelId: "ab",
       modelProvider: "c",
       modeSignature: sig,
       baseSystemPrompt: base,
     });
     const b = computeCacheKey({
+      modelName: "name",
       modelId: "a",
       modelProvider: "bc",
       modeSignature: sig,
@@ -154,10 +164,27 @@ describe("change signal — reason classification (codex-required)", () => {
     const last = getChangeSignal().lastEntry;
     expect(last?.reason).toBe("initial");
     expect(last?.previousKey).toBeUndefined();
+    expect(last?.detail.modelName.from).toBeUndefined();
     expect(last?.detail.modelId.from).toBeUndefined();
     expect(last?.detail.modelProvider.from).toBeUndefined();
     expect(last?.detail.modeSignature.from).toBeUndefined();
     expect(last?.detail.baseHash.from).toBeUndefined();
+  });
+
+  it("modelName change (same id+provider+mode+base) records reason model-switched with modelName detail", () => {
+    const i1 = { ...BASE_INPUTS, modelName: "Model One" };
+    const k1 = computeCacheKey(i1);
+    getCachedResult(k1);
+    setCachedResult(k1, "A", i1);
+
+    const i2 = { ...BASE_INPUTS, modelName: "Model Two" };
+    const k2 = computeCacheKey(i2);
+    getCachedResult(k2);
+    setCachedResult(k2, "B", i2);
+
+    const last = getChangeSignal().lastEntry;
+    expect(last?.reason).toBe("model-switched");
+    expect(last?.detail.modelName).toEqual({ from: "Model One", to: "Model Two" });
   });
 
   it("modelId change (same provider+mode+base) records reason model-switched with modelId detail", () => {
@@ -224,7 +251,8 @@ describe("change signal — reason classification (codex-required)", () => {
 
     const last = getChangeSignal().lastEntry;
     expect(last?.reason).toBe("base-changed");
-    expect(last?.detail.baseHash.from).toBe(last?.detail.baseHash.from); // hash stable
+    expect(last?.detail.baseHash.from).toBeDefined();
+    expect(last?.detail.baseHash.to).toBeDefined();
     expect(last?.detail.baseHash.from).not.toBe(last?.detail.baseHash.to);
   });
 
@@ -235,6 +263,28 @@ describe("change signal — reason classification (codex-required)", () => {
     setCachedResult(k1, "A", i1);
 
     const i2 = { ...BASE_INPUTS, modelId: "m2", baseSystemPrompt: "base B" };
+    const k2 = computeCacheKey(i2);
+    getCachedResult(k2);
+    setCachedResult(k2, "B", i2);
+
+    expect(getChangeSignal().lastEntry?.reason).toBe("model-switched");
+  });
+
+  it("simultaneous model+mode change classifies as model-switched (priority: model > mode > base)", () => {
+    const i1 = {
+      ...BASE_INPUTS,
+      modelId: "m1",
+      modeSignature: "base:chill",
+    };
+    const k1 = computeCacheKey(i1);
+    getCachedResult(k1);
+    setCachedResult(k1, "A", i1);
+
+    const i2 = {
+      ...BASE_INPUTS,
+      modelId: "m2",
+      modeSignature: "base:focus",
+    };
     const k2 = computeCacheKey(i2);
     getCachedResult(k2);
     setCachedResult(k2, "B", i2);

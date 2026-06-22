@@ -59,6 +59,21 @@ updated: 2026-06-22
 - `gate-docs-readme-footer-indicator` (story, gate-docs) — README omits footer mode indicator
 - `gate-docs-readme-mode-none-command` (story, gate-docs) — README omits `/mode none` command form
 
+- `followup-cache-key-include-model-name` (story, gate-tests) — Cache key includes model.name
+- `followup-cache-model-mode-priority-test` (story, gate-tests) — Cache priority regression for simultaneous model+mode changes
+- `gate-tests-cache-tautological-assertion` (story, gate-tests) — Remove tautological cache assertion
+- `gate-tests-keybinding-forward-cycle-pin` (story, gate-tests) — Pin forward-cycle expected preset
+- `gate-tests-mode-default-footer-refresh-assertion` (story, gate-tests) — Strengthen default-write footer refresh assertion
+- `gate-cruft-base-manifest-dead-type` (story, gate-cruft) — Remove dead BaseManifest export
+- `gate-cruft-preset-file-dead-type` (story, gate-cruft) — Remove dead PresetFile export
+- `gate-cruft-mode-default-constant-ssot` (story, gate-cruft) — Deduplicate /mode default constants
+- `gate-cruft-format-mode-summary-comment` (story, gate-cruft) — Remove stale mode-summary deferral comment
+- `gate-cruft-footer-source-unused-field` (story, gate-cruft) — Remove unused footer source field
+- `gate-cruft-mode-default-message-type-export` (story, gate-cruft) — Unexport local mode-default message type
+
 ## Gate runs
 
+- **gate-cruft** (2026-06-22) — 6 findings fixed (2 high, 1 medium, 3 low)
+- **gate-tests** (2026-06-22) — 5 findings fixed (1 high, 1 medium, 3 low)
+- **gate-security** (2026-06-22) — 0 findings
 - **gate-docs** (2026-06-22) — 5 findings fixed (2 high, 2 medium, 1 low)

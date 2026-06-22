@@ -205,12 +205,13 @@ describe("registerModeKeybindings", () => {
 
     await forward(ctx);
 
-    // The first sorted bundled preset name is the override now.
-    const active = getActiveMode();
-    expect(typeof active).toBe("string");
+    // The first sorted bundled preset name is the override now. Pin the actual
+    // value so a wrap or catalog-order regression cannot substitute itself into
+    // the expectation.
+    expect(getActiveMode()).toBe("create");
     expect(getEffectiveModeSource()).toBe("override");
     expect(notifies).toHaveLength(1);
-    expect(notifies[0].message).toBe(`◆ mode: ${active as string}`);
+    expect(notifies[0].message).toBe("◆ mode: create");
     expect(notifies[0].type).toBe("info");
   });
 

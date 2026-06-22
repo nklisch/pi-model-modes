@@ -204,9 +204,9 @@ would double-inject identity/mode fragments if used as the base.
   Pi's assembled content (tools/context/date) trails — if pi's tail drifts
   (e.g. midnight date rollover), only the tail's cache invalidates; the
   head stays warm.
-- **The cache key is the only thing that decides work.** Switching models
-  or modes is the only thing that forces a re-assemble. Everything else
-  is a hit.
+- **The cache key is the only thing that decides work.** Switching model
+  identity (`name`/`id`/`provider`), switching modes, or receiving a different
+  pi base prompt forces a re-assemble. Identical inputs are a hit.
 - **The plugin never rewrites message history.** All per-turn transformation
   happens inside the system prompt; the plugin never mutates or rewrites
   existing conversation entries. The one additive exception is the

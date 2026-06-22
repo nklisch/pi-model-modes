@@ -19,12 +19,6 @@ import { join, resolve, sep } from "node:path";
 export type Axis = "agency" | "quality" | "scope";
 export const AXES: readonly Axis[] = ["agency", "quality", "scope"] as const;
 
-/** Shape of <root>/base.json. `overlays` are paths relative to <root>; array
- *  order is the load-bearing base splice order. */
-export interface BaseManifest {
-  overlays: string[];
-}
-
 /** One cached file: numeric mtimeMs + trimmed content. */
 interface CacheEntry {
   mtimeMs: number;

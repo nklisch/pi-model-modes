@@ -1,12 +1,12 @@
 ---
 id: followup-cache-model-mode-priority-test
 kind: story
-stage: drafting
+stage: done
 tags: [tests]
 parent: null
 depends_on: []
-release_binding: null
-gate_origin: null
+release_binding: v0.2.0
+gate_origin: tests
 created: 2026-06-21
 updated: 2026-06-21
 review_origin: epic-identity-injection-cache-and-change-signal
@@ -36,3 +36,10 @@ Add a test under `change signal — reason classification`:
 
 - [ ] Simultaneous model+mode changes classify as `model-switched`.
 - [ ] Existing cache tests still pass.
+
+
+## Gate implementation notes (2026-06-22)
+
+Implemented by adding the simultaneous model+mode priority regression in `tests/cache.test.ts`; the reason remains `model-switched`.
+
+Verification: `npm run typecheck`; `npm test` (371/371).

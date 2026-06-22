@@ -84,9 +84,6 @@ export interface Preset {
   modifiers: string[];
 }
 
-/** The on-disk shape of presets.json: a name -> Preset object map. */
-export type PresetFile = Readonly<Record<string, Preset>>;
-
 /** The in-memory registry after load + validation. */
 export type PresetRegistry = Readonly<Record<string, Preset>>;
 

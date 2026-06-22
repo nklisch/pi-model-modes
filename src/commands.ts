@@ -14,7 +14,11 @@ import {
 } from "./resolver.js";
 import { listPresetNames, getPreset, loadPresets, NONE_PRESET } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
-import { MODE_OFF_ARG } from "./autocomplete.js";
+import {
+  MODE_DEFAULT_ARG,
+  MODE_DEFAULT_GLOBAL_FLAG,
+  MODE_OFF_ARG,
+} from "./autocomplete.js";
 import { assembleForInspect, getLastBaseSystemPrompt } from "./handler.js";
 import {
   writeDefaultToConfig,
@@ -45,8 +49,8 @@ export const MODE_INSPECT_MESSAGE_TYPE = "mode-inspect";
 
 /** Mode summary for the `Mode:` line. `undefined` (no active mode) → "unset";
  *  a resolved mode renders `base:X • agency:Y • quality:Z • scope:W` plus a
- *  ` • +mod` suffix per modifier (preset-name prefix deferred to
- *  `epic-switching-paths`). */
+ *  ` • +mod` suffix per modifier. Preset names are shown by the caller on a
+ *  sibling line or autocomplete item; the summary stays axes-only. */
 export function formatModeSummary(mode: ResolvedMode | undefined): string {
   if (mode === undefined) {
     return "unset";
@@ -74,8 +78,10 @@ function formatChangeDetail(entry: ChangeSignalEntry): string {
     case "initial":
       return ""; // first population — no from-state to show
     case "model-switched": {
-      const from = `${entry.detail.modelProvider.from ?? "?"}/${entry.detail.modelId.from ?? "?"}`;
-      const to = `${entry.detail.modelProvider.to}/${entry.detail.modelId.to}`;
+      const fromName = entry.detail.modelName.from ?? "?";
+      const toName = entry.detail.modelName.to;
+      const from = `${entry.detail.modelProvider.from ?? "?"}/${entry.detail.modelId.from ?? "?"} (${fromName})`;
+      const to = `${entry.detail.modelProvider.to}/${entry.detail.modelId.to} (${toName})`;
       return `(${from} → ${to})`;
     }
     case "mode-switched": {
@@ -192,12 +198,8 @@ export function formatModeListing(
   ].join("\n");
 }
 
-/** Subcommand keyword that routes `/mode default …` to default-tier writes. */
-export const MODE_DEFAULT_ARG = "default";
-/** `--global` flag selecting the user-level config scope. */
-export const MODE_DEFAULT_GLOBAL_FLAG = "--global";
 /** `customType` tag for the `/mode default` display-only panel. */
-export const MODE_DEFAULT_MESSAGE_TYPE = "mode-default";
+const MODE_DEFAULT_MESSAGE_TYPE = "mode-default";
 
 /** Discriminated parse result for the `/mode default` subcommand. */
 export type DefaultSubcommand =

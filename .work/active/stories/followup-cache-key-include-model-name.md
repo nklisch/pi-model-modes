@@ -1,12 +1,12 @@
 ---
 id: followup-cache-key-include-model-name
 kind: story
-stage: drafting
+stage: done
 tags: [tests]
 parent: null
 depends_on: []
-release_binding: null
-gate_origin: null
+release_binding: v0.2.0
+gate_origin: tests
 created: 2026-06-21
 updated: 2026-06-21
 review_origin: epic-identity-injection-handler-integration
@@ -79,3 +79,10 @@ backbone.
 One stride: extend `CacheKeyInputs`/`KeyComponents`/`componentsOf`/
 `encodeComponents`/`classifyReason`/detail + 1-2 new tests + update the
 handler's key construction + SPEC formula. ~6-8 units.
+
+
+## Gate implementation notes (2026-06-22)
+
+Implemented by threading `modelName` through `CacheKeyInputs`, `KeyComponents`, canonical encoding, reason classification, change-signal detail, and the handler key construction. Added cache and handler tests for name-only invalidation.
+
+Verification: `npm run typecheck`; `npm test` (371/371).

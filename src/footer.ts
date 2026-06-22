@@ -1,7 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ResolvedMode } from "./presets.js";
 import {
-  getEffectiveModeSource,
   getActiveMode,
   getDefaultMode,
   resolveActiveModePlan,
@@ -70,8 +69,6 @@ export function selectModeGlyph(inputs: ModeFooterInputs): string {
 
 /** PURE inputs to the footer render (no pi coupling). */
 export interface ModeFooterInputs {
-  /** Reserved for future footer use; not rendered in v1. */
-  source: "override" | "default" | "unset";
   /** Effective preset name when the spec is a string preset. */
   specName: string | undefined;
   /** Resolved axes; undefined means no effective mode. */
@@ -141,7 +138,6 @@ export function refreshModeFooter(ctx: ExtensionContext): void {
     return;
   }
 
-  const source = getEffectiveModeSource();
   const spec = getActiveMode() ?? getDefaultMode();
   const specName = typeof spec === "string" ? spec : undefined;
   let mode: ResolvedMode | undefined;
@@ -155,7 +151,6 @@ export function refreshModeFooter(ctx: ExtensionContext): void {
   ctx.ui.setStatus(
     MODE_FOOTER_KEY,
     formatModeFooter({
-      source,
       specName,
       mode,
       modeError,

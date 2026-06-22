@@ -123,7 +123,7 @@ describe("handleBeforeAgentStart — active-mode wiring (smoke)", () => {
     const activeSig = resolveActiveModePlan().signature;
     expect(activeSig).not.toBe(NO_MODE_SIGNATURE);
 
-    const common = { modelId: model.id, modelProvider: model.provider, baseSystemPrompt: base };
+    const common = { modelName: model.name, modelId: model.id, modelProvider: model.provider, baseSystemPrompt: base };
     const unsetKey = computeCacheKey({ ...common, modeSignature: unsetSig });
     const activeKey = computeCacheKey({ ...common, modeSignature: activeSig });
     expect(activeKey).not.toBe(unsetKey);

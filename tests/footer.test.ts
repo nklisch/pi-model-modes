@@ -32,7 +32,6 @@ const mode: ResolvedMode = {
 
 function inputs(overrides: Partial<ModeFooterInputs> = {}): ModeFooterInputs {
   return {
-    source: "override",
     specName: undefined,
     mode,
     modeError: undefined,
@@ -68,9 +67,7 @@ describe("formatModeFooter", () => {
   });
 
   it("renders unset when no mode resolves", () => {
-    expect(formatModeFooter(inputs({ source: "unset", mode: undefined }))).toBe(
-      "◆ unset",
-    );
+    expect(formatModeFooter(inputs({ mode: undefined }))).toBe("◆ unset");
   });
 
   it("renders unresolvable when modeError is set, winning over a defined mode", () => {
@@ -105,7 +102,7 @@ describe("formatModeFooter", () => {
     ).toBe(`◆ pi/autonomous/architect/unrestricted +1${hint}`);
     expect(
       formatModeFooter(
-        inputs({ source: "unset", mode: undefined, cycleHintEnabled: true }),
+        inputs({ mode: undefined, cycleHintEnabled: true }),
       ),
     ).toBe(`◆ unset${hint}`);
     expect(
@@ -119,7 +116,6 @@ describe("formatModeFooter", () => {
     expect(
       formatModeFooter(
         inputs({
-          source: "unset",
           mode: undefined,
           cycleHintEnabled: false,
         }),
@@ -159,9 +155,7 @@ describe("selectModeGlyph", () => {
   });
 
   it("returns the default glyph when no mode is active", () => {
-    expect(selectModeGlyph(inputs({ source: "unset", mode: undefined }))).toBe(
-      "◆",
-    );
+    expect(selectModeGlyph(inputs({ mode: undefined }))).toBe("◆");
   });
 
   it("returns the unresolvable glyph when modeError is set, winning over mode", () => {
