@@ -1,7 +1,7 @@
 ---
 id: feature-mode-footer-indicator-refresh-wiring
 kind: story
-stage: review
+stage: done
 tags: []
 parent: feature-mode-footer-indicator
 depends_on:

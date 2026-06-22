@@ -1,7 +1,7 @@
 ---
 id: feature-mode-footer-indicator-cycle-opt-in
 kind: story
-stage: review
+stage: done
 tags: []
 parent: feature-mode-footer-indicator
 depends_on: [feature-mode-footer-indicator-footer-render]

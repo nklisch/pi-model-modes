@@ -1,7 +1,7 @@
 ---
 id: story-mode-autocomplete-suggestion-helpers
 kind: story
-stage: review
+stage: done
 tags: [tests]
 parent: feature-mode-command-autocomplete
 depends_on: []
