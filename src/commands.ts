@@ -313,6 +313,15 @@ export function formatDefaultNotify(args: {
         : (activeOverride as { base: string }).base;
     return `default set to "${writtenValue}" (${scopeLabel}) — override "${ovLabel}" still active; /mode off to use it now`;
   }
+
+  // No override, but a higher-precedence default scope still masks the write
+  // (today this means: wrote global while project has a default). Surface the
+  // scope win explicitly; otherwise the user sees no immediate mode change and
+  // has no clue why.
+  if (effective.source !== "unset" && effective.source !== writtenScope) {
+    return `default set to "${writtenValue}" (${scopeLabel}) — ${effective.source} default "${effective.value}" still wins; /mode default off to use it now`;
+  }
+
   return `default set to "${writtenValue}" (${scopeLabel}); effective mode is now "${effective.value}" (default)`;
 }
 

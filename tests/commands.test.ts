@@ -629,6 +629,19 @@ describe("formatDefaultNotify — override-still-wins wording", () => {
     );
   });
 
+  it("set global while project default wins → names the winning scope and next step", () => {
+    expect(
+      formatDefaultNotify({
+        writtenScope: "global",
+        writtenValue: "flow",
+        effective: { value: "extend", source: "project" },
+        activeOverride: undefined,
+      }),
+    ).toBe(
+      'default set to "flow" (global) — project default "extend" still wins; /mode default off to use it now',
+    );
+  });
+
   it("cleared + surviving default → falls back to global wording", () => {
     expect(
       formatDefaultNotify({
