@@ -105,6 +105,20 @@ function formatLastChanged(snapshot: ChangeSignalSnapshot): string {
   return detail ? `${head}\n  ${detail}` : head;
 }
 
+/**
+ * PURE: choose a markdown fence longer than any backtick run in `content`, then
+ * return a fenced block. Real system prompts can contain markdown fences; using
+ * a fixed ``` fence would terminate early in pi's rendered message.
+ */
+export function formatFencedBlock(content: string): string {
+  const longestBacktickRun = Math.max(
+    0,
+    ...Array.from(content.matchAll(/`+/g), (m) => m[0].length),
+  );
+  const fence = "`".repeat(Math.max(3, longestBacktickRun + 1));
+  return `${fence}\n${content}\n${fence}`;
+}
+
 /** PURE: build the plain-text inspect panel. No pi coupling → fully unit-tested.
  *
  *  `assembledPrompt` — when present (the `/mode:inspect --prompt` flag), the
@@ -132,7 +146,7 @@ export function renderModeInspect(
     `Cache key: ${cacheKey}`,
   ];
   if (assembledPrompt !== undefined) {
-    lines.push("", "System prompt:", "```", assembledPrompt, "```");
+    lines.push("", "System prompt:", formatFencedBlock(assembledPrompt));
   }
   return lines.join("\n");
 }
@@ -405,6 +419,10 @@ export function registerModeCommand(pi: ExtensionAPI): void {
             `could not write ${result.path}: ${result.error}`,
             "error",
           );
+          return;
+        }
+        if (result.noop === true) {
+          ctx.ui.notify(`no default set in ${result.writtenScope}`, "info");
           return;
         }
         refreshModeFooter(ctx);

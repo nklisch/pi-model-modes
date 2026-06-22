@@ -7,6 +7,7 @@ import {
   parseModeDefaultArgs,
   formatDefaultListing,
   formatDefaultNotify,
+  formatFencedBlock,
 } from "../src/commands.js";
 import { deriveIdentityLine } from "../src/identity.js";
 import {
@@ -307,6 +308,19 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
   });
 });
 
+describe("formatFencedBlock", () => {
+  it("uses a fence longer than any backtick run in the content", () => {
+    const block = formatFencedBlock("before\n```ts\nconst x = 1;\n```\nafter");
+    const lines = block.split("\n");
+    expect(lines[0]).toBe("````");
+    expect(lines.at(-1)).toBe("````");
+  });
+
+  it("uses a normal triple fence when the content has no longer run", () => {
+    expect(formatFencedBlock("plain")).toBe("```\nplain\n```");
+  });
+});
+
 describe("renderModeInspect — `--prompt` append block", () => {
   beforeEach(() => {
     resetCacheForTesting();
@@ -336,6 +350,17 @@ describe("renderModeInspect — `--prompt` append block", () => {
     );
     expect(withUndefined).toBe(bare);
     expect(bare).not.toContain("System prompt:");
+  });
+
+  it("chooses a longer fence when the prompt itself contains triple backticks", () => {
+    const out = renderModeInspect(
+      getChangeSignal(),
+      undefined,
+      undefined,
+      undefined,
+      "prompt with ``` fence",
+    );
+    expect(out).toContain("````\nprompt with ``` fence\n````");
   });
 
   it("places a blank line between the bare panel and the prompt block", () => {

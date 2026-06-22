@@ -473,6 +473,61 @@ describe("writeDefaultToConfig — write pipeline", () => {
     expect(reloaded.cycleKeybinding).toBe(true);
   });
 
+  it("CLEAR-WHEN-EMPTY blocker: `off` on a missing target is a no-op (no file/dir, no resolver touch)", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    const projectDir = dirname(project);
+
+    const result = writeDefaultToConfig(d, DEFAULT_OFF, "project");
+
+    expect(result).toEqual({
+      ok: true,
+      noop: true,
+      writtenScope: "project",
+      writtenValue: undefined,
+      effective: { value: undefined, source: "unset" },
+    });
+    // Crucial Codex blocker: do NOT create `<cwd>/.pi/` or write `{}`.
+    expect(existsSync(project)).toBe(false);
+    expect(existsSync(projectDir)).toBe(false);
+    // Resolver untouched.
+    expect(getDefaultMode()).toBeUndefined();
+    expect(getEffectiveModeSource()).toBe("unset");
+  });
+
+  it("CLEAR-WHEN-EMPTY blocker: `off` on existing sibling-only file is byte-stable and does not reseed", () => {
+    const d = freshDir();
+    const { project } = setPaths(d);
+    mkdirSync(dirname(project), { recursive: true });
+    const original = `${JSON.stringify({ cycleKeybinding: true }, null, 2)}\n`;
+    writeFileSync(project, original);
+
+    const result = writeDefaultToConfig(d, DEFAULT_OFF, "project");
+
+    expect(result).toEqual({
+      ok: true,
+      noop: true,
+      writtenScope: "project",
+      writtenValue: undefined,
+      effective: { value: undefined, source: "unset" },
+    });
+    expect(readFileSync(project, "utf8")).toBe(original);
+    expect(getDefaultMode()).toBeUndefined();
+  });
+
+  it("CLEAR-WHEN-EMPTY blocker: global `off` on a missing target is also a no-op", () => {
+    const d = freshDir();
+    const { global } = setPaths(d);
+
+    const result = writeDefaultToConfig(d, DEFAULT_OFF, "global");
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.noop).toBe(true);
+    expect(existsSync(global)).toBe(false);
+    expect(existsSync(dirname(global))).toBe(true); // temp root exists, file absent
+    expect(getDefaultMode()).toBeUndefined();
+  });
+
   it("the OPUS BLOCKER: project `off` with a global default falls back to global", () => {
     const d = freshDir();
     const { global, project } = setPaths(d);

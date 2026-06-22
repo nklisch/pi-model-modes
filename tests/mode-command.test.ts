@@ -355,6 +355,67 @@ describe("/mode default [...] — durable default subcommand", () => {
     );
   });
 
+  it("CLEAR-WHEN-EMPTY blocker: `/mode default off` on missing project target writes nothing and only notifies no-op", async () => {
+    buildFixture();
+    const { cwd, projectPath } = setupDirs();
+    const { handler } = getModeHandler();
+    const ui = makeUi();
+    const ctx = makeContext({
+      cwd,
+      hasUI: true,
+      ui,
+      model: makeModel({ name: "x", provider: "y" }),
+    } as unknown as Partial<ExtensionCommandContext>) as ExtensionCommandContext;
+
+    await handler("default off", ctx);
+
+    expect(existsSync(projectPath)).toBe(false);
+    expect(existsSync(dirname(projectPath))).toBe(false);
+    expect(ui.notifyCalls).toEqual([
+      { message: "no default set in project", type: "info" },
+    ]);
+    expect(ui.statusCalls).toHaveLength(0); // no footer refresh on noop
+  });
+
+  it("CLEAR-WHEN-EMPTY blocker: `/mode default off --global` on missing global target writes nothing", async () => {
+    buildFixture();
+    const { cwd, globalPath } = setupDirs();
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+    await handler("default off --global", ctx);
+
+    expect(existsSync(globalPath)).toBe(false);
+    expect(notifies.at(-1)).toEqual({
+      message: "no default set in global",
+      type: "info",
+    });
+  });
+
+  it("CLEAR-WHEN-EMPTY blocker: existing sibling-only target is byte-stable and no footer refresh", async () => {
+    buildFixture();
+    const { cwd, projectPath } = setupDirs();
+    mkdirSync(dirname(projectPath), { recursive: true });
+    const original = `${JSON.stringify({ cycleKeybinding: true }, null, 2)}\n`;
+    writeFileSync(projectPath, original);
+    const { handler } = getModeHandler();
+    const ui = makeUi();
+    const ctx = makeContext({
+      cwd,
+      hasUI: true,
+      ui,
+      model: makeModel({ name: "x", provider: "y" }),
+    } as unknown as Partial<ExtensionCommandContext>) as ExtensionCommandContext;
+
+    await handler("default off", ctx);
+
+    expect(readFileSync(projectPath, "utf8")).toBe(original);
+    expect(ui.notifyCalls).toEqual([
+      { message: "no default set in project", type: "info" },
+    ]);
+    expect(ui.statusCalls).toHaveLength(0);
+  });
+
   it("the OPUS BLOCKER: project `off` falls back to a surviving global default", async () => {
     buildFixture();
     const { cwd, projectPath, globalPath } = setupDirs();

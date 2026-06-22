@@ -196,9 +196,15 @@ export const DEFAULT_OFF = "off";
 /** Success: the writer reports the new effective default + which scope won. */
 export interface WriteDefaultOk {
   ok: true;
-  /** The scope that was just written. */
+  /**
+   * True when `off` targeted a scope whose file has no `defaultMode`; no file,
+   * directory, resolver, or footer state was touched. Codex final-review
+   * blocker: clear-when-empty is a no-op, not a write of `{}`.
+   */
+  noop?: true;
+  /** The scope that was just written (or inspected for a no-op clear). */
   writtenScope: DefaultScope;
-  /** The value just written (`undefined` when `off` cleared the only default). */
+  /** The value just written (`undefined` when `off` cleared/no-opped). */
   writtenValue: string | undefined;
   /**
    * The EFFECTIVE default after re-merge (project wins over global). `undefined`
@@ -261,17 +267,20 @@ function readObjectForWrite(path: string): Record<string, unknown> {
  *   1. Resolve `path` via the existing `globalConfigPath`/`projectConfigPath`
  *      seams so `setConfigPathsForTesting` intercepts writes (Opus medium).
  *   2. Strict-read the target file (malformed → fail, do NOT overwrite).
- *   3. Mutate in memory: set or `delete` `defaultMode`; siblings preserved.
- *   4. Serialize as `JSON.stringify(obj, null, 2) + "\n"` (Opus medium).
- *   5. Atomic write: `writeFileSync(path.tmp)` + `renameSync(tmp, path)`
+ *   3. If clearing and the target object has no `defaultMode`, return a no-op
+ *      result immediately: do NOT write `{}`, create dirs/files, reseed the
+ *      resolver, or refresh the footer (Codex final-review blocker).
+ *   4. Mutate in memory: set or `delete` `defaultMode`; siblings preserved.
+ *   5. Serialize as `JSON.stringify(obj, null, 2) + "\n"` (Opus medium).
+ *   6. Atomic write: `writeFileSync(path.tmp)` + `renameSync(tmp, path)`
  *      (both reviewers). The reader is tolerant, so a torn concurrent read
  *      silently degrades to `{}` and drops the default for that session_start
  *      — atomic rename is cheap insurance.
- *   6. Bootstrap parent dir for BOTH scopes via `mkdirSync(recursive)`
+ *   7. Bootstrap parent dir for BOTH scopes via `mkdirSync(recursive)`
  *      (Codex medium; global may be absent on a fresh machine).
- *   7. Reconcile via `applyDefaultFromConfig(cwd)` (Opus blocker — NOT
+ *   8. Reconcile via `applyDefaultFromConfig(cwd)` (Opus blocker — NOT
  *      `applySessionStart`, which clears the override).
- *   8. Return the effective default + source so the caller builds a truthful
+ *   9. Return the effective default + source so the caller builds a truthful
  *      notify without re-reading.
  *
  * NEVER touches the EPHEMERAL override tier — the precedence invariant
@@ -291,9 +300,24 @@ export function writeDefaultToConfig(
     return { ok: false, path, error: (cause as Error).message };
   }
 
+  const cleared = value === DEFAULT_OFF;
+  const hasDefaultMode = Object.prototype.hasOwnProperty.call(loaded, "defaultMode");
+
+  // Clear-when-empty is a no-op, not a write of `{}`. This preserves the
+  // explicit contract from the feature design and avoids surprising file/dir
+  // creation when the user asks to clear something that was never set.
+  if (cleared && !hasDefaultMode) {
+    return {
+      ok: true,
+      noop: true,
+      writtenScope: scope,
+      writtenValue: undefined,
+      effective: effectiveDefaultSource(cwd),
+    };
+  }
+
   // Mutate in memory — siblings (cycleKeybinding, future keys) preserved.
   const next: Record<string, unknown> = { ...loaded };
-  const cleared = value === DEFAULT_OFF;
   if (cleared) {
     delete next.defaultMode;
   } else {
