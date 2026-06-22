@@ -14,7 +14,8 @@ import { setDefaultMode, clearDefaultMode, clearActiveMode } from "./resolver.js
  *
  * Tolerant by design — a missing file is `{}`; a malformed file warns and is
  * treated as `{}`. Loading config never throws, so `session_start` seeding
- * can never crash the session. v1 shape is `{ defaultMode? }`, extensible.
+ * can never crash the session. Shape is `{ defaultMode?, cycleKeybinding? }`,
+ * extensible.
  *
  * Pure module (Node builtins + the resolver's default-tier setter only). The
  * two absolute paths are overridable via a test seam so tests never touch the
@@ -26,6 +27,7 @@ import { setDefaultMode, clearDefaultMode, clearActiveMode } from "./resolver.js
 /** The v1 plugin config shape (extensible). */
 export interface PluginConfig {
   defaultMode?: string;
+  cycleKeybinding?: boolean;
 }
 
 // --- config file paths (override via the test seam) --------------------------
@@ -75,6 +77,20 @@ function readConfigFile(path: string): PluginConfig {
   }
 }
 
+function readCycleKeybindingFlag(config: PluginConfig, path: string): boolean {
+  const value = (config as { cycleKeybinding?: unknown }).cycleKeybinding;
+  if (value === undefined) {
+    return false;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  console.warn(
+    `pi-model-modes: config "${path}" cycleKeybinding must be a boolean — disabling cycle keybindings`,
+  );
+  return false;
+}
+
 /**
  * Load the merged plugin config: global `~/.pi/agent/pi-model-modes.json`
  * shallow-merged with project `<cwd>/.pi/pi-model-modes.json`, PROJECT WINS.
@@ -85,6 +101,20 @@ export function loadPluginConfig(cwd: string): PluginConfig {
   const global = readConfigFile(globalConfigPath());
   const project = readConfigFile(projectConfigPath(cwd));
   return { ...global, ...project };
+}
+
+/**
+ * Load the GLOBAL plugin config only. Factory-load-time decisions such as
+ * keybinding registration cannot depend on project config because cwd is not
+ * known yet and pi keybindings are process-global.
+ */
+export function loadGlobalPluginConfig(): PluginConfig {
+  const path = globalConfigPath();
+  const global = readConfigFile(path);
+  return {
+    ...global,
+    cycleKeybinding: readCycleKeybindingFlag(global, path),
+  };
 }
 
 /**

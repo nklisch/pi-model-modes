@@ -1,7 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { registerModeCommand, registerModeInspectCommand } from "../src/commands.js";
-import { applySessionStart } from "../src/config.js";
+import { applySessionStart, loadGlobalPluginConfig } from "../src/config.js";
+import { setCycleHintEnabled } from "../src/footer.js";
+import { registerModeKeybindings } from "../src/keybinding.js";
 
 /**
  * pi extension entry. The default export is the factory pi discovers and
@@ -23,6 +25,9 @@ import { applySessionStart } from "../src/config.js";
  *     `pi-model-modes.json` merged — and clears the EPHEMERAL session override on
  *     a genuinely new session (`new`/`resume`/`fork`) so it restarts from the
  *     config default; a same-session `reload`/`startup` keeps any override).
+ *   - Optional cycle keybindings + footer hint when global config sets
+ *     `cycleKeybinding: true` (default off, preserving the no-default-shortcut
+ *     invariant).
  *
  * Downstream epics extend this factory (register `/mode`, keybindings, etc.)
  * by adding more `pi.on(...)` / `pi.registerCommand(...)` calls — edit, don't
@@ -38,4 +43,10 @@ export default function (pi: ExtensionAPI) {
   registerModeCommand(pi);
   registerModeInspectCommand(pi);
   pi.on("session_start", (e, ctx) => applySessionStart(e.reason, ctx.cwd));
+
+  const { cycleKeybinding } = loadGlobalPluginConfig();
+  setCycleHintEnabled(cycleKeybinding === true);
+  if (cycleKeybinding === true) {
+    registerModeKeybindings(pi);
+  }
 }

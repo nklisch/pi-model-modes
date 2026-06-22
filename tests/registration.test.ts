@@ -1,8 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import factory from "../extensions/index.js";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { MODE_COMMAND, MODE_INSPECT_COMMAND } from "../src/commands.js";
-import { makePi } from "./harness.js";
+import {
+  MODE_FOOTER_KEY,
+  refreshModeFooter,
+  resetFooterForTesting,
+} from "../src/footer.js";
+import { CYCLE_BACKWARD_KEY, CYCLE_FORWARD_KEY } from "../src/keybinding.js";
+import { resetConfigForTesting, setConfigPathsForTesting } from "../src/config.js";
+import { resetResolverForTesting } from "../src/resolver.js";
+import { makeContext, makePi } from "./harness.js";
 
 /**
  * Registration wiring — the factory registers the `before_agent_start` handler
@@ -12,7 +24,66 @@ import { makePi } from "./harness.js";
  * factory wires the handler, the session-start seed, and the command, and
  * nothing more.
  */
+let dir: string | undefined;
+
+function freshDir(): string {
+  const d = mkdtempSync(join(tmpdir(), "registration-"));
+  dir = d;
+  return d;
+}
+
+function writeJson(path: string, obj: unknown): void {
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, JSON.stringify(obj), "utf8");
+}
+
+function setGlobalConfig(obj: unknown): void {
+  const d = freshDir();
+  const global = join(d, "global.json");
+  writeJson(global, obj);
+  setConfigPathsForTesting({ global, project: join(d, "project.json") });
+}
+
+function setMissingConfig(): void {
+  const d = freshDir();
+  setConfigPathsForTesting({
+    global: join(d, "global.json"),
+    project: join(d, "project.json"),
+  });
+}
+
+function renderedFooterText(): string | undefined {
+  const calls: [string, string | undefined][] = [];
+  const ctx = makeContext({
+    hasUI: true,
+    ui: {
+      setStatus: (key: string, text: string | undefined) => {
+        calls.push([key, text]);
+      },
+    },
+  } as unknown as Partial<ExtensionContext>);
+  refreshModeFooter(ctx);
+  expect(calls[0]?.[0]).toBe(MODE_FOOTER_KEY);
+  return calls[0]?.[1];
+}
+
 describe("factory registration wiring", () => {
+  beforeEach(() => {
+    resetConfigForTesting();
+    resetFooterForTesting();
+    resetResolverForTesting();
+    setMissingConfig();
+  });
+
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = undefined;
+    resetConfigForTesting();
+    resetFooterForTesting();
+    resetResolverForTesting();
+    vi.restoreAllMocks();
+  });
+
   it("registers before_agent_start by reference exactly once", () => {
     const { pi, calls } = makePi();
     factory(pi);
@@ -67,11 +138,49 @@ describe("factory registration wiring", () => {
     expect(unexpected).toHaveLength(0);
   });
 
-  it("does not auto-register mode-cycle shortcuts", () => {
+  it("defaults to no mode-cycle shortcuts and no footer cycle hint", () => {
     const { pi, calls } = makePi();
     factory(pi);
 
     const shortcuts = calls.filter((c) => c.method === "registerShortcut");
     expect(shortcuts).toHaveLength(0);
+    expect(renderedFooterText()).toBe("mode: unset");
   });
+
+  it("registers both cycle shortcuts and enables the footer hint when globally enabled", () => {
+    setGlobalConfig({ cycleKeybinding: true });
+    const { pi, calls } = makePi();
+    factory(pi);
+
+    const shortcuts = calls.filter((c) => c.method === "registerShortcut");
+    expect(shortcuts).toHaveLength(2);
+    expect(shortcuts.map((c) => c.args[0]).sort()).toEqual(
+      [CYCLE_BACKWARD_KEY, CYCLE_FORWARD_KEY].sort(),
+    );
+    expect(
+      shortcuts.filter((c) => c.args[0] === CYCLE_FORWARD_KEY),
+    ).toHaveLength(1);
+    expect(
+      shortcuts.filter((c) => c.args[0] === CYCLE_BACKWARD_KEY),
+    ).toHaveLength(1);
+    expect(renderedFooterText()).toBe(
+      `mode: unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
+    );
+  });
+
+  it.each([false, "yes"] as const)(
+    "does not register shortcuts or enable the hint for cycleKeybinding=%s",
+    (cycleKeybinding) => {
+      if (cycleKeybinding !== false) {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+      }
+      setGlobalConfig({ cycleKeybinding });
+      const { pi, calls } = makePi();
+      factory(pi);
+
+      const shortcuts = calls.filter((c) => c.method === "registerShortcut");
+      expect(shortcuts).toHaveLength(0);
+      expect(renderedFooterText()).toBe("mode: unset");
+    },
+  );
 });

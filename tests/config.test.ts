@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   loadPluginConfig,
+  loadGlobalPluginConfig,
   applyDefaultFromConfig,
   applySessionStart,
   setConfigPathsForTesting,
@@ -150,6 +151,63 @@ describe("loadPluginConfig — merge + tolerance", () => {
     expect(loadPluginConfig("/unused")).toEqual({});
     expect(warn).toHaveBeenCalled();
   });
+});
+
+describe("loadGlobalPluginConfig — cycle keybinding flag", () => {
+  it("reads only the global file", () => {
+    const d = freshDir();
+    const global = join(d, "global.json");
+    const project = join(d, "project.json");
+    writeJson(global, { cycleKeybinding: true });
+    writeRaw(project, "{ not valid json ");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    setConfigPathsForTesting({ global, project });
+
+    expect(loadGlobalPluginConfig()).toEqual({ cycleKeybinding: true });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("defaults missing cycleKeybinding to false", () => {
+    const d = freshDir();
+    const global = join(d, "global.json");
+    writeJson(global, {});
+    setConfigPathsForTesting({
+      global,
+      project: join(d, "project.json"),
+    });
+
+    expect(loadGlobalPluginConfig().cycleKeybinding).toBe(false);
+  });
+
+  it("returns true for boolean true", () => {
+    const d = freshDir();
+    const global = join(d, "global.json");
+    writeJson(global, { cycleKeybinding: true });
+    setConfigPathsForTesting({
+      global,
+      project: join(d, "project.json"),
+    });
+
+    expect(loadGlobalPluginConfig().cycleKeybinding).toBe(true);
+  });
+
+  it.each(["yes", 1] as const)(
+    "warns and disables non-boolean cycleKeybinding (%s)",
+    (value) => {
+      const d = freshDir();
+      const global = join(d, "global.json");
+      writeJson(global, { cycleKeybinding: value });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      setConfigPathsForTesting({
+        global,
+        project: join(d, "project.json"),
+      });
+
+      expect(() => loadGlobalPluginConfig()).not.toThrow();
+      expect(loadGlobalPluginConfig().cycleKeybinding).toBe(false);
+      expect(warn).toHaveBeenCalled();
+    },
+  );
 });
 
 describe("applyDefaultFromConfig — seeding", () => {

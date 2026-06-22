@@ -11,7 +11,9 @@ pi-model-modes is a pi extension package (`pi-package`), installed via
 - A `before_agent_start` handler that transforms pi's assembled system
   prompt per turn.
 - A `/mode` command family for interactive mode selection.
-- No mode-cycle keybinding is registered by default.
+- No mode-cycle keybinding is registered by default. A global
+  `cycleKeybinding: true` config opt-in registers the cycle shortcuts and
+  enables the footer cycle hint; the flag defaults to `false`.
 - A `session_start` handler that seeds the default mode from plugin-owned
   config (`pi-model-modes.json`, global + project merged).
 
@@ -174,8 +176,7 @@ edit takes effect on the next turn (no `/reload`) while disk reads stay minimal.
 
 ## Switching paths
 
-Two built-in paths converge on one resolver, with one optional helper retained
-for explicit consumers:
+Two built-in paths converge on one resolver, with one global keybinding opt-in:
 
 1. **`/mode <name|preset>`** — interactive command. Sets the active mode
    for the current session (ephemeral override over the config default).
@@ -202,10 +203,13 @@ for explicit consumers:
    which has no plugin namespace.) Seeded into the resolver's default tier at
    `session_start`; an invalid value warns and is skipped (never crashes the
    session). Persists across sessions unless overridden.
-3. **Optional keybinding helper** — `src/keybinding.ts` retains a tested helper
-   that can register cycle shortcuts for explicit consumers. The package factory
-   does not call it, because `Ctrl+M` is encoded like Enter in legacy terminal
-   input and package-level default shortcuts can interfere with normal entry.
+3. **Global cycle-keybinding opt-in** — a `cycleKeybinding` boolean in the
+   global plugin config (`~/.pi/agent/pi-model-modes.json`) defaults to `false`.
+   When set to `true`, the package factory registers the forward/backward cycle
+   shortcuts and enables the footer cycle hint from the same flag. Missing,
+   `false`, or non-boolean values do not register shortcuts; non-boolean values
+   warn and are treated as `false`. Project-level `cycleKeybinding` is not used
+   because keybindings are registered at package load and are global in pi.
 
 Resolution precedence: session override (`/mode`) > config default > unset.
 The resolver holds this as two distinct tiers (override + default); the

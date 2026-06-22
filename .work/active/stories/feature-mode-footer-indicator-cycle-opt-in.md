@@ -1,7 +1,7 @@
 ---
 id: feature-mode-footer-indicator-cycle-opt-in
 kind: story
-stage: implementing
+stage: review
 tags: []
 parent: feature-mode-footer-indicator
 depends_on: [feature-mode-footer-indicator-footer-render]
@@ -59,22 +59,36 @@ factory imports `setCycleHintEnabled` from `src/footer.ts`.
 
 ## Acceptance criteria
 
-- [ ] `loadGlobalPluginConfig` reads ONLY the global config file (assert via
+- [x] `loadGlobalPluginConfig` reads ONLY the global config file (assert via
   `setConfigPathsForTesting` that the project file is not consulted).
-- [ ] `cycleKeybinding` validation: missing → `false`; `true` → `true`;
+- [x] `cycleKeybinding` validation: missing → `false`; `true` → `true`;
   non-boolean (e.g. `"yes"`, `1`) → `console.warn` + `false`; NEVER throws.
-- [ ] Factory: with global `{ "cycleKeybinding": true }`, registers the two
+- [x] Factory: with global `{ "cycleKeybinding": true }`, registers the two
   cycle shortcuts AND calls `setCycleHintEnabled(true)`. With missing / false /
   non-boolean, registers no shortcuts and leaves the hint signal `false`.
-- [ ] `registerModeKeybindings` is called at most once per process (the
+- [x] `registerModeKeybindings` is called at most once per process (the
   factory runs once).
-- [ ] `registration.test.ts`: default-off property still asserted (no
+- [x] `registration.test.ts`: default-off property still asserted (no
   shortcuts when flag absent); new flag-on test asserts both shortcuts + the
   hint signal.
-- [ ] SPEC + ARCHITECTURE updated: the `cycleKeybinding` flag is documented as
+- [x] SPEC + ARCHITECTURE updated: the `cycleKeybinding` flag is documented as
   the opt-in for cycle keybindings + footer hint; the "no default cycle
   keybinding" invariant is preserved (default off).
-- [ ] typecheck clean; tests green.
+- [x] typecheck clean; tests green.
+
+## Implementation notes
+
+- Added `cycleKeybinding?: boolean` and `loadGlobalPluginConfig()` in
+  `src/config.ts`; the loader reads only the global path and normalizes missing
+  / invalid values to `false`, warning for non-booleans.
+- Wired the factory to enable the footer hint and register
+  `registerModeKeybindings(pi)` only when global `cycleKeybinding === true`.
+- Extended config and registration tests for global-only reads, tolerant
+  validation, default-off shortcut behavior, and flag-on shortcut + hint
+  behavior.
+- Rolled `docs/SPEC.md` and `docs/ARCHITECTURE.md` forward with the current
+  global opt-in contract.
+- Verification: `npm run typecheck`; `npm test`.
 
 ## Out of scope
 

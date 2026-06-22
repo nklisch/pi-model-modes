@@ -9,18 +9,21 @@ pi-model-modes/
 ├─ package.json              pi-package manifest: pi { extensions } + files allowlist
 │                            (prompts/ is loaded by the plugin at runtime, package-relative)
 ├─ extensions/
-│   └─ index.ts              default export: registers handler, /mode, session_start
+│   └─ index.ts              default export: registers handler, /mode, session_start,
+│                            optional global cycle keybindings
 ├─ src/
 │   ├─ handler.ts            before_agent_start entry — orchestrates the transform
 │   ├─ resolver.ts           mode resolution: two tiers (override > default), effective = override ?? default ?? unset
-│   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds the default tier
+│   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds the default tier;
+│   │                        global cycleKeybinding opt-in for factory-load wiring
 │   ├─ assemble.ts           identity derivation + fragment splice
 │   ├─ cache.ts              cache key, lastKey/lastResult, change signal
 │   ├─ fragments.ts          fragment loader (reads prompts/, caches in module scope)
 │   ├─ presets.ts            preset table (name → {base, agency, quality, scope, mods})
 │   ├─ provider-names.ts     provider id → display name map
 │   ├─ commands.ts           /mode, /mode off, /mode:inspect
-│   └─ keybinding.ts         optional cycle keybinding helper (not auto-registered)
+│   ├─ footer.ts             footer status formatter + cycle-hint signal
+│   └─ keybinding.ts         cycle keybinding helper, registered only when globally opted in
 ├─ prompts/
 │   ├─ base.json  overlay manifest (slot order) — at the prompts/ root
 │   ├─ base/      voice overlays (chill.md, flow.md, pi-direct.md)
@@ -46,10 +49,14 @@ pi-model-modes/
 ```
 
 `extensions/index.ts` is the single registration surface. It wires the
-handler, the commands, and the `session_start` config-seed to pi's
-`ExtensionAPI`. Everything else is plain modules with no pi coupling
-except through typed interfaces — which keeps the logic unit-testable without
-spinning up pi.
+handler, the commands, the `session_start` config-seed, and the optional
+global cycle keybindings to pi's `ExtensionAPI`. The cycle path is gated by
+the global `cycleKeybinding` flag; when that flag is `true`, the factory
+registers both cycle shortcuts and enables the footer cycle hint. Missing,
+`false`, and non-boolean values leave both off, preserving the no-default
+cycle-keybinding invariant. Everything else is plain modules with no pi
+coupling except through typed interfaces — which keeps the logic unit-testable
+without spinning up pi.
 
 **Two-tier mode state.** `resolver.ts` holds the effective selection as two
 distinct tiers: an ephemeral OVERRIDE (`/mode`, set via `setActiveMode` /
@@ -58,7 +65,10 @@ via `setDefaultMode`). The per-turn resolve materializes `override ?? default`,
 falling back to no-mode when both are unset; `getEffectiveModeSource()` reports
 which tier won. `config.ts` reads the merged plugin config and seeds the
 default tier at `session_start` (`applyDefaultFromConfig`), tolerating missing
-or invalid config without crashing.
+or invalid config without crashing. Factory-load-time keybinding decisions use
+`loadGlobalPluginConfig()` instead, which reads only
+`~/.pi/agent/pi-model-modes.json`; project config is not consulted because
+keybindings register before cwd is known and are global in pi.
 
 ## Per-turn data flow
 
