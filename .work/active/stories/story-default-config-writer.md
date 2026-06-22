@@ -1,7 +1,7 @@
 ---
 id: story-default-config-writer
 kind: story
-stage: review
+stage: done
 tags: [tests]
 parent: feature-mode-default-management
 depends_on: []
@@ -98,3 +98,21 @@ so `effective` is the merge result the resolver actually sees).
 - All test-matrix cases pass.
 - `setConfigPathsForTesting` intercepts writes (writes hit the test paths).
 - `npm run typecheck` clean; `npm test` green.
+
+## Review (2026-06-21)
+
+Verdict: Approve — story verified by implementation tests and final Codex
+focused re-review.
+
+Verification:
+
+- `npm run typecheck` clean
+- `npm test` 360/360 passing
+- Codex focused re-review: PASS; prior clear-when-empty blocker fixed, no new blockers.
+
+Accepted review finding fixed before approval:
+
+- Codex final review found that clearing an unset/missing target wrote `{}` and
+  created config dirs/files. Fixed in `writeDefaultToConfig`: clear-when-empty
+  now returns `noop` before mkdir/write/reseed; tests cover missing target,
+  sibling-only target, byte stability, no resolver reseed, no footer refresh.

@@ -1,7 +1,7 @@
 ---
 id: story-default-autocomplete-multistage
 kind: story
-stage: review
+stage: done
 tags: [tests]
 parent: feature-mode-default-management
 depends_on: [story-default-command-surface]
@@ -67,3 +67,14 @@ Extend `src/autocomplete.ts`:
 - All test-matrix cases pass.
 - Zero existing autocomplete tests regress.
 - `npm run typecheck` clean; `npm test` green.
+
+## Review (2026-06-21)
+
+Verdict: Approve — story verified by implementation tests and final review bundle.
+
+Verification:
+
+- `npm run typecheck` clean
+- `npm test` 360/360 passing
+- Codex final review did not identify autocomplete blockers.
+- Opus final review: PASS WITH NITS; autocomplete invariants preserved.

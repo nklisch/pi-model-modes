@@ -1,7 +1,7 @@
 ---
 id: feature-mode-inspect-prompt-flag
 kind: feature
-stage: review
+stage: done
 tags: []
 parent: null
 depends_on: []
@@ -147,3 +147,20 @@ Implemented and verified.
   - Added render append-block tests, single-source byte-equality tests against `handleBeforeAgentStart`, no-model fallback, `--prompt` command-path tests, and parser rejection matrix.
 
 Verification: `npm run typecheck`; `npm test` (350/350 after the full `/mode default` work).
+
+## Review (2026-06-21)
+
+Verdict: Approve — feature verified by tests + Codex/Opus final review.
+
+Verification:
+
+- `npm run typecheck` clean
+- `npm test` 360/360 passing
+- Opus final review: PASS WITH NITS; no blockers/high/medium findings for inspect.
+- Codex focused re-review: PASS; markdown-fence nit fixed.
+
+Accepted non-blocking finding fixed before approval:
+
+- Codex noted that a fixed triple-backtick fence could be closed early by a
+  system prompt containing fenced code. Fixed with `formatFencedBlock`, which
+  chooses a fence longer than any backtick run in the prompt; tests cover this.

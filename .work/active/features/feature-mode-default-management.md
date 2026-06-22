@@ -1,7 +1,7 @@
 ---
 id: feature-mode-default-management
 kind: feature
-stage: review
+stage: done
 tags: []
 parent: null
 depends_on: []
@@ -286,3 +286,34 @@ Implemented all three child stories and advanced them to review:
 Docs rolled forward in `README.md`, `docs/SPEC.md`, and `docs/ARCHITECTURE.md`.
 
 Verification: `npm run typecheck`; `npm test` (350/350).
+
+## Review (2026-06-21)
+
+Verdict: Approve — feature verified by tests + Codex/Opus final review.
+
+Verification:
+
+- `npm run typecheck` clean
+- `npm test` 360/360 passing
+- Opus final review: PASS WITH NITS; no blockers/high/medium findings.
+- Codex final review: initial FAIL on clear-when-empty; accepted and fixed.
+- Codex focused re-review: PASS; prior blockers fixed, no new blockers.
+
+Accepted review findings fixed before approval:
+
+- Clear-when-empty now no-ops instead of writing `{}` / creating config paths.
+- Command surface now emits `no default set in <scope>` and skips footer refresh
+  on no-op clears.
+- `/mode:inspect --prompt` now uses a dynamic markdown fence, preventing prompts
+  with backtick fences from closing the debug block early.
+
+Rejected/parked nits:
+
+- Inspect parser saying "flag" for a non-dash extra token is cosmetic and not
+  worth delaying this feature.
+- Stage-3 autocomplete requiring a leading `-` before suggesting `--global` is
+  accepted because it follows the locked Opus design.
+- ARCHITECTURE test-list staleness predates this work; low-priority cleanup for
+  a future docs hygiene pass if desired.
+- The commit-message glitch in `3681216` is message-only; rewrite blocked by the
+  harness history-mutation guard, and code/substrate state are unaffected.

@@ -1,7 +1,7 @@
 ---
 id: story-default-command-surface
 kind: story
-stage: review
+stage: done
 tags: [tests]
 parent: feature-mode-default-management
 depends_on: [story-default-config-writer]
@@ -94,3 +94,19 @@ unreadable: `global: (unreadable)` rather than crashing.
 - All test-matrix cases pass.
 - Existing `/mode <preset>` and `/mode off` behavior unchanged.
 - `npm run typecheck` clean; `npm test` green.
+
+## Review (2026-06-21)
+
+Verdict: Approve — command surface verified by implementation tests and final
+Codex focused re-review.
+
+Verification:
+
+- `npm run typecheck` clean
+- `npm test` 360/360 passing
+- Codex focused re-review: PASS; command no-op notify branch fixed, no new blockers.
+
+Accepted review finding fixed before approval:
+
+- `/mode default off` and `off --global` now surface `no default set in <scope>`
+  and return before footer refresh when the writer reports `noop`.
