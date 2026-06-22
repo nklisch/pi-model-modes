@@ -15,6 +15,7 @@ import {
 import { listPresetNames } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
 import { MODE_OFF_ARG } from "./autocomplete.js";
+import { assembleForInspect, getLastBaseSystemPrompt } from "./handler.js";
 
 /**
  * `/mode:inspect` — the epic's one user-facing command surface.
@@ -97,24 +98,36 @@ function formatLastChanged(snapshot: ChangeSignalSnapshot): string {
   return detail ? `${head}\n  ${detail}` : head;
 }
 
-/** PURE: build the plain-text inspect panel. No pi coupling → fully unit-tested. */
+/** PURE: build the plain-text inspect panel. No pi coupling → fully unit-tested.
+ *
+ *  `assembledPrompt` — when present (the `/mode:inspect --prompt` flag), the
+ *  panel appends a blank line, a `System prompt:` header, and a fenced block
+ *  containing the bytes. When `undefined`, the bare four-line panel is emitted
+ *  unchanged. The `"(no turn has run yet — …)"` sentinel is passed by the
+ *  command layer when the base-prompt memo is empty so the panel honestly
+ *  reports the gap rather than emitting an empty fenced block. */
 export function renderModeInspect(
   snapshot: ChangeSignalSnapshot,
   model: Model<any> | undefined,
   mode: ResolvedMode | undefined,
   modeError?: string,
+  assembledPrompt?: string,
 ): string {
   const identity = model ? deriveIdentityLine(model) : "(no model)";
   const cacheKey = snapshot.currentKey ? shortHex(snapshot.currentKey) : "(none)";
   const modeLine = modeError
     ? `(unresolvable — ${modeError})`
     : formatModeSummary(mode);
-  return [
+  const lines = [
     `Mode: ${modeLine}`,
     `Identity: ${identity}`,
     formatLastChanged(snapshot),
     `Cache key: ${cacheKey}`,
-  ].join("\n");
+  ];
+  if (assembledPrompt !== undefined) {
+    lines.push("", "System prompt:", "```", assembledPrompt, "```");
+  }
+  return lines.join("\n");
 }
 
 /** Slash command name for the `/mode` command family. */
@@ -223,12 +236,35 @@ export function registerModeCommand(pi: ExtensionAPI): void {
 }
 
 /** The only pi seam: register `/mode:inspect`. Reads the change signal + the
- *  live model, renders, and emits a display-only message (no `triggerTurn`). */
+ *  live model, renders, and emits a display-only message (no `triggerTurn`).
+ *
+ *  Arg contract: an optional single `--prompt` flag (case-sensitive, no
+ *  `=value` form). When present, the panel appends the FULL assembled system
+ *  prompt (the same bytes `handleBeforeAgentStart` will splice for the next
+ *  turn) via the shared `assembleForInspect` pure helper. Unknown / repeated /
+ *  extra tokens → error toast, no panel emit, no resolver mutation. Bare
+ *  `/mode:inspect` (no flag) is byte-for-byte unchanged. */
 export function registerModeInspectCommand(pi: ExtensionAPI): void {
   pi.registerCommand(MODE_INSPECT_COMMAND, {
     description:
-      "Show the effective prompt's identity, last-change reason, and cache key",
-    handler: async (_args: string, ctx: ExtensionCommandContext): Promise<void> => {
+      "Show the effective prompt's identity, last-change reason, and cache key (--prompt appends the full assembled system prompt)",
+    handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+      // Parse the arg contract: empty | `--prompt` | (error).
+      const tokens = (args ?? "").trim().split(/\s+/).filter((t) => t.length > 0);
+      let includePrompt = false;
+      for (const token of tokens) {
+        if (token === "--prompt") {
+          if (includePrompt) {
+            ctx.ui.notify(`unexpected repeated flag "${token}"`, "error");
+            return;
+          }
+          includePrompt = true;
+          continue;
+        }
+        ctx.ui.notify(`unknown /mode:inspect flag "${token}" (only --prompt is supported)`, "error");
+        return;
+      }
+
       // Resolve the active mode (the resolved axes, NOT a raw preset string).
       // A fragment that vanished after `setActiveMode` would throw here — catch
       // it so the diagnostic command degrades to a graceful unresolvable line.
@@ -239,7 +275,27 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
       } catch (err) {
         modeError = (err as Error).message;
       }
-      const content = renderModeInspect(getChangeSignal(), ctx.model, mode, modeError);
+
+      // The --prompt branch: re-run the SAME splice the handler uses, against
+      // the most recent pi base prompt the handler observed. If no turn has run
+      // yet the memo is empty — emit an honest sentinel rather than an empty
+      // fenced block.
+      let assembledPrompt: string | undefined;
+      if (includePrompt) {
+        const base = getLastBaseSystemPrompt();
+        assembledPrompt =
+          base === undefined
+            ? "(no turn has run yet — run a turn to populate the base prompt)"
+            : assembleForInspect(ctx.model, base);
+      }
+
+      const content = renderModeInspect(
+        getChangeSignal(),
+        ctx.model,
+        mode,
+        modeError,
+        assembledPrompt,
+      );
       pi.sendMessage({
         customType: MODE_INSPECT_MESSAGE_TYPE,
         content,

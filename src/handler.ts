@@ -3,6 +3,7 @@ import type {
   BeforeAgentStartEventResult,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import type { Model } from "@earendil-works/pi-ai";
 import { deriveIdentityLine } from "./identity.js";
 import {
   computeCacheKey,
@@ -16,6 +17,68 @@ import { assembleSystemPrompt } from "./assemble.js";
 export type RequiredBeforeAgentStartResult = BeforeAgentStartEventResult & {
   systemPrompt: string;
 };
+
+/**
+ * The most recent pi-assembled BASE system prompt seen by this handler (i.e.
+ * `e.systemPrompt`, BEFORE this plugin splices anything in). Set on every
+ * `before_agent_start` invocation; `undefined` until the first turn has run.
+ *
+ * Read by `/mode:inspect --prompt` so the debug view can re-run the splice
+ * against the same base the live turn used. We CANNOT read
+ * `ctx.getSystemPrompt()` for this — that returns the ALREADY-SPLICED prompt
+ * (`session.systemPrompt` set to `result.systemPrompt` after our handler ran),
+ * so re-assembling on top of it would double-splice identity + fragments.
+ */
+let lastBaseSystemPrompt: string | undefined;
+
+/** Read the most recent pi base prompt; `undefined` until the first turn. */
+export function getLastBaseSystemPrompt(): string | undefined {
+  return lastBaseSystemPrompt;
+}
+
+/** TEST-ONLY: clear the base-prompt memo so the next read returns `undefined`. */
+export function resetHandlerForTesting(): void {
+  lastBaseSystemPrompt = undefined;
+}
+
+/**
+ * PURE: assemble the same bytes `handleBeforeAgentStart` would produce for the
+ * given model + base prompt, using the CURRENTLY active mode (resolved fresh
+ * via `resolveActiveModePlan()`). SINGLE source of truth for the splice — the
+ * live handler below calls this too, so `/mode:inspect --prompt` and the live
+ * turn cannot drift apart.
+ *
+ * Two-path splice mirrors the handler exactly:
+ *   - mode unset  → identity-only single-`\n` join (or bare base when no model)
+ *   - mode active → `assembleSystemPrompt(identity, plan, base)` (blank-line join)
+ */
+export function assembleForInspect(
+  model: Model<any> | undefined,
+  baseSystemPrompt: string,
+): string {
+  const plan = resolveActiveModePlan();
+  const identity = model ? deriveIdentityLine(model) : "";
+  return spliceSystemPrompt(identity, plan, baseSystemPrompt);
+}
+
+/**
+ * PURE two-path splice. Extracted so both `handleBeforeAgentStart` (live turn)
+ * and `assembleForInspect` (debug view) run identical bytes for identical inputs.
+ */
+function spliceSystemPrompt(
+  identity: string,
+  plan: ReturnType<typeof resolveActiveModePlan>,
+  baseSystemPrompt: string,
+): string {
+  return plan.mode === undefined
+    ? // Unset: legacy identity-only form (single `\n`) — preserves the
+      // no-op-when-unset invariant byte-for-byte.
+      identity
+        ? `${identity}\n${baseSystemPrompt}`
+        : baseSystemPrompt
+    : // Mode active: identity + ordered fragments + base (blank-line join).
+      assembleSystemPrompt(identity, plan, baseSystemPrompt);
+}
 
 /**
  * `before_agent_start` handler — identity-injecting, cache-aware form.
@@ -56,6 +119,11 @@ export function handleBeforeAgentStart(
 ): RequiredBeforeAgentStartResult {
   const model = ctx.model; // Model<any> | undefined
 
+  // Memo the unspliced base for /mode:inspect --prompt. See
+  // lastBaseSystemPrompt's doc comment for why ctx.getSystemPrompt() is not
+  // usable as the base.
+  lastBaseSystemPrompt = e.systemPrompt;
+
   // Resolve the active mode BEFORE the cache check — its signature is part of
   // the key. Unset is the fast path: NO_MODE_SIGNATURE + empty fragments.
   const plan = resolveActiveModePlan();
@@ -74,16 +142,9 @@ export function handleBeforeAgentStart(
     return { systemPrompt: cached };
   }
 
-  // MISS — derive identity, then a two-path splice, store, return.
+  // MISS — derive identity, splice via the shared pure helper, store, return.
   const identity = model ? deriveIdentityLine(model) : "";
-  const result =
-    plan.mode === undefined
-      ? // Unset: legacy identity-only form (single `\n`) — preserves Invariant 3.
-        identity
-        ? `${identity}\n${e.systemPrompt}`
-        : e.systemPrompt
-      : // Mode active: identity + ordered fragments + base (blank-line join).
-        assembleSystemPrompt(identity, plan, e.systemPrompt);
+  const result = spliceSystemPrompt(identity, plan, e.systemPrompt);
   setCachedResult(key, result, inputs);
   return { systemPrompt: result };
 }

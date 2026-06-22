@@ -15,8 +15,14 @@ import {
 } from "../src/cache.js";
 import type { CacheKeyInputs, ChangeSignalEntry } from "../src/cache.js";
 import type { ResolvedMode } from "../src/presets.js";
-import { handleBeforeAgentStart } from "../src/handler.js";
-import { makeContext, makeEvent, makeModel, makePi } from "./harness.js";
+import {
+  assembleForInspect,
+  getLastBaseSystemPrompt,
+  handleBeforeAgentStart,
+  resetHandlerForTesting,
+} from "../src/handler.js";
+import { setActiveMode, resetResolverForTesting } from "../src/resolver.js";
+import { makeContext, makeEvent, makeModel, makePi, makeUi } from "./harness.js";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { RecordedCall } from "./harness.js";
 
@@ -296,4 +302,195 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
     // Inspect is a pure read: invoking it must not advance the turn counter.
     expect(getChangeSignal().currentTurn).toBe(turnBefore);
   });
+});
+
+describe("renderModeInspect — `--prompt` append block", () => {
+  beforeEach(() => {
+    resetCacheForTesting();
+    resetResolverForTesting();
+  });
+
+  it("appends the assembled prompt under a `System prompt:` header in a fenced block", () => {
+    const out = renderModeInspect(
+      getChangeSignal(),
+      undefined,
+      undefined,
+      undefined,
+      "HELLO-BASE",
+    );
+    expect(out).toContain("System prompt:");
+    expect(out).toContain("```\nHELLO-BASE\n```");
+  });
+
+  it("is unchanged byte-for-byte when assembledPrompt is undefined", () => {
+    const bare = renderModeInspect(getChangeSignal(), undefined, undefined);
+    const withUndefined = renderModeInspect(
+      getChangeSignal(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(withUndefined).toBe(bare);
+    expect(bare).not.toContain("System prompt:");
+  });
+
+  it("places a blank line between the bare panel and the prompt block", () => {
+    const out = renderModeInspect(
+      getChangeSignal(),
+      undefined,
+      undefined,
+      undefined,
+      "X",
+    );
+    const lines = out.split("\n");
+    // …, "Cache key: …", "", "System prompt:", "```", "X", "```"
+    const headerIdx = lines.indexOf("System prompt:");
+    expect(headerIdx).toBeGreaterThan(0);
+    expect(lines[headerIdx - 1]).toBe("");
+  });
+});
+
+describe("assembleForInspect — single-source-of-truth splice", () => {
+  beforeEach(() => {
+    resetCacheForTesting();
+    resetResolverForTesting();
+    resetHandlerForTesting();
+  });
+
+  it("byte-identical to handleBeforeAgentStart output for the same model + base (mode-unset)", () => {
+    const model = makeModel({ name: "GLM-5.2", provider: "zai" });
+    const base = "pi's assembled base prompt";
+
+    // Drive the live handler once on a fresh cache to capture its splice.
+    const result = handleBeforeAgentStart(
+      makeEvent(base),
+      makeContext({ model }),
+    );
+
+    // The inspect path (resolving mode NOW, against the same base) must agree.
+    expect(assembleForInspect(model, base)).toBe(result.systemPrompt);
+    // And the handler memoized the base it just saw, so the inspect command
+    // layer can read it without reaching into ctx.getSystemPrompt() (which would
+    // return the SPLICED prompt and double-splice).
+    expect(getLastBaseSystemPrompt()).toBe(base);
+  });
+
+  it("byte-identical to the live handler output when a mode is active", () => {
+    // Set a real bundled preset so fragments resolve.
+    setActiveMode("none"); // virtual no-mode override — still triggers the
+    // mode-active branch (plan.mode !== undefined for `none`).
+    const model = makeModel({ name: "GLM-5.2", provider: "zai" });
+    const base = "pi's assembled base prompt";
+
+    const result = handleBeforeAgentStart(
+      makeEvent(base),
+      makeContext({ model }),
+    );
+
+    expect(assembleForInspect(model, base)).toBe(result.systemPrompt);
+  });
+
+  it("falls back to the bare base when there is no model (no identity line)", () => {
+    expect(assembleForInspect(undefined, "JUST-BASE")).toBe("JUST-BASE");
+  });
+});
+
+describe("registerModeInspectCommand — `--prompt` flag handling", () => {
+  beforeEach(() => {
+    resetCacheForTesting();
+    resetResolverForTesting();
+    resetHandlerForTesting();
+  });
+
+  function getHandler() {
+    const { pi, calls } = makePi();
+    registerModeInspectCommand(pi);
+    const command = calls.find((c) => c.method === "registerCommand")!;
+    return {
+      calls,
+      handler: (command.args[1] as {
+        handler: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
+      }).handler,
+    };
+  }
+
+  function ctxWithNotify() {
+    const ui = makeUi();
+    const ctx = makeContext({
+      model: makeModel({ name: "GLM-5.2", provider: "zai" }),
+      ui,
+    }) as ExtensionCommandContext;
+    return { ctx, notifies: ui.notifyCalls };
+  }
+
+  it("`--prompt` emits the panel with the full assembled prompt in a fenced block", async () => {
+    const model = makeModel({ name: "GLM-5.2", provider: "zai" });
+    // Populate the base-prompt memo via one real handler turn.
+    handleBeforeAgentStart(
+      makeEvent("pi-base-content"),
+      makeContext({ model }),
+    );
+
+    const { calls, handler } = getHandler();
+    const { ctx } = ctxWithNotify();
+    await handler("--prompt", ctx);
+
+    const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
+    const msg = send.args[0] as { content: string; display: boolean };
+    expect(msg.display).toBe(true);
+    expect(msg.content).toContain("System prompt:");
+    // The assembled bytes appear verbatim in the fenced block: identity line,
+    // then pi-base-content (mode-unset → identity-only single-\n splice).
+    expect(msg.content).toContain(
+      `${deriveIdentityLine(model)}\npi-base-content`,
+    );
+  });
+
+  it("`--prompt` with no turn having run emits an honest sentinel, not an empty block", async () => {
+    // No handleBeforeAgentStart call → memo is empty.
+    expect(getLastBaseSystemPrompt()).toBeUndefined();
+
+    const { calls, handler } = getHandler();
+    const { ctx } = ctxWithNotify();
+    await handler("--prompt", ctx);
+
+    const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
+    const msg = send.args[0] as { content: string };
+    expect(msg.content).toContain(
+      "(no turn has run yet — run a turn to populate the base prompt)",
+    );
+  });
+
+  it("bare `/mode:inspect` (no flag) is byte-for-byte unchanged", async () => {
+    const model = makeModel({ name: "GLM-5.2", provider: "zai" });
+    handleBeforeAgentStart(makeEvent("base"), makeContext({ model }));
+
+    const { calls, handler } = getHandler();
+    const { ctx } = ctxWithNotify();
+    await handler("", ctx);
+
+    const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
+    const msg = send.args[0] as { content: string };
+    expect(msg.content).not.toContain("System prompt:");
+  });
+
+  it.each([
+    ["--verbose", `unknown /mode:inspect flag "--verbose" (only --prompt is supported)`],
+    ["--prompt --prompt", `unexpected repeated flag "--prompt"`],
+    ["extra", `unknown /mode:inspect flag "extra" (only --prompt is supported)`],
+    ["--Prompt", `unknown /mode:inspect flag "--Prompt" (only --prompt is supported)`],
+    ["--prompt=true", `unknown /mode:inspect flag "--prompt=true" (only --prompt is supported)`],
+  ])(
+    "rejects `%s` with an error toast and emits no message",
+    async (arg, expectedError) => {
+      const { calls, handler } = getHandler();
+      const { ctx, notifies } = ctxWithNotify();
+      await handler(arg, ctx);
+
+      expect(notifies).toEqual([{ message: expectedError, type: "error" }]);
+      expect(calls.filter((c: RecordedCall) => c.method === "sendMessage"))
+        .toHaveLength(0);
+    },
+  );
 });
