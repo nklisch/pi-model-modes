@@ -4,6 +4,9 @@ import {
   registerModeInspectCommand,
   MODE_INSPECT_COMMAND,
   MODE_INSPECT_MESSAGE_TYPE,
+  parseModeDefaultArgs,
+  formatDefaultListing,
+  formatDefaultNotify,
 } from "../src/commands.js";
 import { deriveIdentityLine } from "../src/identity.js";
 import {
@@ -493,4 +496,160 @@ describe("registerModeInspectCommand — `--prompt` flag handling", () => {
         .toHaveLength(0);
     },
   );
+});
+
+describe("parseModeDefaultArgs — subcommand grammar", () => {
+  it("bare → display", () => {
+    expect(parseModeDefaultArgs("")).toEqual({ kind: "display" });
+    expect(parseModeDefaultArgs("   ")).toEqual({ kind: "display" });
+  });
+
+  it("<preset> → set project", () => {
+    expect(parseModeDefaultArgs("flow")).toEqual({
+      kind: "set",
+      value: "flow",
+      scope: "project",
+    });
+  });
+
+  it("none → set project (none is a real value, not an action keyword)", () => {
+    expect(parseModeDefaultArgs("none")).toEqual({
+      kind: "set",
+      value: "none",
+      scope: "project",
+    });
+  });
+
+  it("off → clear project", () => {
+    expect(parseModeDefaultArgs("off")).toEqual({
+      kind: "clear",
+      scope: "project",
+    });
+  });
+
+  it("--global may appear before OR after the action", () => {
+    expect(parseModeDefaultArgs("--global flow")).toEqual({
+      kind: "set",
+      value: "flow",
+      scope: "global",
+    });
+    expect(parseModeDefaultArgs("flow --global")).toEqual({
+      kind: "set",
+      value: "flow",
+      scope: "global",
+    });
+    expect(parseModeDefaultArgs("--global off")).toEqual({
+      kind: "clear",
+      scope: "global",
+    });
+  });
+
+  it.each([
+    ["--global --global flow", /unexpected repeated flag/],
+    ["flow --global --global", /unexpected repeated flag/],
+    ["--global=true flow", /unknown \/mode default flag/],
+    ["--Global flow", /unknown \/mode default flag/],
+    ["--verbose flow", /unknown \/mode default flag/],
+    ["flow extra", /unexpected extra tokens after "flow"/],
+    ["--global", /given but no/],
+    ["flow off", /unexpected extra tokens after "flow"/],
+  ])("rejects `%s` with parser error", (arg, expected) => {
+    const result = parseModeDefaultArgs(arg);
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.message).toMatch(expected);
+    }
+  });
+});
+
+describe("formatDefaultListing — 3-line display panel", () => {
+  it("renders both scopes + the effective default + source label", () => {
+    const out = formatDefaultListing("flow", undefined, {
+      value: "flow",
+      source: "global",
+    });
+    const lines = out.split("\n");
+    expect(lines).toEqual([
+      "Default mode (durable config):",
+      "  global:  flow",
+      "  project: (unset)",
+      "Effective default: flow (global)",
+    ]);
+  });
+
+  it("shows (unset) for the effective line when no default in either scope", () => {
+    const out = formatDefaultListing(undefined, undefined, {
+      value: undefined,
+      source: "unset",
+    });
+    expect(out).toContain("Effective default: (unset)");
+  });
+
+  it("surfaces (unreadable) for a malformed file rather than crashing", () => {
+    const out = formatDefaultListing("(unreadable)", "safe", {
+      value: "safe",
+      source: "project",
+    });
+    expect(out).toContain("global:  (unreadable)");
+  });
+
+  it("includes the source label so global-vs-project merge is unambiguous", () => {
+    const out = formatDefaultListing("flow", "safe", {
+      value: "safe",
+      source: "project",
+    });
+    expect(out).toContain("Effective default: safe (project)");
+  });
+});
+
+describe("formatDefaultNotify — override-still-wins wording", () => {
+  it("set + unmasked → effective is now the new default", () => {
+    expect(
+      formatDefaultNotify({
+        writtenScope: "project",
+        writtenValue: "extend",
+        effective: { value: "extend", source: "project" },
+        activeOverride: undefined,
+      }),
+    ).toBe(
+      'default set to "extend" (project); effective mode is now "extend" (default)',
+    );
+  });
+
+  it("set + override masks it → actionable dual-line wording", () => {
+    expect(
+      formatDefaultNotify({
+        writtenScope: "project",
+        writtenValue: "extend",
+        effective: { value: "extend", source: "project" },
+        activeOverride: "safe",
+      }),
+    ).toBe(
+      'default set to "extend" (project) — override "safe" still active; /mode off to use it now',
+    );
+  });
+
+  it("cleared + surviving default → falls back to global wording", () => {
+    expect(
+      formatDefaultNotify({
+        writtenScope: "project",
+        writtenValue: undefined,
+        effective: { value: "flow", source: "global" },
+        activeOverride: undefined,
+      }),
+    ).toBe(
+      'default cleared (project); effective default is now "flow" (global)',
+    );
+  });
+
+  it("cleared + no surviving default → unset wording", () => {
+    expect(
+      formatDefaultNotify({
+        writtenScope: "project",
+        writtenValue: undefined,
+        effective: { value: undefined, source: "unset" },
+        activeOverride: undefined,
+      }),
+    ).toBe("default cleared (project); effective default is (unset)");
+  });
 });

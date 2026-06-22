@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import factory from "../extensions/index.js";
 import {
@@ -20,6 +20,11 @@ import {
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import { resetCacheForTesting } from "../src/cache.js";
+import {
+  setConfigPathsForTesting,
+  resetConfigForTesting,
+  loadPluginConfig,
+} from "../src/config.js";
 import { makePi, makeContext, makeModel, makeUi } from "./harness.js";
 import type {
   ExtensionAPI,
@@ -89,7 +94,7 @@ function getModeHandler(): {
 type NotifyCall = { message: string; type?: string };
 
 /** A ctx stub that records `ctx.ui.notify` calls + carries a model. */
-function makeNotifyCtx(): {
+function makeNotifyCtx(opts: { cwd?: string } = {}): {
   ctx: ExtensionCommandContext;
   notifies: NotifyCall[];
 } {
@@ -98,6 +103,7 @@ function makeNotifyCtx(): {
     model: makeModel({ name: "claude-sonnet-4-5", provider: "anthropic" }),
     hasUI: true,
     ui,
+    ...(opts.cwd !== undefined ? { cwd: opts.cwd } : {}),
   } as unknown as Partial<ExtensionCommandContext>) as ExtensionCommandContext;
   return { ctx, notifies: ui.notifyCalls };
 }
@@ -107,6 +113,7 @@ beforeEach(() => {
   resetFragmentCacheForTesting();
   resetPresetsForTesting();
   resetCacheForTesting();
+  resetConfigForTesting();
 });
 
 afterEach(() => {
@@ -118,6 +125,7 @@ afterEach(() => {
   resetFragmentCacheForTesting();
   resetPresetsForTesting();
   resetCacheForTesting();
+  resetConfigForTesting();
 });
 
 describe("/mode command registration", () => {
@@ -246,5 +254,227 @@ describe("/mode <unknown> — graceful error", () => {
     const last = notifies.at(-1)!;
     expect(last.type).toBe("error");
     expect(last.message).toMatch(/unknown preset "does-not-exist"/);
+  });
+});
+
+describe("/mode default [...] — durable default subcommand", () => {
+  /** Per-test temp dir for the writer; both config paths point inside it so
+   *  tests never touch the real home dir. `cwd` is the synthetic project root. */
+  function setupDirs(): {
+    cwd: string;
+    globalPath: string;
+    projectPath: string;
+  } {
+    const dir = mkdtempSync(join(tmpdir(), "mode-default-"));
+    tmp = dir; // afterEach cleans up
+    const cwd = join(dir, "cwd");
+    const globalPath = join(dir, "global.json");
+    const projectPath = join(cwd, ".pi", "pi-model-modes.json");
+    setConfigPathsForTesting({ global: globalPath, project: projectPath });
+    return { cwd, globalPath, projectPath };
+  }
+
+  it("bare `/mode default` emits the 3-line display panel (display-only)", async () => {
+    buildFixture();
+    const { cwd } = setupDirs();
+    const { calls, handler } = getModeHandler();
+    const { ctx } = makeNotifyCtx({ cwd });
+
+    await handler("default", ctx);
+
+    const send = calls.find((c) => c.method === "sendMessage");
+    expect(send).toBeDefined();
+    const msg = send!.args[0] as { content: string; display: boolean };
+    expect(msg.display).toBe(true);
+    expect(msg.content).toContain("Default mode (durable config):");
+    expect(msg.content).toContain("global:  (unset)");
+    expect(msg.content).toContain("project: (unset)");
+    expect(msg.content).toContain("Effective default: (unset)");
+  });
+
+  it("`/mode default extend` writes the PROJECT config + reseeds + notifies", async () => {
+    buildFixture();
+    const { cwd, projectPath, globalPath } = setupDirs();
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+    await handler("default extend", ctx);
+
+    expect(loadPluginConfig(cwd).defaultMode).toBe("extend");
+    expect(existsSync(projectPath)).toBe(true);
+    expect(existsSync(globalPath)).toBe(false); // global untouched
+    expect(notifies.at(-1)?.type).toBe("info");
+    expect(notifies.at(-1)?.message).toBe(
+      'default set to "extend" (project); effective mode is now "extend" (default)',
+    );
+  });
+
+  it("`/mode default extend --global` writes the GLOBAL config", async () => {
+    buildFixture();
+    const { cwd, projectPath, globalPath } = setupDirs();
+    const { handler } = getModeHandler();
+    const { ctx } = makeNotifyCtx({ cwd });
+
+    await handler("default extend --global", ctx);
+
+    expect(existsSync(globalPath)).toBe(true);
+    expect(existsSync(projectPath)).toBe(false);
+    expect(loadPluginConfig(cwd).defaultMode).toBe("extend");
+  });
+
+  it("`--global` is position-flexible (before the action)", async () => {
+    buildFixture();
+    const { cwd, globalPath } = setupDirs();
+    const { handler } = getModeHandler();
+    const { ctx } = makeNotifyCtx({ cwd });
+
+    await handler("default --global extend", ctx);
+
+    expect(existsSync(globalPath)).toBe(true);
+    expect(loadPluginConfig(cwd).defaultMode).toBe("extend");
+  });
+
+  it("`/mode default off` clears the PROJECT key", async () => {
+    buildFixture();
+    const { cwd, projectPath } = setupDirs();
+    mkdirSync(dirname(projectPath), { recursive: true });
+    writeFileSync(
+      projectPath,
+      JSON.stringify({ cycleKeybinding: true, defaultMode: "extend" }),
+    );
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+    await handler("default off", ctx);
+
+    const reloaded = loadPluginConfig(cwd) as Record<string, unknown>;
+    expect("defaultMode" in reloaded).toBe(false);
+    expect(reloaded.cycleKeybinding).toBe(true); // sibling preserved
+    expect(notifies.at(-1)?.message).toBe(
+      "default cleared (project); effective default is (unset)",
+    );
+  });
+
+  it("the OPUS BLOCKER: project `off` falls back to a surviving global default", async () => {
+    buildFixture();
+    const { cwd, projectPath, globalPath } = setupDirs();
+    mkdirSync(dirname(globalPath), { recursive: true });
+    writeFileSync(globalPath, JSON.stringify({ defaultMode: "extend" }));
+    mkdirSync(dirname(projectPath), { recursive: true });
+    writeFileSync(projectPath, JSON.stringify({ defaultMode: "extend" }));
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+    await handler("default off", ctx);
+
+    // Effective falls back to global (extend), not unset.
+    expect(notifies.at(-1)?.message).toBe(
+      'default cleared (project); effective default is now "extend" (global)',
+    );
+  });
+
+  it("override-still-wins: setting a default under an active override notifies with the next step", async () => {
+    buildFixture();
+    const { cwd } = setupDirs();
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+    // Establish an override first.
+    await handler("safe", ctx);
+    expect(getEffectiveModeSource()).toBe("override");
+
+    await handler("default extend", ctx);
+
+    // Override still active; notify points at /mode off.
+    expect(getEffectiveModeSource()).toBe("override");
+    expect(getActiveMode()).toBe("safe");
+    expect(notifies.at(-1)?.message).toBe(
+      'default set to "extend" (project) — override "safe" still active; /mode off to use it now',
+    );
+  });
+
+  it("unknown preset → error toast; file NOT written", async () => {
+    buildFixture();
+    const { cwd, projectPath } = setupDirs();
+    const { handler } = getModeHandler();
+    const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+    await handler("default does-not-exist", ctx);
+
+    expect(notifies.at(-1)?.type).toBe("error");
+    expect(notifies.at(-1)?.message).toMatch(/unknown preset/);
+    expect(existsSync(projectPath)).toBe(false);
+  });
+
+  it.each([
+    ["default --global --global flow", /unexpected repeated flag/],
+    ["default --global=true flow", /unknown \/mode default flag/],
+    ["default --Global flow", /unknown \/mode default flag/],
+    ["default flow extra", /unexpected extra tokens/],
+    ["default --global", /given but no/],
+  ])(
+    "parser rejects `%s` with an error toast and writes nothing",
+    async (arg, expectedError) => {
+      buildFixture();
+      const { cwd, projectPath, globalPath } = setupDirs();
+      const { handler } = getModeHandler();
+      const { ctx, notifies } = makeNotifyCtx({ cwd });
+
+      await handler(arg, ctx);
+
+      expect(notifies.at(-1)?.type).toBe("error");
+      expect(notifies.at(-1)?.message).toMatch(expectedError);
+      expect(existsSync(projectPath)).toBe(false);
+      expect(existsSync(globalPath)).toBe(false);
+    },
+  );
+
+  it("refreshes the footer after a successful write", async () => {
+    buildFixture();
+    const { cwd } = setupDirs();
+    const { calls, handler } = getModeHandler();
+    // Wire a setStatus capture onto the ui.
+    const ui = makeUi();
+    const ctx = makeContext({
+      cwd,
+      hasUI: true,
+      ui,
+      model: makeModel({ name: "x", provider: "y" }),
+    } as unknown as Partial<ExtensionCommandContext>) as ExtensionCommandContext;
+
+    await handler("default extend", ctx);
+
+    // Exactly one setStatus call (the footer refresh).
+    expect(ui.statusCalls.length).toBeGreaterThanOrEqual(1);
+    void calls;
+  });
+
+  it("written file is 2-space indented + trailing newline", async () => {
+    buildFixture();
+    const { cwd, projectPath } = setupDirs();
+    const { handler } = getModeHandler();
+    const { ctx } = makeNotifyCtx({ cwd });
+
+    await handler("default extend", ctx);
+
+    const text = readFileSync(projectPath, "utf8");
+    expect(text.endsWith("\n")).toBe(true);
+    expect(text).toContain('\n  "defaultMode"');
+  });
+
+  it("`/mode default` (bare) does NOT trigger a turn", async () => {
+    buildFixture();
+    const { cwd } = setupDirs();
+    const { calls, handler } = getModeHandler();
+    const { ctx } = makeNotifyCtx({ cwd });
+
+    await handler("default", ctx);
+
+    const send = calls.find((c) => c.method === "sendMessage");
+    const [, sendOpts] = send!.args as [
+      { triggerTurn?: boolean },
+      { triggerTurn?: boolean } | undefined,
+    ];
+    expect(sendOpts?.triggerTurn).toBeUndefined();
   });
 });

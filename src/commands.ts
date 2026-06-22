@@ -12,10 +12,17 @@ import {
   getDefaultMode,
   getEffectiveModeSource,
 } from "./resolver.js";
-import { listPresetNames } from "./presets.js";
+import { listPresetNames, getPreset, loadPresets, NONE_PRESET } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
 import { MODE_OFF_ARG } from "./autocomplete.js";
 import { assembleForInspect, getLastBaseSystemPrompt } from "./handler.js";
+import {
+  writeDefaultToConfig,
+  readDefaultSources,
+  effectiveDefaultSource,
+  DEFAULT_OFF,
+  type DefaultScope,
+} from "./config.js";
 
 /**
  * `/mode:inspect` — the epic's one user-facing command surface.
@@ -171,6 +178,144 @@ export function formatModeListing(
   ].join("\n");
 }
 
+/** Subcommand keyword that routes `/mode default …` to default-tier writes. */
+export const MODE_DEFAULT_ARG = "default";
+/** `--global` flag selecting the user-level config scope. */
+export const MODE_DEFAULT_GLOBAL_FLAG = "--global";
+/** `customType` tag for the `/mode default` display-only panel. */
+export const MODE_DEFAULT_MESSAGE_TYPE = "mode-default";
+
+/** Discriminated parse result for the `/mode default` subcommand. */
+export type DefaultSubcommand =
+  | { kind: "display" }
+  | { kind: "set"; value: string; scope: DefaultScope }
+  | { kind: "clear"; scope: DefaultScope }
+  | { kind: "error"; message: string };
+
+/**
+ * PURE parser for the `/mode default` subcommand. Grammar:
+ * `/mode default [--global] (<preset>|none|off) [--global]`.
+ *
+ * - `default`, `off`, `none`, `--global` are lowercase, exact, case-sensitive.
+ * - `--global` may appear before OR after the action token.
+ * - Rejects (→ `error`): duplicate `--global`, `--global=...` value form,
+ *   mixed-case flags, unknown flags, extra positionals, flag-only with no
+ *   action, multiple action tokens.
+ * - Bare `/mode default` (no action, no flag) → `display`.
+ * - `<preset>` is the literal token text here; preset-name validation happens
+ *   downstream in the command layer via `getPreset`.
+ */
+export function parseModeDefaultArgs(args: string): DefaultSubcommand {
+  const tokens = (args ?? "").trim().split(/\s+/).filter((t) => t.length > 0);
+  let scope: DefaultScope = "project";
+  let scopeSeenCount = 0;
+  const positionals: string[] = [];
+
+  for (const token of tokens) {
+    if (token === MODE_DEFAULT_GLOBAL_FLAG) {
+      scope = "global";
+      scopeSeenCount += 1;
+      if (scopeSeenCount > 1) {
+        return { kind: "error", message: `unexpected repeated flag "${token}"` };
+      }
+      continue;
+    }
+    // Reject anything else that looks like a flag (starts with `-`).
+    if (token.startsWith("-")) {
+      return {
+        kind: "error",
+        message: `unknown /mode default flag "${token}" (only ${MODE_DEFAULT_GLOBAL_FLAG} is supported)`,
+      };
+    }
+    positionals.push(token);
+  }
+
+  if (scopeSeenCount > 0 && positionals.length === 0) {
+    return {
+      kind: "error",
+      message: `"${MODE_DEFAULT_GLOBAL_FLAG}" given but no <preset>|none|off followed`,
+    };
+  }
+
+  if (positionals.length === 0) {
+    return { kind: "display" };
+  }
+  if (positionals.length > 1) {
+    return {
+      kind: "error",
+      message: `unexpected extra tokens after "${positionals[0]}" — usage: /mode default [--global] <preset|none|off> [--global]`,
+    };
+  }
+
+  const action = positionals[0];
+  if (action === DEFAULT_OFF) {
+    return { kind: "clear", scope };
+  }
+  return { kind: "set", value: action, scope };
+}
+
+/**
+ * PURE: build the bare `/mode default` display panel (3 lines). `global` /
+ * `project` come from `readDefaultSources`; each may be `undefined` (unset) or
+ * `"(unreadable)"` (malformed file surfaced rather than crashing).
+ */
+export function formatDefaultListing(
+  global: string | undefined | "(unreadable)",
+  project: string | undefined | "(unreadable)",
+  effective: { value: string | undefined; source: "global" | "project" | "unset" },
+): string {
+  const fmt = (v: string | undefined | "(unreadable)"): string =>
+    v === undefined ? "(unset)" : v;
+  const eff =
+    effective.source === "unset"
+      ? "(unset)"
+      : `${fmt(effective.value)} (${effective.source})`;
+  return [
+    "Default mode (durable config):",
+    `  global:  ${fmt(global)}`,
+    `  project: ${fmt(project)}`,
+    `Effective default: ${eff}`,
+  ].join("\n");
+}
+
+/**
+ * PURE: build the override-still-wins notify string from the post-write
+ * effective default + the active override. Three shapes:
+ *   - cleared, no surviving default → "default cleared (<scope>); effective default is (unset)"
+ *   - cleared, surviving default    → "default cleared (<scope>); effective default is now \"<v>\" (<source>)"
+ *   - set, override masks it        → "default set to \"<v>\" (<scope>) — override \"<ov>\" still active; /mode off to use it now"
+ *   - set, unmasked                 → "default set to \"<v>\" (<scope>); effective mode is now \"<v>\" (default)"
+ * `activeOverride` is `getActiveMode()` — a string preset name, an object spec,
+ * or `undefined`.
+ */
+export function formatDefaultNotify(args: {
+  writtenScope: DefaultScope;
+  writtenValue: string | undefined; // `undefined` when cleared
+  effective: { value: string | undefined; source: "global" | "project" | "unset" };
+  activeOverride: string | { base: string } | undefined;
+}): string {
+  const { writtenScope, writtenValue, effective, activeOverride } = args;
+  const scopeLabel = writtenScope;
+
+  if (writtenValue === undefined) {
+    // Cleared.
+    if (effective.source === "unset") {
+      return `default cleared (${scopeLabel}); effective default is (unset)`;
+    }
+    return `default cleared (${scopeLabel}); effective default is now "${effective.value}" (${effective.source})`;
+  }
+
+  // Set.
+  if (activeOverride !== undefined) {
+    const ovLabel =
+      typeof activeOverride === "string"
+        ? activeOverride
+        : (activeOverride as { base: string }).base;
+    return `default set to "${writtenValue}" (${scopeLabel}) — override "${ovLabel}" still active; /mode off to use it now`;
+  }
+  return `default set to "${writtenValue}" (${scopeLabel}); effective mode is now "${effective.value}" (default)`;
+}
+
 /**
  * The `/mode` command family — the interactive switching path.
  *   - no arg → emit a display-only listing panel (effective mode + presets).
@@ -179,6 +324,8 @@ export function formatModeListing(
  *   - a name → `setActiveMode(arg)` (validated at set-time); success notifies,
  *              failure surfaces the resolver error and leaves prior override
  *              intact.
+ *   - `default [...]` → manage the durable default tier via the writer
+ *              pipeline. See `parseModeDefaultArgs` for the subcommand grammar.
  */
 export function registerModeCommand(pi: ExtensionAPI): void {
   pi.registerCommand(MODE_COMMAND, {
@@ -186,6 +333,7 @@ export function registerModeCommand(pi: ExtensionAPI): void {
       "Show or set the session mode (no arg lists; <preset> sets; off reverts to default)",
     handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
       const arg = args?.trim() ?? "";
+      const firstToken = arg.split(/\s+/)[0] ?? "";
 
       // No arg → emit the listing panel.
       if (arg === "") {
@@ -205,6 +353,61 @@ export function registerModeCommand(pi: ExtensionAPI): void {
           content: formatModeListing(source, specName, mode, modeError, presets),
           display: true,
         });
+        return;
+      }
+
+      // `default [...]` → durable default tier. Parser-then-writer pipeline.
+      if (firstToken === MODE_DEFAULT_ARG) {
+        const rest = arg.slice(MODE_DEFAULT_ARG.length).trim();
+        const parsed = parseModeDefaultArgs(rest);
+        if (parsed.kind === "error") {
+          ctx.ui.notify(parsed.message, "error");
+          return;
+        }
+        if (parsed.kind === "display") {
+          const sources = readDefaultSources(ctx.cwd);
+          const effective = effectiveDefaultSource(ctx.cwd);
+          pi.sendMessage({
+            customType: MODE_DEFAULT_MESSAGE_TYPE,
+            content: formatDefaultListing(sources.global, sources.project, effective),
+            display: true,
+          });
+          return;
+        }
+
+        // `set` → validate the preset name BEFORE touching the filesystem
+        // (preset-not-found is a user typo, not a write-path concern).
+        if (parsed.kind === "set" && parsed.value !== NONE_PRESET) {
+          try {
+            getPreset(parsed.value, loadPresets());
+          } catch (err) {
+            ctx.ui.notify((err as Error).message, "error");
+            return;
+          }
+        }
+
+        // `set` (incl. `none`) or `clear` → writer pipeline. The writer
+        // reseed path (applyDefaultFromConfig) reloads + merges both files,
+        // so the resolver ends up truthfully reflecting the new state.
+        const value = parsed.kind === "clear" ? DEFAULT_OFF : parsed.value;
+        const result = writeDefaultToConfig(ctx.cwd, value, parsed.scope);
+        if (!result.ok) {
+          ctx.ui.notify(
+            `could not write ${result.path}: ${result.error}`,
+            "error",
+          );
+          return;
+        }
+        refreshModeFooter(ctx);
+        ctx.ui.notify(
+          formatDefaultNotify({
+            writtenScope: result.writtenScope,
+            writtenValue: result.writtenValue,
+            effective: result.effective,
+            activeOverride: getActiveMode(),
+          }),
+          "info",
+        );
         return;
       }
 
