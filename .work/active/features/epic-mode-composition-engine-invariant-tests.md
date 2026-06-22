@@ -5,7 +5,7 @@ stage: done
 tags: [tests]
 parent: epic-mode-composition
 depends_on: [epic-mode-composition-handler-wiring]
-release_binding: null
+release_binding: v0.2.0
 gate_origin: null
 created: 2026-06-21
 updated: 2026-06-21

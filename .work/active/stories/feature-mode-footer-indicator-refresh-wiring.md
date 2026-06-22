@@ -7,7 +7,7 @@ parent: feature-mode-footer-indicator
 depends_on:
   - feature-mode-footer-indicator-footer-render
   - feature-mode-footer-indicator-cycle-opt-in
-release_binding: null
+release_binding: v0.2.0
 gate_origin: null
 created: 2026-06-21
 updated: 2026-06-21

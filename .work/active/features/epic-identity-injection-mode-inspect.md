@@ -5,7 +5,7 @@ stage: done
 tags: [tests]
 parent: epic-identity-injection
 depends_on: [epic-identity-injection-cache-and-change-signal, epic-identity-injection-identity-derivation]
-release_binding: null
+release_binding: v0.2.0
 gate_origin: null
 created: 2026-06-21
 updated: 2026-06-21

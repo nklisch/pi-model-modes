@@ -5,7 +5,7 @@ stage: done
 tags: []
 parent: epic-fragment-library
 depends_on: [epic-fragment-library-base-overlays, epic-fragment-library-agency-axis, epic-fragment-library-quality-axis, epic-fragment-library-scope-axis, epic-fragment-library-modifiers]
-release_binding: null
+release_binding: v0.2.0
 gate_origin: null
 created: 2026-06-21
 updated: 2026-06-21

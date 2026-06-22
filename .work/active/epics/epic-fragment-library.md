@@ -5,7 +5,7 @@ stage: done
 tags: [docs, patterns]
 parent: null
 depends_on: [epic-mode-composition]
-release_binding: null
+release_binding: v0.2.0
 gate_origin: null
 created: 2026-06-20
 updated: 2026-06-20
