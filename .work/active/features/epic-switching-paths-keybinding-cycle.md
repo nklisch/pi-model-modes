@@ -11,12 +11,12 @@ created: 2026-06-21
 updated: 2026-06-21
 ---
 
-# Keybinding Cycle (Ctrl+M forward / Shift+Ctrl+M backward)
+# Keybinding Cycle (Ctrl+Shift+U forward / Ctrl+Shift+Alt+U backward)
 
 ## Brief
 
-This feature registers the mode-cycle keybinding: `Ctrl+M` cycles **forward**
-through the preset list and `Shift+Ctrl+M` cycles **backward**, each setting the
+This feature registers the mode-cycle keybinding: `Ctrl+Shift+U` cycles **forward**
+through the preset list and `Ctrl+Shift+Alt+U` cycles **backward**, each setting the
 session override (via the resolver seam) relative to the current **effective**
 mode (from `config-default`'s state layer). User-rebindable via
 `~/.pi/agent/keybindings.json`.
@@ -40,7 +40,7 @@ command (mode-command); it reuses the same set-override seam.
   the pi `registerShortcut` API (verify against `@earendil-works/pi-coding-agent`).
 
 ## Inherited / epic design decisions (do not re-litigate)
-- **Ctrl+M forward / Shift+Ctrl+M backward**, user-rebindable; default chosen here
+- **Ctrl+Shift+U forward / Ctrl+Shift+Alt+U backward**, global opt-in; default chosen here
   (SPEC open question closed). Cycle relative to the effective mode.
 
 ## Design decisions (resolved during feature-design)

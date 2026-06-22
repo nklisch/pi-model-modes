@@ -41,6 +41,7 @@ is a named bundle of those choices, applied atomically.
 |---|---|
 | `/mode` | Show the effective mode (its source tier + composed axes) and the available presets. Display-only — triggers no turn. |
 | `/mode <preset>` | Set the mode for this session (an ephemeral override). Unknown presets surface an error and leave the prior mode intact. |
+| `/mode none` | Set a virtual no-mode override for this session. It injects no mode fragments and still wins over the config default. |
 | `/mode off` | Clear the session override; falls back to the config default (or unset). |
 | `/mode default` | Show the durable default configured in global + project config files, and which scope wins. Display-only — triggers no turn. |
 | `/mode default <preset>` | Set the **project** default mode in `<cwd>/.pi/pi-model-modes.json`. Use `none` to make "no mode" the durable project default. |
@@ -54,11 +55,27 @@ prompt in a fenced block. The prompt view uses the most recent pi base prompt
 seen by the turn handler; if no turn has run yet it reports that the base prompt
 has not been populated rather than guessing.
 
+### Footer indicator
+
+The effective mode is shown in pi's footer under the short `mode` key. The value
+starts with a base-family glyph: `◆` for pi/default voice, `◇` for `chill`, `⬡`
+for `flow`, and `✕` when the current mode is unresolvable. The text then shows
+the preset/voice summary plus `+N` when modifiers are active; an unset state
+renders like `mode:◆ unset`.
+
+When keyboard cycling is enabled, the footer also adds the cycle hint:
+`ctrl+shift+u/ctrl+shift+alt+u cycle`.
+
 ### Keybindings
 
 No mode-cycle shortcut is registered by default. Mode changes are made with
 `/mode`; this avoids terminal control-character collisions such as `Ctrl+M`,
 which is encoded like Enter in legacy terminal input.
+
+To opt into keyboard cycling, set `cycleKeybinding: true` in the **global**
+config file (`~/.pi/agent/pi-model-modes.json`). This registers
+`Ctrl+Shift+U` to cycle forward and `Ctrl+Shift+Alt+U` to cycle backward through
+the preset list, and enables the footer cycle hint.
 
 ### Config default
 

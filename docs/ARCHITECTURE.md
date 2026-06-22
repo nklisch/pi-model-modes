@@ -16,12 +16,14 @@ pi-model-modes/
 │   ├─ resolver.ts           mode resolution: two tiers (override > default), effective = override ?? default ?? unset
 │   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds + writes the default tier;
 │   │                        global cycleKeybinding opt-in for factory-load wiring
-│   ├─ assemble.ts           identity derivation + fragment splice
+│   ├─ assemble.ts           fragment splice + clean-base insertion policy
 │   ├─ cache.ts              cache key, lastKey/lastResult, change signal
 │   ├─ fragments.ts          fragment loader (reads prompts/, caches in module scope)
 │   ├─ presets.ts            preset table (name → {base, agency, quality, scope, mods})
+│   ├─ identity.ts           deriveIdentityLine(model) → "You are {name} from {provider}."
 │   ├─ provider-names.ts     provider id → display name map
 │   ├─ commands.ts           /mode, /mode default, /mode off, /mode:inspect [--prompt]
+│   ├─ autocomplete.ts       three-stage /mode + /mode default autocomplete provider
 │   ├─ footer.ts             footer status formatter + cycle-hint signal
 │   └─ keybinding.ts         cycle keybinding helper, registered only when globally opted in
 ├─ prompts/
@@ -35,17 +37,30 @@ pi-model-modes/
 │                   director, speak-plain, context-pacing, playful
 ├─ presets.json              named bundles (e.g. "flow", "refactor", "create")
 └─ tests/
-    ├─ cache.test.ts
+    ├─ assemble.test.ts
+    ├─ autocomplete-seam.test.ts
+    ├─ autocomplete.test.ts
     ├─ cache-stability.test.ts
+    ├─ cache.test.ts
     ├─ clean-base.test.ts
     ├─ commands.test.ts
     ├─ config.test.ts
+    ├─ engine-stability.test.ts
+    ├─ footer-wiring.test.ts
+    ├─ footer.test.ts
+    ├─ fragments.test.ts
+    ├─ handler-mode.test.ts
     ├─ handler.test.ts
+    ├─ harness.ts
     ├─ identity.test.ts
+    ├─ keybinding.test.ts
+    ├─ mode-command.test.ts
     ├─ noop.test.ts
+    ├─ preset-catalog.test.ts
+    ├─ presets.test.ts
     ├─ registration.test.ts
-    ├─ resolver.test.ts
-    └─ resolver-tiers.test.ts
+    ├─ resolver-tiers.test.ts
+    └─ resolver.test.ts
 ```
 
 `extensions/index.ts` is the single registration surface. It wires the

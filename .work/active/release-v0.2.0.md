@@ -40,7 +40,7 @@ updated: 2026-06-22
 - `epic-scaffold-handler-noop-handler` (feature) — No-Op Handler + Test Harness (Invariants 3 and 1)
 - `epic-scaffold-handler-package-skeleton` (feature) — Package Skeleton (loadable pi-package)
 - `epic-switching-paths-config-default` (feature) — Config Default + Effective-Mode State (override > default > unset)
-- `epic-switching-paths-keybinding-cycle` (feature) — Keybinding Cycle (Ctrl+M forward / Shift+Ctrl+M backward)
+- `epic-switching-paths-keybinding-cycle` (feature) — Keybinding Cycle (Ctrl+Shift+U forward / Ctrl+Shift+Alt+U backward)
 - `epic-switching-paths-mode-command` (feature) — /mode Command Family
 - `feature-mode-default-management` (feature) — `/mode default` — manage the durable default from inside pi
 - `feature-mode-inspect-prompt-flag` (feature) — `/mode:inspect --prompt` debug flag
@@ -53,6 +53,12 @@ updated: 2026-06-22
 - `story-mode-autocomplete-provider-seam` (story) — `/mode` autocomplete — pi provider seam + factory wiring
 - `story-mode-autocomplete-suggestion-helpers` (story) — `/mode` autocomplete — pure suggestion helpers
 
+- `gate-docs-architecture-src-inventory` (story, gate-docs) — Architecture component tree omits source modules
+- `gate-docs-architecture-test-inventory` (story, gate-docs) — Architecture tests listing is stale
+- `gate-docs-readme-keybinding-opt-in` (story, gate-docs) — README omits cycleKeybinding opt-in details
+- `gate-docs-readme-footer-indicator` (story, gate-docs) — README omits footer mode indicator
+- `gate-docs-readme-mode-none-command` (story, gate-docs) — README omits `/mode none` command form
+
 ## Gate runs
 
-Pending.
+- **gate-docs** (2026-06-22) — 5 findings fixed (2 high, 2 medium, 1 low)
