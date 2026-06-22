@@ -1,7 +1,7 @@
 ---
 id: feature-mode-default-management
 kind: feature
-stage: implementing
+stage: review
 tags: []
 parent: null
 depends_on: []
@@ -267,3 +267,22 @@ Plus doc roll-forward in `docs/SPEC.md` + `README.md`.
   migrate reader+writer to `getAgentDir()` (low; do both or neither).
 
 Both non-blocking on disagreement; consensus findings implemented.
+
+## Implementation notes (2026-06-21)
+
+Implemented all three child stories and advanced them to review:
+
+- `story-default-config-writer`
+  - `src/config.ts`: `writeDefaultToConfig`, `readDefaultSources`, `effectiveDefaultSource`, path seam exports.
+  - Strict read-for-write, 2-space+newline serialization, tmp+rename atomic write, parent bootstrap, sibling-key preservation, `none` persistence, `applyDefaultFromConfig` reconciliation.
+  - Dedicated regression coverage for the Opus blocker: project `off` with global default falls back to global.
+- `story-default-command-surface`
+  - `src/commands.ts`: `parseModeDefaultArgs`, `formatDefaultListing`, `formatDefaultNotify`, `/mode default` dispatch.
+  - Five forms implemented; `--global` position-flexible; parser errors reject before write; unknown presets validate before filesystem touch; active override preserved with actionable notify.
+- `story-default-autocomplete-multistage`
+  - `src/autocomplete.ts`: top-level `default` builder, stage-2 action suggestions, stage-3 `--global` suggestions.
+  - Existing `MODE_ARG_TRIGGER` and `buildModeArgItems` invariants preserved.
+
+Docs rolled forward in `README.md`, `docs/SPEC.md`, and `docs/ARCHITECTURE.md`.
+
+Verification: `npm run typecheck`; `npm test` (350/350).

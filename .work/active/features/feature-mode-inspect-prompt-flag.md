@@ -1,7 +1,7 @@
 ---
 id: feature-mode-inspect-prompt-flag
 kind: feature
-stage: implementing
+stage: review
 tags: []
 parent: null
 depends_on: []
@@ -130,3 +130,20 @@ right now, and the base changes only when tools/skills/config do.
 Single stride. ~40-60 LoC across `src/commands.ts` (arg parse + render
 branch) and the assembler call site, plus 4-6 unit tests in
 `tests/commands.test.ts`.
+
+## Implementation notes (2026-06-21)
+
+Implemented and verified.
+
+- `src/handler.ts`
+  - Added `lastBaseSystemPrompt` memo (unspliced base from `BeforeAgentStartEvent.systemPrompt`).
+  - Added `getLastBaseSystemPrompt()` + `resetHandlerForTesting()`.
+  - Added `assembleForInspect(model, baseSystemPrompt)` and refactored the live handler through the same `spliceSystemPrompt` helper so `/mode:inspect --prompt` and the live turn share one splice path.
+- `src/commands.ts`
+  - `/mode:inspect` now accepts a single optional `--prompt` flag.
+  - Unknown/repeated/extra flags produce error toasts and no panel emit.
+  - With `--prompt`, the panel appends `System prompt:` + fenced block; if no turn has run yet it emits an explicit sentinel.
+- `tests/commands.test.ts`
+  - Added render append-block tests, single-source byte-equality tests against `handleBeforeAgentStart`, no-model fallback, `--prompt` command-path tests, and parser rejection matrix.
+
+Verification: `npm run typecheck`; `npm test` (350/350 after the full `/mode default` work).

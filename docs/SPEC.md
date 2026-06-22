@@ -115,7 +115,12 @@ would drop identity + mode entirely.
 
 The key diff is exposed internally as a change signal: downstream surfaces
 (`/mode:inspect`, an optional status-line widget) read it to report *why*
-the effective prompt last changed and *when*.
+the effective prompt last changed and *when*. `/mode:inspect --prompt` additionally
+appends the full assembled prompt for debugging; it uses the most recent
+unspliced pi base prompt seen by `before_agent_start` (not `ctx.getSystemPrompt`,
+which contains the already-spliced previous result) and the same splice helper as
+the live handler, so identical inputs produce byte-identical output without
+polluting the cache.
 
 ## Identity line
 
@@ -182,6 +187,7 @@ Two built-in paths converge on one resolver, with one global keybinding opt-in:
    for the current session (ephemeral override over the config default).
    `/mode` with no argument shows the current mode and available presets.
    `/mode off` clears the override (falls back to config default or unset).
+   `/mode default …` manages the durable config-default tier.
 
    Command output: with **no argument** `/mode` emits a display-only panel (a
    `customType:"mode"` message, no turn triggered) with two parts — the
@@ -190,14 +196,42 @@ Two built-in paths converge on one resolver, with one global keybinding opt-in:
    `base:… • agency:… • quality:… • scope:…` plus any `+modifier`s; a broken
    active mode degrades to an `(unresolvable — …)` line) and the **available
    presets** (the sorted `presets.json` names plus the virtual `none` mode).
-   In TUI mode, the `<preset>` argument is discoverable via autocomplete:
-   preset names (including the virtual `none`) plus the literal `off`.
+   In TUI mode, the first argument is discoverable via autocomplete: preset
+   names (including the virtual `none`) plus the literals `off` and `default`.
    With a **`<preset>`** argument `/mode` sets the session override and confirms
    via a toast (`mode set to "<name>"`); an unknown preset / missing fragment
    surfaces the resolver's error as an error toast and leaves the prior override
    intact. **`/mode none`** is a virtual no-mode override: it wins over config
    default and injects no mode fragments. **`/mode off`** clears the override and
    toasts the new effective state (the config default, or unset).
+
+   **`/mode default`** is the durable-default subcommand family:
+
+   - `/mode default` emits a display-only `customType:"mode-default"` panel
+     showing global default, project default, and the effective default + source
+     (project wins over global).
+   - `/mode default <preset>` writes `defaultMode` to the **project** config
+     (`<cwd>/.pi/pi-model-modes.json`); `/mode default <preset> --global`
+     writes the global config (`~/.pi/agent/pi-model-modes.json`). `--global`
+     may appear before or after the preset token.
+   - `/mode default none` persists the virtual no-mode default; this is the way
+     for a project to intentionally mask a global default with durable no-mode.
+   - `/mode default off [--global]` deletes `defaultMode` in the selected scope.
+     Clearing project scope may reveal a global default; clearing global scope
+     may leave the project default effective.
+   - Writes validate before touching disk, strict-read the target JSON (malformed
+     or non-object files are refused rather than overwritten), preserve sibling
+     keys, serialize with two-space indentation + trailing newline, and write via
+     a temp file + rename before reconciling the resolver through
+     `applyDefaultFromConfig(cwd)` (the same merge path as `session_start`).
+   - Changing the durable default NEVER clears the ephemeral override tier. When
+     an override masks the new default, the notify says so and points at
+     `/mode off` to use the default now.
+
+   Autocomplete for the default subcommand is multi-stage but keeps the original
+   `/mode <partial>` trigger intact: top-level `/mode <partial>` suggests
+   presets + `off` + `default`; `/mode default <partial>` suggests presets +
+   `off`; `/mode default <action> <--flag>` suggests `--global`.
 2. **Config default** — a `defaultMode` key in the plugin-owned
    `pi-model-modes.json`, read from `~/.pi/agent/pi-model-modes.json` (global)
    and `<cwd>/.pi/pi-model-modes.json` (project), shallow-merged with the
@@ -224,8 +258,10 @@ effective mode is `override ?? default ?? unset`. `/mode off` clears only the
 override tier, so resolution falls back to the config default (not to unset).
 
 Mode-state persistence model: config default is durable (file-backed in
-`pi-model-modes.json`); the session override is ephemeral (lives in module
-state, not written to disk). A new session restarts from the config default.
+`pi-model-modes.json`, and writable via `/mode default …`); the session override
+is ephemeral (lives in module state, not written to disk). A new session restarts
+from the config default. Mutating the default tier does not clear an active
+override; this preserves the two-tier model and the precedence invariant.
 
 ## Out of scope for v1
 

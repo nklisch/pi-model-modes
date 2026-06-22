@@ -14,14 +14,14 @@ pi-model-modes/
 ├─ src/
 │   ├─ handler.ts            before_agent_start entry — orchestrates the transform
 │   ├─ resolver.ts           mode resolution: two tiers (override > default), effective = override ?? default ?? unset
-│   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds the default tier;
+│   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds + writes the default tier;
 │   │                        global cycleKeybinding opt-in for factory-load wiring
 │   ├─ assemble.ts           identity derivation + fragment splice
 │   ├─ cache.ts              cache key, lastKey/lastResult, change signal
 │   ├─ fragments.ts          fragment loader (reads prompts/, caches in module scope)
 │   ├─ presets.ts            preset table (name → {base, agency, quality, scope, mods})
 │   ├─ provider-names.ts     provider id → display name map
-│   ├─ commands.ts           /mode, /mode off, /mode:inspect
+│   ├─ commands.ts           /mode, /mode default, /mode off, /mode:inspect [--prompt]
 │   ├─ footer.ts             footer status formatter + cycle-hint signal
 │   └─ keybinding.ts         cycle keybinding helper, registered only when globally opted in
 ├─ prompts/
@@ -164,6 +164,12 @@ Effective prompt last changed: 3 turns ago — reason: model switched
                                          (zai/glm-4.5 → zai/glm-4.6)
 Cache key: 9f3a...c1e2
 ```
+
+With `--prompt`, `/mode:inspect` appends a fenced `System prompt:` block. That
+path uses the unspliced base prompt memoized from the last `before_agent_start`
+input and the same splice helper as the live handler. It deliberately avoids
+`ctx.getSystemPrompt()`, which returns the previous already-spliced result and
+would double-inject identity/mode fragments if used as the base.
 
 ## Where each invariant is enforced
 

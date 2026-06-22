@@ -42,10 +42,17 @@ is a named bundle of those choices, applied atomically.
 | `/mode` | Show the effective mode (its source tier + composed axes) and the available presets. Display-only — triggers no turn. |
 | `/mode <preset>` | Set the mode for this session (an ephemeral override). Unknown presets surface an error and leave the prior mode intact. |
 | `/mode off` | Clear the session override; falls back to the config default (or unset). |
+| `/mode default` | Show the durable default configured in global + project config files, and which scope wins. Display-only — triggers no turn. |
+| `/mode default <preset>` | Set the **project** default mode in `<cwd>/.pi/pi-model-modes.json`. Use `none` to make "no mode" the durable project default. |
+| `/mode default <preset> --global` | Set the **global** default mode in `~/.pi/agent/pi-model-modes.json`. `--global` may appear before or after the preset. |
+| `/mode default off [--global]` | Clear the default in project scope (or global scope with `--global`); after clearing project scope, any global default becomes effective again. |
 
 `/mode:inspect` shows the effective mode, the derived identity line, when/why the
 prompt last changed, and the current cache key — useful for debugging cache
-behavior or a stuck mode.
+behavior or a stuck mode. Add `--prompt` to append the full assembled system
+prompt in a fenced block. The prompt view uses the most recent pi base prompt
+seen by the turn handler; if no turn has run yet it reports that the base prompt
+has not been populated rather than guessing.
 
 ### Keybindings
 
@@ -55,9 +62,10 @@ which is encoded like Enter in legacy terminal input.
 
 ### Config default
 
-A durable default mode can be set in a plugin-owned config file (separate from
-pi's closed `settings.json`, which has no plugin namespace). Two files are read
-and shallow-merged, **project over global**:
+A durable default mode can be set either with `/mode default …` or by editing a
+plugin-owned config file directly (separate from pi's closed `settings.json`,
+which has no plugin namespace). Two files are read and shallow-merged,
+**project over global**:
 
 - global:  `~/.pi/agent/pi-model-modes.json`
 - project: `<cwd>/.pi/pi-model-modes.json`
@@ -68,13 +76,27 @@ Shape (v1):
 { "defaultMode": "flow" }
 ```
 
-An invalid `defaultMode` (unknown preset / missing fragment) warns and is
-skipped — it never crashes the session.
+The command surface mirrors that merge model:
+
+```text
+/mode default flow          # write project default
+/mode default --global flow # write global default
+/mode default none          # project-level durable no-mode, masking any global default
+/mode default off           # clear project default; global may become effective
+/mode default off --global  # clear global default
+```
+
+Writes preserve sibling keys such as `cycleKeybinding`, format JSON with two-space
+indentation, and refuse to overwrite malformed/non-object JSON files. An invalid
+`defaultMode` (unknown preset / missing fragment) warns and is skipped during
+session start; command-time writes validate before touching disk.
 
 **Precedence:** session override (`/mode`) > config default > unset.
 The override is ephemeral (in-memory, not written to disk): a genuinely new
 session (`/new`, `/resume`, `/fork`) restarts from the config default, while a
-same-session `/reload` or `startup` keeps any active override.
+same-session `/reload` or `startup` keeps any active override. Changing the
+default does **not** clear an active override; run `/mode off` to let the default
+take effect immediately.
 
 ## Mode reference
 
