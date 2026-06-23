@@ -57,11 +57,13 @@ has not been populated rather than guessing.
 
 ### Footer indicator
 
-The effective mode is shown in pi's footer under the short `mode` key. The value
-starts with a base-family glyph: `◆` for pi/default voice, `◇` for `chill`, `⬡`
-for `flow`, and `✕` when the current mode is unresolvable. The text then shows
-the preset/voice summary plus `+N` when modifiers are active; an unset state
-renders like `mode:◆ unset`.
+The effective mode is shown in pi's footer as `mode: <glyph> <summary>` under
+this package's own `pi-model-modes` status key. The glyph is `◆` for pi/default
+voice, `◇` for `chill`, `⬡` for `flow`, and `✕` when the current mode is
+unresolvable. The text then shows the preset/voice summary plus `+N` when
+modifiers are active; an unset state renders like `mode: ◆ unset`. In TUI mode
+the label, glyph, value, and hint use pi's active theme tokens, so Catppuccin
+flavors inherit their own colors cleanly.
 
 When keyboard cycling is enabled, the footer also adds the cycle hint:
 `ctrl+shift+u/ctrl+shift+alt+u cycle`.

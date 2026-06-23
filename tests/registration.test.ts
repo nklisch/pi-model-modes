@@ -158,7 +158,7 @@ describe("factory registration wiring", () => {
 
     const shortcuts = calls.filter((c) => c.method === "registerShortcut");
     expect(shortcuts).toHaveLength(0);
-    expect(renderedFooterText()).toBe("◆ unset");
+    expect(renderedFooterText()).toBe("mode: ◆ unset");
   });
 
   it("registers both cycle shortcuts and enables the footer hint when globally enabled", () => {
@@ -178,7 +178,7 @@ describe("factory registration wiring", () => {
       shortcuts.filter((c) => c.args[0] === CYCLE_BACKWARD_KEY),
     ).toHaveLength(1);
     expect(renderedFooterText()).toBe(
-      `◆ unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
+      `mode: ◆ unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
     );
   });
 
@@ -194,7 +194,7 @@ describe("factory registration wiring", () => {
 
       const shortcuts = calls.filter((c) => c.method === "registerShortcut");
       expect(shortcuts).toHaveLength(0);
-      expect(renderedFooterText()).toBe("◆ unset");
+      expect(renderedFooterText()).toBe("mode: ◆ unset");
     },
   );
 });

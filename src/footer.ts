@@ -7,29 +7,25 @@ import {
 } from "./resolver.js";
 import { CYCLE_FORWARD_KEY, CYCLE_BACKWARD_KEY } from "./keybinding.js";
 
+type Theme = ExtensionContext["ui"]["theme"];
+
 /**
- * The setStatus key: one slot gives this plugin control over its footer blob.
- *
- * pi-bar (and any other footer that re-publishes extension statuses) renders
- * each status as `${key}:${text}`, so this value is what shows up as the
- * label prefix in the footer. `"mode"` reads as a clean label there
- * (`mode:◆ create`) and lets the text below omit a redundant `"mode: "`.
- * The value is also the slot id in pi's internal status map; it must be
- * unique across installed extensions.
+ * Unique plugin-owned status slot. The visible label lives in the value
+ * (`mode: ◆ create`) so custom footers can render extension statuses directly
+ * without relying on any footer's key-prefix behavior.
  */
-export const MODE_FOOTER_KEY = "mode";
+export const MODE_FOOTER_KEY = "pi-model-modes";
 
 /**
  * Leading marker glyph per base voice. Echoes pi-catppuccin-tui's ◆ vocabulary
- * so the mode footer reads as part of the same family as the model/git/cost
+ * so the mode footer reads as part of the same family as the model/git/context
  * line rather than a foreign symbol. Glyph choice tracks voice *character*:
  * solid for pi-family voices (default `pi` and the more-terse `pi-direct`),
  * outline for `chill`'s softer voice, hex for `flow`'s distinct character.
  *
- * Plain Unicode — not ANSI — because pi-bar's status pipeline runs every
- * extension status through `stripTerminalControls` (which drops every ANSI
- * escape) before re-wrapping it in a single fixed `theme.fg("text", …)`. Glyphs
- * survive that pipeline; embedded colors would render as plain text.
+ * The raw glyphs stay plain Unicode for stable tests and fallback renderers;
+ * the pi seam applies theme-aware color so Catppuccin footers inherit the
+ * active flavor instead of hardcoded ANSI escapes.
  */
 const BASE_VOICE_GLYPHS: Readonly<Record<string, string>> = {
   pi: "◆",
@@ -83,17 +79,53 @@ export interface ModeFooterInputs {
   cycleBackwardKey: string;
 }
 
+/** PURE styling hooks for the mode footer render. Defaults are identity. */
+export interface ModeFooterStyle {
+  label(text: string, inputs: ModeFooterInputs): string;
+  glyph(text: string, inputs: ModeFooterInputs): string;
+  value(text: string, inputs: ModeFooterInputs): string;
+  modifier(text: string, inputs: ModeFooterInputs): string;
+  separator(text: string, inputs: ModeFooterInputs): string;
+  hint(text: string, inputs: ModeFooterInputs): string;
+}
+
+const PLAIN_MODE_FOOTER_STYLE: ModeFooterStyle = {
+  label: (text) => text,
+  glyph: (text) => text,
+  value: (text) => text,
+  modifier: (text) => text,
+  separator: (text) => text,
+  hint: (text) => text,
+};
+
 /**
- * PURE: build the one-line footer string. Always returns a string.
- *
- * Returns just the value (e.g. `◆ create`, `✕ unresolvable`) — no `"mode: "`
- * prefix. pi-bar prepends `${MODE_FOOTER_KEY}:` to every extension status, so
- * the label is supplied by the key; baking `"mode: "` into the text would
- * double up (`mode:◆ mode: create`). The native pi footer (without pi-bar)
- * shows the text alone, so the glyph leads and the value still reads clearly
- * (`◆ create`) even without the label.
+ * Catppuccin-compatible styling: use semantic pi theme tokens so the selected
+ * Catppuccin flavor (or any other theme) owns the actual colors.
  */
-export function formatModeFooter(inputs: ModeFooterInputs): string {
+export function createThemedModeFooterStyle(theme: Theme): ModeFooterStyle {
+  return {
+    label: (text) => theme.fg("muted", text),
+    glyph: (text, inputs) => {
+      if (inputs.modeError !== undefined) return theme.fg("error", text);
+      if (inputs.mode === undefined) return theme.fg("dim", text);
+      return theme.fg("accent", text);
+    },
+    value: (text, inputs) => {
+      if (inputs.modeError !== undefined) return theme.fg("error", text);
+      if (inputs.mode === undefined) return theme.fg("dim", text);
+      return theme.fg("toolTitle", text);
+    },
+    modifier: (text) => theme.fg("accent", text),
+    separator: (text) => theme.fg("dim", text),
+    hint: (text) => theme.fg("dim", text),
+  };
+}
+
+/** PURE: build the one-line footer string. Always returns a string. */
+export function formatModeFooter(
+  inputs: ModeFooterInputs,
+  style: ModeFooterStyle = PLAIN_MODE_FOOTER_STYLE,
+): string {
   const glyph = selectModeGlyph(inputs);
   let value: string;
   if (inputs.modeError !== undefined) {
@@ -105,16 +137,19 @@ export function formatModeFooter(inputs: ModeFooterInputs): string {
   } else {
     value = `${inputs.mode.base}/${inputs.mode.agency}/${inputs.mode.quality}/${inputs.mode.scope}`;
   }
-  let indicator = `${glyph} ${value}`;
+  let indicator = `${style.label("mode:", inputs)} ${style.glyph(glyph, inputs)} ${style.value(value, inputs)}`;
 
   if (inputs.modeError === undefined && inputs.mode !== undefined && inputs.mode.modifiers.length > 0) {
-    indicator += ` +${inputs.mode.modifiers.length}`;
+    indicator += ` ${style.modifier(`+${inputs.mode.modifiers.length}`, inputs)}`;
   }
 
   if (!inputs.cycleHintEnabled) {
     return indicator;
   }
-  return `${indicator} · ${inputs.cycleForwardKey}/${inputs.cycleBackwardKey} cycle`;
+  return `${indicator} ${style.separator("·", inputs)} ${style.hint(
+    `${inputs.cycleForwardKey}/${inputs.cycleBackwardKey} cycle`,
+    inputs,
+  )}`;
 }
 
 let cycleHintEnabled = false;
@@ -150,13 +185,16 @@ export function refreshModeFooter(ctx: ExtensionContext): void {
 
   ctx.ui.setStatus(
     MODE_FOOTER_KEY,
-    formatModeFooter({
-      specName,
-      mode,
-      modeError,
-      cycleHintEnabled,
-      cycleForwardKey: CYCLE_FORWARD_KEY,
-      cycleBackwardKey: CYCLE_BACKWARD_KEY,
-    }),
+    formatModeFooter(
+      {
+        specName,
+        mode,
+        modeError,
+        cycleHintEnabled,
+        cycleForwardKey: CYCLE_FORWARD_KEY,
+        cycleBackwardKey: CYCLE_BACKWARD_KEY,
+      },
+      createThemedModeFooterStyle(ctx.ui.theme),
+    ),
   );
 }

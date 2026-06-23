@@ -211,7 +211,7 @@ describe("registerModeKeybindings", () => {
     expect(getActiveMode()).toBe("create");
     expect(getEffectiveModeSource()).toBe("override");
     expect(notifies).toHaveLength(1);
-    expect(notifies[0].message).toBe("◆ mode: create");
+    expect(notifies[0].message).toBe("mode: ◆ create");
     expect(notifies[0].type).toBe("info");
   });
 
@@ -229,6 +229,6 @@ describe("registerModeKeybindings", () => {
     // LAST preset ("tinker") and fail this.
     expect(getActiveMode()).toBe("refactor");
     expect(getEffectiveModeSource()).toBe("override");
-    expect(notifies.at(-1)?.message).toBe("◆ mode: refactor");
+    expect(notifies.at(-1)?.message).toBe("mode: ◆ refactor");
   });
 });

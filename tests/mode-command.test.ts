@@ -526,7 +526,7 @@ describe("/mode default [...] — durable default subcommand", () => {
     // Exactly one setStatus call for the footer refresh, with the newly
     // effective default rendered through the same footer seam users see.
     expect(ui.statusCalls).toEqual([
-      { key: MODE_FOOTER_KEY, text: "◆ extend" },
+      { key: MODE_FOOTER_KEY, text: "mode: ◆ extend" },
     ]);
   });
 

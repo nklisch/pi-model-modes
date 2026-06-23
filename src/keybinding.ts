@@ -99,7 +99,11 @@ export function registerModeKeybindings(pi: ExtensionAPI): void {
       // uses the default glyph rather than throwing mid-cycle.
       base = undefined;
     }
-    ctx.ui.notify(`${glyphForBase(base)} mode: ${next}`, "info");
+    const theme = ctx.ui.theme;
+    ctx.ui.notify(
+      `${theme.fg("muted", "mode:")} ${theme.fg("accent", glyphForBase(base))} ${theme.fg("toolTitle", next)}`,
+      "info",
+    );
   };
 
   pi.registerShortcut(CYCLE_FORWARD_KEY, {

@@ -9,6 +9,7 @@ import {
   selectModeGlyph,
   setCycleHintEnabled,
   type ModeFooterInputs,
+  type ModeFooterStyle,
 } from "../src/footer.js";
 import { CYCLE_BACKWARD_KEY, CYCLE_FORWARD_KEY } from "../src/keybinding.js";
 import type { ResolvedMode } from "../src/presets.js";
@@ -20,7 +21,7 @@ import {
   setDefaultMode,
 } from "../src/resolver.js";
 import { getChangeSignal, resetCacheForTesting } from "../src/cache.js";
-import { makeContext } from "./harness.js";
+import { makeContext, makeUi } from "./harness.js";
 
 const mode: ResolvedMode = {
   base: "pi",
@@ -45,13 +46,13 @@ function inputs(overrides: Partial<ModeFooterInputs> = {}): ModeFooterInputs {
 describe("formatModeFooter", () => {
   it("renders a preset name for a string preset spec", () => {
     expect(formatModeFooter(inputs({ specName: "partner" }))).toBe(
-      "◆ partner",
+      "mode: ◆ partner",
     );
   });
 
   it("renders compact axes for an explicit object spec", () => {
     expect(formatModeFooter(inputs())).toBe(
-      "◆ pi/autonomous/architect/unrestricted",
+      "mode: ◆ pi/autonomous/architect/unrestricted",
     );
   });
 
@@ -60,14 +61,14 @@ describe("formatModeFooter", () => {
 
     expect(
       formatModeFooter(inputs({ specName: "refactor", mode: withMods })),
-    ).toBe("◆ refactor +2");
+    ).toBe("mode: ◆ refactor +2");
     expect(formatModeFooter(inputs({ mode: withMods }))).toBe(
-      "◆ pi/autonomous/architect/unrestricted +2",
+      "mode: ◆ pi/autonomous/architect/unrestricted +2",
     );
   });
 
   it("renders unset when no mode resolves", () => {
-    expect(formatModeFooter(inputs({ mode: undefined }))).toBe("◆ unset");
+    expect(formatModeFooter(inputs({ mode: undefined }))).toBe("mode: ◆ unset");
   });
 
   it("renders unresolvable when modeError is set, winning over a defined mode", () => {
@@ -80,7 +81,7 @@ describe("formatModeFooter", () => {
           modeError: 'mode agency "ghost" has no fragment file',
         }),
       ),
-    ).toBe("✕ unresolvable");
+    ).toBe("mode: ✕ unresolvable");
   });
 
   it("appends the cycle hint in every state when enabled", () => {
@@ -91,25 +92,25 @@ describe("formatModeFooter", () => {
       formatModeFooter(
         inputs({ specName: "partner", cycleHintEnabled: true }),
       ),
-    ).toBe(`◆ partner${hint}`);
+    ).toBe(`mode: ◆ partner${hint}`);
     expect(formatModeFooter(inputs({ cycleHintEnabled: true }))).toBe(
-      `◆ pi/autonomous/architect/unrestricted${hint}`,
+      `mode: ◆ pi/autonomous/architect/unrestricted${hint}`,
     );
     expect(
       formatModeFooter(
         inputs({ mode: withMods, cycleHintEnabled: true }),
       ),
-    ).toBe(`◆ pi/autonomous/architect/unrestricted +1${hint}`);
+    ).toBe(`mode: ◆ pi/autonomous/architect/unrestricted +1${hint}`);
     expect(
       formatModeFooter(
         inputs({ mode: undefined, cycleHintEnabled: true }),
       ),
-    ).toBe(`◆ unset${hint}`);
+    ).toBe(`mode: ◆ unset${hint}`);
     expect(
       formatModeFooter(
         inputs({ modeError: "broken", cycleHintEnabled: true }),
       ),
-    ).toBe(`✕ unresolvable${hint}`);
+    ).toBe(`mode: ✕ unresolvable${hint}`);
   });
 
   it("omits the cycle hint when disabled", () => {
@@ -133,7 +134,31 @@ describe("formatModeFooter", () => {
           cycleBackwardKey: "a+b+c",
         }),
       ),
-    ).toBe("◆ unset · x+y/a+b+c cycle");
+    ).toBe("mode: ◆ unset · x+y/a+b+c cycle");
+  });
+
+  it("accepts injected styling hooks without changing footer semantics", () => {
+    const style: ModeFooterStyle = {
+      label: (text) => `<label>${text}</label>`,
+      glyph: (text) => `<glyph>${text}</glyph>`,
+      value: (text) => `<value>${text}</value>`,
+      modifier: (text) => `<modifier>${text}</modifier>`,
+      separator: (text) => `<separator>${text}</separator>`,
+      hint: (text) => `<hint>${text}</hint>`,
+    };
+
+    expect(
+      formatModeFooter(
+        inputs({
+          specName: "partner",
+          mode: { ...mode, modifiers: ["tdd"] },
+          cycleHintEnabled: true,
+        }),
+        style,
+      ),
+    ).toBe(
+      "<label>mode:</label> <glyph>◆</glyph> <value>partner</value> <modifier>+1</modifier> <separator>·</separator> <hint>ctrl+shift+u/ctrl+shift+alt+u cycle</hint>",
+    );
   });
 });
 
@@ -208,40 +233,32 @@ describe("refreshModeFooter", () => {
   });
 
   it("calls setStatus exactly once when ctx.hasUI is true", () => {
-    const calls: [string, string | undefined][] = [];
+    const ui = makeUi();
     const ctx = makeContext({
       hasUI: true,
-      ui: {
-        setStatus: (key: string, text: string | undefined) => {
-          calls.push([key, text]);
-        },
-      },
+      ui,
     } as unknown as Partial<ExtensionContext>);
 
     refreshModeFooter(ctx);
 
-    expect(calls).toEqual([[MODE_FOOTER_KEY, "◆ unset"]]);
+    expect(ui.statusCalls).toEqual([{ key: MODE_FOOTER_KEY, text: "mode: ◆ unset" }]);
   });
 
   it("uses the module cycle-hint signal when rendering through the seam", () => {
-    const calls: [string, string | undefined][] = [];
+    const ui = makeUi();
     const ctx = makeContext({
       hasUI: true,
-      ui: {
-        setStatus: (key: string, text: string | undefined) => {
-          calls.push([key, text]);
-        },
-      },
+      ui,
     } as unknown as Partial<ExtensionContext>);
 
     setCycleHintEnabled(true);
     refreshModeFooter(ctx);
 
-    expect(calls).toEqual([
-      [
-        MODE_FOOTER_KEY,
-        `◆ unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
-      ],
+    expect(ui.statusCalls).toEqual([
+      {
+        key: MODE_FOOTER_KEY,
+        text: `mode: ◆ unset · ${CYCLE_FORWARD_KEY}/${CYCLE_BACKWARD_KEY} cycle`,
+      },
     ]);
   });
 
@@ -251,14 +268,10 @@ describe("refreshModeFooter", () => {
     const activeBefore = getActiveMode();
     const defaultBefore = getDefaultMode();
     const turnBefore = getChangeSignal().currentTurn;
-    const calls: [string, string | undefined][] = [];
+    const ui = makeUi();
     const ctx = makeContext({
       hasUI: true,
-      ui: {
-        setStatus: (key: string, text: string | undefined) => {
-          calls.push([key, text]);
-        },
-      },
+      ui,
     } as unknown as Partial<ExtensionContext>);
 
     refreshModeFooter(ctx);
@@ -266,6 +279,6 @@ describe("refreshModeFooter", () => {
     expect(getChangeSignal().currentTurn).toBe(turnBefore);
     expect(getActiveMode()).toEqual(activeBefore);
     expect(getDefaultMode()).toEqual(defaultBefore);
-    expect(calls).toHaveLength(1);
+    expect(ui.statusCalls).toHaveLength(1);
   });
 });

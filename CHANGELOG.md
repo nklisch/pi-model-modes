@@ -4,7 +4,7 @@
 
 ### Features
 
-- Added a footer mode indicator (`mode:◆ …`) with per-base glyphs, modifier counts, unresolvable state, and optional cycle-keybinding hint.
+- Added a styled footer mode indicator (`mode: ◆ …`) with per-base glyphs, modifier counts, unresolvable state, and optional cycle-keybinding hint.
 - Added optional mode cycling via global `cycleKeybinding: true`, registering `Ctrl+Shift+U` forward and `Ctrl+Shift+Alt+U` backward.
 - Added `/mode:inspect --prompt` to display the full assembled system prompt using the same splice path as live turns.
 - Added `/mode default` management from inside pi, including project/global scopes, durable `none`, strict config writes, no-op clears, and multistage autocomplete.

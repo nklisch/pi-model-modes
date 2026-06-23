@@ -69,9 +69,12 @@ global cycle keybindings to pi's `ExtensionAPI`. The cycle path is gated by
 the global `cycleKeybinding` flag; when that flag is `true`, the factory
 registers both cycle shortcuts and enables the footer cycle hint. Missing,
 `false`, and non-boolean values leave both off, preserving the no-default
-cycle-keybinding invariant. Everything else is plain modules with no pi
-coupling except through typed interfaces — which keeps the logic unit-testable
-without spinning up pi.
+cycle-keybinding invariant. `src/footer.ts` publishes a plugin-owned
+`pi-model-modes` status value shaped as `mode: <glyph> <summary>` and applies
+semantic pi theme tokens in the runtime seam, so Catppuccin themes control the
+colors without key-prefix assumptions from any status republisher. Everything
+else is plain modules with no pi coupling except through typed interfaces —
+which keeps the logic unit-testable without spinning up pi.
 
 **Two-tier mode state.** `resolver.ts` holds the effective selection as two
 distinct tiers: an ephemeral OVERRIDE (`/mode`, set via `setActiveMode` /

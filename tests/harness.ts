@@ -107,7 +107,17 @@ export interface RecordingUi extends ExtensionUIContext {
 export function makeUi(overrides: Partial<ExtensionUIContext> = {}): RecordingUi {
   const statusCalls: RecordingUi["statusCalls"] = [];
   const notifyCalls: RecordingUi["notifyCalls"] = [];
+  const identityTheme = {
+    fg: (_color: string, text: string) => text,
+    bg: (_color: string, text: string) => text,
+    bold: (text: string) => text,
+    italic: (text: string) => text,
+    underline: (text: string) => text,
+    inverse: (text: string) => text,
+    strikethrough: (text: string) => text,
+  };
   return {
+    theme: identityTheme,
     ...overrides,
     statusCalls,
     notifyCalls,

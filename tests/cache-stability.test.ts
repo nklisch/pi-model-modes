@@ -139,7 +139,7 @@ describe("cache stability — SPEC Invariant 2 (byte-identical across no-change 
     expect(new Set(prompts).size).toBe(1);
     expect(ui.statusCalls).toHaveLength(N);
     for (const call of ui.statusCalls) {
-      expect(call).toEqual({ key: MODE_FOOTER_KEY, text: "◆ safe" });
+      expect(call).toEqual({ key: MODE_FOOTER_KEY, text: "mode: ◆ safe" });
     }
   });
 });

@@ -14,6 +14,9 @@ pi-model-modes is a pi extension package (`pi-package`), installed via
 - No mode-cycle keybinding is registered by default. A global
   `cycleKeybinding: true` config opt-in registers the cycle shortcuts and
   enables the footer cycle hint; the flag defaults to `false`.
+- A styled footer status under the plugin-owned `pi-model-modes` key. Its
+  visible value is `mode: <glyph> <summary>` (for example `mode: ◆ create`),
+  with color supplied by the active pi theme at render time.
 - A `session_start` handler that seeds the default mode from plugin-owned
   config (`pi-model-modes.json`, global + project merged).
 
@@ -115,8 +118,8 @@ The handler **always returns** a `systemPrompt`; it never returns
 would drop identity + mode entirely.
 
 The key diff is exposed internally as a change signal: downstream surfaces
-(`/mode:inspect`, an optional status-line widget) read it to report *why*
-the effective prompt last changed and *when*. `/mode:inspect --prompt` additionally
+(`/mode:inspect`, the `mode: <glyph> <summary>` footer status) read it to report
+*why* the effective prompt last changed and *when*. `/mode:inspect --prompt` additionally
 appends the full assembled prompt for debugging; it uses the most recent
 unspliced pi base prompt seen by `before_agent_start` (not `ctx.getSystemPrompt`,
 which contains the already-spliced previous result) and the same splice helper as
