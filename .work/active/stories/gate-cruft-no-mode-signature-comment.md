@@ -1,7 +1,7 @@
 ---
 id: gate-cruft-no-mode-signature-comment
 kind: story
-stage: implementing
+stage: review
 tags: [cleanup]
 parent: null
 depends_on: []
@@ -27,3 +27,12 @@ The comment says `epic-mode-composition` will replace callers' use of the sentin
 
 ## Removal
 Replace the development-time transition prose with a current-truth one-line contract describing the canonical empty no-mode sentinel.
+
+## Implementation notes
+- Execution capability: inline single-owner cleanup; documentation-only comment correction.
+- review_weight: standard (project default)
+- Files changed: `src/cache.ts`
+- Tests added: none.
+- Verification: `npm run typecheck` (passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.

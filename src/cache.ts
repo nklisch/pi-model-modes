@@ -22,9 +22,7 @@ import { NO_STYLE_SIGNATURE } from "./style.js";
  * Design: `.work/active/features/epic-identity-injection-cache-and-change-signal.md`.
  */
 
-/** No-mode sentinel for `modeSignature` (this epic). Empty string is distinct
- *  from any real (non-empty) composed signature. `epic-mode-composition`
- *  replaces the caller's use of this with the real composed signature. */
+/** Canonical empty no-mode sentinel, distinct from every non-empty composed signature. */
 export const NO_MODE_SIGNATURE = "";
 
 /** The six inputs to the cache key. `baseSystemPrompt` is pi's
