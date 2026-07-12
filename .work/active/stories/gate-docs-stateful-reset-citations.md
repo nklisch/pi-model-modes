@@ -1,7 +1,7 @@
 ---
 id: gate-docs-stateful-reset-citations
 kind: story
-stage: implementing
+stage: review
 tags: [documentation]
 parent: null
 depends_on: []
@@ -22,3 +22,15 @@ pattern-skill-staleness
 
 ## Required edit
 Replace stale config state/reset line references with current locations.
+
+## Implementation notes
+
+- Re-resolved the config path state and test seam declarations in
+  `src/config.ts`: `54`/`55` for the two overrides, `649` for
+  `setConfigPathsForTesting`, and `658` for `resetConfigForTesting`.
+- Updated the pattern citation in place; no code behavior changed.
+
+## Verification
+
+- Citation audit: `grep -nE '^let (globalPathOverride|projectPathOverride)|^export function (setConfigPathsForTesting|resetConfigForTesting)' src/config.ts` matches the cited locations.
+- Transitioned to `stage: review` after the source citation was refreshed.

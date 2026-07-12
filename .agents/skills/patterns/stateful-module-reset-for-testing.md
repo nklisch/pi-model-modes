@@ -50,7 +50,7 @@ export function resetResolverForTesting(): void {
 
 ### Path override + reset
 
-**Files**: `src/config.ts:51`, `src/config.ts:513`, `src/config.ts:522`
+**Files**: `src/config.ts:54`, `src/config.ts:649`, `src/config.ts:658`
 
 ```ts
 let globalPathOverride: string | undefined;
