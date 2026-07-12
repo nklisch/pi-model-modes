@@ -1,7 +1,7 @@
 ---
 id: gate-tests-none-selection-provenance
 kind: story
-stage: implementing
+stage: review
 tags: [testing]
 parent: null
 depends_on: []
@@ -28,3 +28,18 @@ Assert `fragmentSource: none`, empty content/signature, and the correct `selecti
 
 ## Test location
 `tests/style.test.ts`, `tests/config.test.ts`, `tests/commands.test.ts`
+
+## Implementation notes
+
+- Added direct resolver coverage for `none` as an ephemeral override and as
+  both project and global durable defaults.
+- Each tier assertion pins `fragmentSource: none`, the empty content and empty
+  signature sentinels, and the authoritative `selectionSource`.
+- Existing config and inspect tests already cover project masking and the
+  inspect label; no duplicate coverage was added to those files.
+- No production behavior changed.
+
+## Verification
+
+- `npm test -- tests/style.test.ts` — 1 file, 19 tests passed.
+- Transitioned to `stage: review` after bounded verification.

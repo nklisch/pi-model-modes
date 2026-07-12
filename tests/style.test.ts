@@ -114,6 +114,31 @@ describe("style catalog and resolution", () => {
     expect(bundled.signature).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("resolves override none with empty content and signature", () => {
+    setActiveStyle("none");
+    expect(resolveActiveStylePlan()).toEqual({
+      name: undefined,
+      fragmentSource: "none",
+      selectionSource: "override",
+      content: "",
+      signature: "",
+    });
+  });
+
+  it.each(["project", "global"] as const)(
+    "resolves none with empty content and signature for the %s default",
+    (source) => {
+      configureStyleDefaults({ selection: "none", source, registry: new Map() });
+      expect(resolveActiveStylePlan()).toEqual({
+        name: undefined,
+        fragmentSource: "none",
+        selectionSource: source,
+        content: "",
+        signature: "",
+      });
+    },
+  );
+
   it("resolves a global custom style with its defining source", () => {
     const root = freshDir();
     write(root, "team.md", "GLOBAL TEAM");
