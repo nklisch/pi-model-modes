@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -35,6 +35,7 @@ import {
   setFragmentRootForTesting,
 } from "../src/fragments.js";
 import { makeContext, makeEvent, makeModel, makePi, makeUi } from "./harness.js";
+import { resetStyleForTesting, setStyleSelection } from "../src/style.js";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { RecordedCall } from "./harness.js";
 
@@ -318,6 +319,39 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
     expect(typeof options.description).toBe("string");
     expect(options.description!.length).toBeGreaterThan(0);
     expect(typeof options.handler).toBe("function");
+  });
+
+  it("the handler resolves and renders a custom project style", async () => {
+    const root = mkdtempSync(join(tmpdir(), "inspect-style-"));
+    try {
+      writeFileSync(join(root, "team.md"), "TEAM", "utf8");
+      setStyleSelection({
+        selection: "team",
+        registry: new Map([
+          ["team", { rawRel: "team.md", configDir: root, scope: "project" }],
+        ]),
+      });
+      const { pi, calls } = makePi();
+      registerModeInspectCommand(pi);
+      const command = calls.find((c) => c.method === "registerCommand")!;
+      const options = command.args[1] as {
+        handler: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
+      };
+
+      await options.handler(
+        "",
+        makeContext({
+          model: makeModel({ name: "GLM-5.2", provider: "zai" }),
+        }) as ExtensionCommandContext,
+      );
+
+      const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
+      const message = send.args[0] as { content: string };
+      expect(message.content).toContain("Style: team (custom, project)");
+    } finally {
+      resetStyleForTesting();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("the handler reads the cache populated by the handler and emits a display-only message with no triggerTurn", async () => {

@@ -1,7 +1,7 @@
 ---
 id: gate-tests-style-inspect-handler-resolution
 kind: story
-stage: implementing
+stage: review
 tags: [testing]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ Seed a custom project style, invoke the registered inspect handler, and assert t
 
 ## Test location
 `tests/commands.test.ts`
+
+## Implementation notes
+- Execution capability: inline single-owner command-seam test; focused resolver-to-render wiring coverage.
+- review_weight: standard (project default)
+- Files changed: `tests/commands.test.ts`
+- Tests added: registered inspect handler resolves and emits a custom project style.
+- Verification: `npx vitest --run tests/commands.test.ts` (71 passed).
+- Discrepancies from design: omitted the optional unresolvable case because the required real custom-state seam is fully exercised.
+- Adjacent issues parked: none.
