@@ -119,6 +119,34 @@ describe("writing style handler integration", () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it("preserves the active mode when a custom style vanishes", () => {
+    const { stylePath } = fixture();
+    setActiveMode({
+      base: "pi",
+      agency: "autonomous",
+      quality: "pragmatic",
+      scope: "adjacent",
+      modifiers: [],
+    });
+    rmSync(stylePath);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const first = handleBeforeAgentStart(makeEvent(base), makeContext({ model }));
+    const second = handleBeforeAgentStart(makeEvent(base), makeContext({ model }));
+    const expected = [
+      deriveIdentityLine(model),
+      "AGENCY",
+      "QUALITY",
+      "SCOPE",
+      base,
+    ].join("\n\n");
+
+    expect(first.systemPrompt).toBe(expected);
+    expect(second.systemPrompt).toBe(expected);
+    expect(first.systemPrompt).not.toContain("STYLE ONE");
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
   it("content edits invalidate while a touch with identical content keeps the result key stable", () => {
     const { stylePath } = fixture();
     const first = handleBeforeAgentStart(makeEvent(base), makeContext({ model }));
