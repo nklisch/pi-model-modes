@@ -27,4 +27,6 @@ updated: 2026-07-12
 
 - **gate-docs** (2026-07-12) — 2 findings (pattern-skill-staleness=1, foundation-doc-assertion=1)
 
-Pending: patterns.
+- **gate-patterns** (2026-07-12) — 2 patterns extracted; 1 inconsistency tracked
+
+All configured gates have run. Release readiness now depends on draining the bound gate findings to `stage: done`.
