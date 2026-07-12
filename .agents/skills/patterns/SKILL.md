@@ -12,6 +12,8 @@ See individual pattern files for full rationale, examples, and common violations
 
 Available patterns:
 - [pure-core-thin-pi-seam.md](pure-core-thin-pi-seam.md) — Every pi-facing surface is a PURE, pi-free function (fully unit-tested) plus a tiny `registerX(pi)` wrapper that is the only code allowed to touch `ExtensionAPI`/`ExtensionContext`.
+- [content-derived-cache-signatures.md](content-derived-cache-signatures.md) — Hash resolved prompt content and propagate signatures into cache identity so file edits invalidate cached output.
+- [validate-before-commit-state.md](validate-before-commit-state.md) — Validate or materialize candidates before committing in-memory or durable state.
 - [stateful-module-reset-for-testing.md](stateful-module-reset-for-testing.md) — Stateful modules hold mutable state at module scope and expose one `resetXForTesting()` (plus optional `setXForTesting` path overrides) called by tests in `beforeEach`/`afterEach`; the reset is the contract that the listed state is complete.
 - [tolerant-config-shape-warn-degrade.md](tolerant-config-shape-warn-degrade.md) — Per-key/per-entry config shape validation warns and degrades to a safe default rather than throwing, so `session_start` seeding never crashes.
 - [resolver-throw-graceful-degrade.md](resolver-throw-graceful-degrade.md) — Wrap every `resolveActiveModePlan()` read in `try/catch` → `modeError`, and render a state-specific unresolvable fallback; the resolver stays Fail Fast, each surface degrades on its own terms.

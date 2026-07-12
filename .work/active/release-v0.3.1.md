@@ -29,4 +29,6 @@ updated: 2026-07-12
 
 - **gate-docs** (2026-07-12) — 6 findings (changelog-gap=1, pattern-skill-staleness=4, foundation-doc-assertion=1)
 
-Pending configured gate: patterns.
+- **gate-patterns** (2026-07-12) — 2 patterns extracted; 2 in-bundle inconsistencies tracked (2 out-of-bundle observations rejected)
+
+All configured gates ran. Gate-produced items must reach `stage: done` before shipping.
