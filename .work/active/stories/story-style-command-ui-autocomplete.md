@@ -1,7 +1,7 @@
 ---
 id: story-style-command-ui-autocomplete
 kind: story
-stage: implementing
+stage: review
 tags: []
 parent: feature-style-command-family
 depends_on: [story-style-selection-tiers-config]
@@ -100,4 +100,20 @@ See `feature-style-command-family` Units 3–5, Testing, and Risks.
 
 **Review context**: standard weight; cross-model GLM 5.2 deep review over commit
 `3810220`; independent verification was green (464 tests and typecheck). The
-implementation itself was judged correct; only regression protection is missing.
+implementation itself was judged correct; only regression protection was missing.
+
+## Correction notes (2026-07-12)
+
+- Added the missing style-only inspect regression. It proves a vanished custom
+  style is reported on `Style:` without contaminating the valid `Mode: unset`
+  status.
+- Confirmed the shared handler seam gracefully assembles the diagnostic prompt
+  without the broken style, so the test pins the real contract: identity + base
+  remain visible, vanished style bytes are absent, and no mode or assembly error
+  is fabricated.
+
+## Correction evidence
+
+- `npx vitest --run tests/commands.test.ts` — 73 tests passed.
+- `npm run typecheck` — passed.
+- `git diff --check` — passed.

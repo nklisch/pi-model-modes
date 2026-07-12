@@ -659,6 +659,44 @@ describe("registerModeInspectCommand — `--prompt` flag handling", () => {
     );
   });
 
+  it("`--prompt` keeps mode resolvable when only style assembly fails", async () => {
+    const root = mkdtempSync(join(tmpdir(), "inspect-broken-style-"));
+    const stylePath = join(root, "team.md");
+    writeFileSync(stylePath, "TEAM STYLE", "utf8");
+    configureStyleDefaults({
+      selection: "team",
+      source: "project",
+      registry: new Map([
+        ["team", { rawRel: "team.md", configDir: root, scope: "project" }],
+      ]),
+    });
+
+    try {
+      const model = makeModel({ name: "GLM-5.2", provider: "zai" });
+      handleBeforeAgentStart(makeEvent("memoized-base"), makeContext({ model }));
+      rmSync(stylePath);
+
+      const { calls, handler } = getHandler();
+      const { ctx, notifies } = ctxWithNotify();
+      await handler("--prompt", ctx);
+
+      expect(notifies).toEqual([]);
+      const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
+      const msg = send.args[0] as { content: string };
+      expect(msg.content).toContain("Mode: unset");
+      expect(msg.content).toContain("Style: (unresolvable — custom style file not found:");
+      expect(msg.content).not.toContain("Mode: (unresolvable");
+      // Inspect uses the handler's graceful style resolver for assembly, so the
+      // diagnostic prompt remains available with only the broken style omitted.
+      expect(msg.content).toContain(`${deriveIdentityLine(model)}\nmemoized-base`);
+      expect(msg.content).not.toContain("TEAM STYLE");
+      expect(msg.content).not.toContain("(could not assemble");
+    } finally {
+      resetStyleForTesting();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("bare `/mode:inspect` (no flag) is byte-for-byte unchanged", async () => {
     const model = makeModel({ name: "GLM-5.2", provider: "zai" });
     handleBeforeAgentStart(makeEvent("base"), makeContext({ model }));
