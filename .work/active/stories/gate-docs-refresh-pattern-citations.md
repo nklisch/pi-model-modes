@@ -1,7 +1,7 @@
 ---
 id: gate-docs-refresh-pattern-citations
 kind: story
-stage: implementing
+stage: review
 tags: [documentation]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ The writing-style implementation shifted the referenced definitions. Current anc
 
 ## Required edit
 Refresh only the stale citations to current source lines. Regenerate the patterns index/digest if the pattern gate changes its entry block; do not add historical prose.
+
+## Implementation notes
+- Execution capability: inline single-owner documentation maintenance; bounded citation-only refresh.
+- review_weight: standard (project default)
+- Files changed: `.agents/skills/patterns/resolver-throw-graceful-degrade.md`, `.agents/skills/patterns/pure-core-thin-pi-seam.md`, `.agents/skills/patterns/stateful-module-reset-for-testing.md`, `.agents/skills/patterns/enoent-tolerant-read-rethrow.md`
+- Tests added: none.
+- Verification: `git diff --check -- .agents/skills/patterns` and stale-citation grep (passed).
+- Discrepancies from design: the patterns index/digest entry block was unchanged, so regeneration was not needed.
+- Adjacent issues parked: none.

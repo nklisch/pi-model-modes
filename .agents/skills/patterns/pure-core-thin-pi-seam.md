@@ -17,7 +17,7 @@ keeps runtime seams narrow.
 
 ### Render core + command registration
 
-**Files**: `src/commands.ts:136`, `src/commands.ts:531`
+**Files**: `src/commands.ts:162`, `src/commands.ts:559`
 
 ```ts
 export function renderModeInspect(
@@ -35,7 +35,7 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
 
 ### Footer formatter + UI seam
 
-**Files**: `src/footer.ts:96`, `src/footer.ts:136`
+**Files**: `src/footer.ts:125`, `src/footer.ts:171`
 
 ```ts
 export function formatModeFooter(inputs: ModeFooterInputs): string { /* pure */ }

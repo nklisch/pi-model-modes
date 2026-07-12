@@ -16,7 +16,7 @@ auditable.
 
 ### Cache state + reset
 
-**Files**: `src/cache.ts:51`, `src/cache.ts:231`
+**Files**: `src/cache.ts:92`, `src/cache.ts:238`
 
 ```ts
 let lastKey: string | undefined;
@@ -36,7 +36,7 @@ export function resetCacheForTesting(): void {
 
 ### Resolver tiers + reset
 
-**Files**: `src/resolver.ts:69`, `src/resolver.ts:329`
+**Files**: `src/resolver.ts:86`, `src/resolver.ts:329`
 
 ```ts
 let activeSpec: ModeSpec | undefined;
@@ -50,7 +50,7 @@ export function resetResolverForTesting(): void {
 
 ### Path override + reset
 
-**Files**: `src/config.ts:33`, `src/config.ts:402`, `src/config.ts:411`
+**Files**: `src/config.ts:51`, `src/config.ts:513`, `src/config.ts:522`
 
 ```ts
 let globalPathOverride: string | undefined;
