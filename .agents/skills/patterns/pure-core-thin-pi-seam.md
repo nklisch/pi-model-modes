@@ -17,7 +17,7 @@ keeps runtime seams narrow.
 
 ### Render core + command registration
 
-**Files**: `src/commands.ts:162`, `src/commands.ts:559`
+**Files**: `src/commands.ts:180`, `src/commands.ts:537`
 
 ```ts
 export function renderModeInspect(

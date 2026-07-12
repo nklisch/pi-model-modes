@@ -1,7 +1,7 @@
 ---
 id: gate-docs-pure-core-citations
 kind: story
-stage: implementing
+stage: review
 tags: [documentation]
 parent: null
 depends_on: []
@@ -22,3 +22,14 @@ pattern-skill-staleness
 
 ## Required edit
 Replace stale `commands.ts` line citations with the current `renderModeInspect` and `registerModeInspectCommand` lines.
+
+## Implementation notes
+
+- Re-resolved the exported symbol declarations in `src/commands.ts`: `180`
+  (`renderModeInspect`) and `537` (`registerModeInspectCommand`).
+- Updated the pattern citation in place; no code behavior changed.
+
+## Verification
+
+- Citation audit: `grep -nE '^export function (renderModeInspect|registerModeInspectCommand)' src/commands.ts` matches `180` and `537`.
+- Transitioned to `stage: review` after the source citation was refreshed.
