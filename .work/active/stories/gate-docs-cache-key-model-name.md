@@ -1,7 +1,7 @@
 ---
 id: gate-docs-cache-key-model-name
 kind: story
-stage: implementing
+stage: review
 tags: [documentation]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ The live key has six components: `model.name`, `model.id`, `model.provider`, mod
 
 ## Required edit
 Insert `model.name` as the first cache-key component in ARCHITECTURE and README, replacing the incomplete assertion in place.
+
+## Implementation notes
+- Execution capability: inline single-owner documentation correction; two bounded current-state assertions.
+- review_weight: standard (project default)
+- Files changed: `docs/ARCHITECTURE.md`, `README.md`
+- Tests added: none.
+- Verification: `git diff --check -- docs/ARCHITECTURE.md README.md` plus direct `model.name` citation check (passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.

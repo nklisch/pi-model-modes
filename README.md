@@ -209,7 +209,7 @@ Fragment files are cached by mtime, so editing one takes effect on the next turn
   (in preset-declared order) →
   pi's assembled base.
 - **Cache-stable.** The handler computes a cache key each turn over
-  `model.id` + `model.provider` + the mode signature + the style signature + a hash of pi's base, and
+  `model.name` + `model.id` + `model.provider` + the mode signature + the style signature + a hash of pi's base, and
   only re-assembles on a miss. There are no timestamps, counters, or
   nondeterministic values in the assembled output, so consecutive no-change
   turns produce byte-identical prompts.

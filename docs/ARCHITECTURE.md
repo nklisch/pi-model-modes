@@ -114,7 +114,7 @@ keybindings register before cwd is known and are global in pi.
                 │     mode: override > config default > unset      │
                 │     style: project config > global > unset       │
                 │  2. compute cache key                            │
-                │     = hash(model.id, model.provider,             │
+                │     = hash(model.name, model.id, model.provider, │
                 │            mode.signature, style.signature,      │
                 │            hash(e.systemPrompt))                 │
                 │  3. key === lastKey ?  ─────── yes ──▶ return lastResult
