@@ -1,7 +1,7 @@
 ---
 id: gate-tests-custom-global-source-resolution
 kind: story
-stage: implementing
+stage: review
 tags: [testing]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ Seed a global-scope custom entry and assert `resolveActiveStylePlan()` returns i
 
 ## Test location
 `tests/style.test.ts`
+
+## Implementation notes
+- Execution capability: inline single-owner test addition; narrow, low-risk resolver coverage.
+- review_weight: standard (project default)
+- Files changed: `tests/style.test.ts`
+- Tests added: global custom-style source resolution.
+- Verification: `npx vitest --run tests/style.test.ts` (13 passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.

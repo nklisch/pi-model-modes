@@ -109,6 +109,23 @@ describe("style catalog and resolution", () => {
     expect(bundled.signature).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("resolves a global custom style with its defining source", () => {
+    const root = freshDir();
+    write(root, "team.md", "GLOBAL TEAM");
+    setStyleSelection({
+      selection: "team",
+      registry: new Map([
+        ["team", { rawRel: "team.md", configDir: root, scope: "global" }],
+      ]),
+    });
+
+    expect(resolveActiveStylePlan()).toMatchObject({
+      name: "team",
+      source: "custom-global",
+      content: "GLOBAL TEAM",
+    });
+  });
+
   it("custom registration wins on a bundled-name collision and vanished files throw", () => {
     const root = freshDir();
     const path = write(root, "clear.md", "CUSTOM CLEAR");
