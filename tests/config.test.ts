@@ -220,18 +220,22 @@ describe("style config scopes + seeding", () => {
     });
   });
 
-  it("drops bad entries, preserves siblings, and degrades an unknown selection", () => {
+  it("drops bad entries without poisoning a selected valid sibling", () => {
     const d = freshDir();
     const global = join(d, "config.json");
     writeRaw(join(d, "valid.md"), "VALID");
     writeJson(global, {
-      writingStyle: "unknown",
+      writingStyle: "valid",
       customStyles: { valid: "valid.md", bad: "../escape.md", "Bad Name": "valid.md" },
     });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     setConfigPathsForTesting({ global, project: join(d, "missing.json") });
     expect(() => applyStyleFromConfig("/unused")).not.toThrow();
-    expect(resolveActiveStylePlan()).toMatchObject({ source: "unset", content: "" });
+    expect(resolveActiveStylePlan()).toMatchObject({
+      name: "valid",
+      source: "custom-global",
+      content: "VALID",
+    });
     expect(warn).toHaveBeenCalled();
   });
 });
