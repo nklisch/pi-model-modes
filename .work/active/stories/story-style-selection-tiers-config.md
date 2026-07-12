@@ -1,7 +1,7 @@
 ---
 id: story-style-selection-tiers-config
 kind: story
-stage: review
+stage: done
 tags: []
 parent: feature-style-command-family
 depends_on: []
@@ -119,3 +119,19 @@ See `feature-style-command-family` Units 1–2, Testing, and Risks.
 
 **Review context**: standard weight; cross-model GLM 5.2 deep review over commit
 `4852ade`; integrated verification was green (427 tests and typecheck).
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none remaining; the positive global-custom regression gap was
+fixed in `135846a` and verified by a targeted cross-model re-review.
+**Nits**: the temporary `StylePlan.source` compatibility projection remains
+until the dependent command/inspect story migrates its consumers, as designed.
+
+**Notes**: Standard-weight deep review with a GLM 5.2 cross-model pass, followed
+by a focused fresh re-review after correction. Independent integrated
+verification passed: 25 files, 428 tests, and TypeScript typecheck. Interim
+foundation-doc drift is explicitly owned by Unit 5 of the dependent story and
+must be cleared before the parent feature can complete.
