@@ -1,7 +1,7 @@
 ---
 id: story-style-command-ui-autocomplete
 kind: story
-stage: review
+stage: implementing
 tags: []
 parent: feature-style-command-family
 depends_on: [story-style-selection-tiers-config]
@@ -88,3 +88,16 @@ See `feature-style-command-family` Units 3–5, Testing, and Risks.
 - Test-integrity inspection — no skipped/only tests, placeholder assertions, or
   deleted behavioral coverage; legacy `StylePlan.source` assertions were
   migrated to the authoritative provenance field.
+
+## Review findings (2026-07-12)
+
+**Verdict**: Request changes
+
+**Blocking correction**:
+- Add a regression test for the adjacent inspect fix: when style assembly fails
+  but mode resolution succeeds, `/mode:inspect --prompt` must report the style
+  and prompt assembly failure without mislabeling `Mode:` as unresolvable.
+
+**Review context**: standard weight; cross-model GLM 5.2 deep review over commit
+`3810220`; independent verification was green (464 tests and typecheck). The
+implementation itself was judged correct; only regression protection is missing.
