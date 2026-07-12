@@ -27,4 +27,6 @@ updated: 2026-07-12
 
 - **gate-cruft** (2026-07-12) — 4 findings (High=0, Medium=2, Low=2)
 
-Pending configured gates: docs, patterns.
+- **gate-docs** (2026-07-12) — 6 findings (changelog-gap=1, pattern-skill-staleness=4, foundation-doc-assertion=1)
+
+Pending configured gate: patterns.
