@@ -511,6 +511,8 @@ describe("assembleForInspect — single-source-of-truth splice", () => {
 });
 
 describe("registerModeInspectCommand — `--prompt` flag handling", () => {
+  let inspectBrokenRoot: string | undefined;
+
   const validPiMode: ResolvedMode = {
     base: "pi",
     agency: "autonomous",
@@ -527,6 +529,7 @@ describe("registerModeInspectCommand — `--prompt` flag handling", () => {
 
   function switchToBrokenFragmentRoot(): void {
     const root = mkdtempSync(join(tmpdir(), "inspect-broken-"));
+    inspectBrokenRoot = root;
     // Keep the axis dir non-empty so resolve fails on the selected VALUE rather
     // than on missing fixture infrastructure.
     writeFragment(root, "axis/agency/other.md", "OTHER");
@@ -547,6 +550,10 @@ describe("registerModeInspectCommand — `--prompt` flag handling", () => {
 
   afterEach(() => {
     resetFragmentsForTesting();
+    if (inspectBrokenRoot) {
+      rmSync(inspectBrokenRoot, { recursive: true, force: true });
+      inspectBrokenRoot = undefined;
+    }
   });
 
   function getHandler() {

@@ -1,7 +1,7 @@
 ---
 id: gate-patterns-clean-inspect-temp-dir
 kind: story
-stage: implementing
+stage: review
 tags: [refactor, testing]
 parent: null
 depends_on: []
@@ -21,3 +21,12 @@ updated: 2026-07-12
 
 ## Required reconciliation
 Hoist the temp path to the describe scope, assign it from the helper, and remove/reset it in `afterEach` with `rmSync(..., { recursive: true, force: true })`. Preserve existing test behavior.
+
+## Implementation notes
+- Execution capability: inline single-owner test-fixture cleanup; direct application of the existing temp scaffold pattern.
+- review_weight: standard (project default)
+- Files changed: `tests/commands.test.ts`
+- Tests added: none; existing inspect command tests verify preserved behavior.
+- Verification: `npx vitest --run tests/commands.test.ts` (71 passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.
