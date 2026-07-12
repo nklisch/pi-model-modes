@@ -1,7 +1,7 @@
 ---
 id: feature-configurable-writing-styles
 kind: feature
-stage: review
+stage: done
 tags: [security, tests, docs]
 parent: null
 depends_on: []
@@ -923,3 +923,88 @@ this is one feature, not a multi-feature arc.
 - Verification: focused style/config/cache/handler/inspect suite passed (166 tests); final full suite passed (408 tests); `tsc --noEmit` passed.
 - Discrepancies from design: none.
 - Adjacent issues parked: none.
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+**Nits** (advisory; not items):
+- `loadPluginConfig` casts the merged `customStyles` to `Record<string, string>` without
+  per-value type validation at that seam (`src/config.ts`). The lie is fully contained —
+  `readStyleScope` re-validates each entry's `typeof === "string"` before it reaches the
+  registry — but a stricter helper (`isStringRecord`) would make the containment explicit
+  instead of relying on the downstream reader. No behavior gap today.
+- Acceptance criterion "`formatModeListing` and `formatModeFooter` outputs are byte-unchanged"
+  is satisfied by absence (neither function references style state), but neither surface has
+  a direct byte-asserting unit test (`formatModeListing` has no direct test at all in the
+  suite). `formatModeFooter` is covered by `tests/footer.test.ts`, which was not modified by
+  this commit and still passes — that is the load-bearing proof. Pre-existing gap, not
+  introduced here; noting for a future test-coverage item.
+- `resolveActiveStylePlan()` is invoked twice during `/mode:inspect --prompt` (once for the
+  `Style:` line via the command's own try/catch, once inside `assembleForInspect` via
+  `resolveStyleGracefully(false)`). Each custom-style resolution costs a `realpathSync` +
+  `statSync` (+ possible read). Inspect is a manual diagnostic, not a hot path, so the
+  doubled FS cost is fine; a single resolved-style pass shared between the two consumers
+  would be a small future cleanup.
+- `warnedStyleErrors` in `handler.ts` is an unbounded `Set<string>`. In practice the
+  distinct-error count is tiny (deterministic per vanished-file state), so this is not a
+  leak risk; flagging only for completeness.
+
+**Notes**:
+- Mode: substrate. Lane: Deep (feature kind at `standard` weight), run inline in fresh
+  cross-model context per the caller's instruction (no subagents / no peeragent). The host
+  context for this pass is GLM-5.2; the review intentionally re-derived the security and
+  byte-compat conclusions from the source rather than trusting the design's claims.
+- Verification re-run: `npm test` → 408/408 passed (25 files); `npm run typecheck` → clean.
+  Both match the implementor's recorded evidence.
+- Complementary/completeness pass confirmed: every Unit's acceptance criterion is met by an
+  assertion in the test suite (path containment + symlink/TOCTOU in `tests/style.test.ts`;
+  per-key merge + scope seeding + tolerance in `tests/config.test.ts`; 6-component key +
+  `style-switched` classification + priority ordering in `tests/cache.test.ts`; byte-compat,
+  independent injection, ordering, graceful degrade, content-vs-touch invalidation, inspect
+  parity in `tests/handler-style.test.ts`; Style-line states + reason detail in
+  `tests/commands.test.ts`; legacy-byte preservation across `noop`/`cache-stability`/
+  `clean-base`/`handler-mode` regressions).
+- Adversarial attack focused on the caller's risk surfaces:
+  - **Path containment / symlink / TOCTOU**: `resolveCustomStylePath` realpath-contains the
+    candidate against `realpathSync(configDir)` with the correct `+ sep` boundary, rejects
+    absolute / non-`.md` / missing / non-regular / escaping paths with distinct messages,
+    and is re-invoked every turn from `resolveActiveStylePlan` (closing the seed→read
+    symlink-swap window). Residual same-turn TOCTOU between `isFile()` and `readFileSync` is
+    the explicitly-accepted risk in the design (write access inside `<cwd>/.pi/` is already
+    trusted content). Solid.
+  - **Global/project merge semantics**: scalars shallow-merge project-over-global unchanged;
+    `customStyles` per-key merges with project winning, including over a bundled name when
+    explicitly registered. A bad project entry (invalid path) does NOT poison a valid global
+    entry — the global stays. Correct and graceful.
+  - **Graceful degradation**: style resolution is wrapped in `resolveStyleGracefully`;
+    mode resolution stays unwrapped (pre-existing, deliberately asymmetric per design).
+    `warnedStyleErrors` dedupes per distinct message. Verified by the vanished-file test.
+  - **No-style byte compatibility**: `spliceSystemPrompt` takes the legacy single-`\n` branch
+    IFF `stylePlan.content === "" && plan.mode === undefined`; any style flips to the
+    blank-line join. Byte-exact assertions in `noop`, `cache-stability`, `clean-base`, and
+    `handler-style` confirm both directions. The mode-active + no-style path is byte-identical
+    to pre-feature (style fragment is `undefined` → skipped), confirmed by `handler-mode`
+    passing unmodified.
+  - **Cache key / reason correctness**: 6th component `styleSignature` participates in
+    `computeCacheKey` (term-necessity test added); classification priority
+    `initial > model > mode > style > base` is correct, including the mode-wins-on-tie test.
+    Content-hash invalidation (not mtime) is proven by the touch-vs-edit test.
+  - **Inspect rendering**: dedicated `Style:` line for all five sources plus the unresolvable
+    case; `style-switched` reason detail renders `(style <from> → <to>)` with `unset` for the
+    empty signature. No leakage into `formatModeListing` or `formatModeFooter`.
+  - **Test integrity**: every test asserts real behavior; no `expect(true).toBe(true)`-style
+    gaming. The vanished-file test deletes a real fixture and asserts the throw; the
+    symlink test creates real in-dir and escaping symlinks; the touch-vs-edit test does real
+    `utimesSync` and content writes. Honest suite.
+- Foundation-doc roll-forward verified consistent: SPEC Invariant 3 + cache-key formula +
+  assembly diagram, ARCHITECTURE component tree + per-turn flow + TOCTOU note, VISION
+  orthogonal-styles bullet, README built-in/custom/`none` examples + behavioral boundary,
+  CHANGELOG `Unreleased` Features entry. No drift.
+- Discrepancies from design: none material. Implementation matches every locked decision
+  in the design section.
+- Item advanced `review → done`. No release binding and no active parent → archiving as a
+  bodyless stub under `delete-refs` retention in a follow-up commit; `archived_atop: v0.2.0`
+  (latest shipped tag at archival time).
