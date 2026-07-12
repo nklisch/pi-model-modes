@@ -21,4 +21,6 @@ updated: 2026-07-12
 
 ## Gate runs
 
-Pending configured gates: security, tests, cruft, docs, patterns.
+- **gate-security** (2026-07-12) — 3 findings (Critical=0, High=0, Medium=0, Low=3)
+
+Pending configured gates: tests, cruft, docs, patterns.
