@@ -12,8 +12,11 @@ import {
   setConfigPathsForTesting,
   resetConfigForTesting,
   writeDefaultToConfig,
+  writeStyleDefaultToConfig,
   effectiveDefaultSource,
+  effectiveStyleDefaultSource,
   readDefaultSources,
+  readStyleDefaultSources,
   DEFAULT_OFF,
 } from "../src/config.js";
 import {
@@ -29,7 +32,13 @@ import {
   resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
-import { resetStyleForTesting, resolveActiveStylePlan } from "../src/style.js";
+import {
+  getActiveStyle,
+  getEffectiveStyleSelectionSource,
+  resetStyleForTesting,
+  resolveActiveStylePlan,
+  setActiveStyle,
+} from "../src/style.js";
 
 /**
  * Tests for `src/config.ts` — the plugin-owned config loader + default-tier
@@ -800,6 +809,111 @@ describe("writeDefaultToConfig — write pipeline", () => {
       expect(result.error.length).toBeGreaterThan(0);
     }
     expect(getDefaultMode()).toBeUndefined();
+  });
+});
+
+describe("style durable defaults + lifecycle", () => {
+  function setStylePaths(d: string): { global: string; project: string } {
+    const global = join(d, "global.json");
+    const project = join(d, "cwd", ".pi", "pi-model-modes.json");
+    setConfigPathsForTesting({ global, project });
+    return { global, project };
+  }
+
+  it("writes project style defaults, preserves siblings, and keeps an override", () => {
+    const d = freshDir();
+    const { project } = setStylePaths(d);
+    writeJson(project, { defaultMode: "extend", cycleKeybinding: true, writingStyle: "clear", customStyles: {} });
+    setActiveStyle("clear");
+
+    const result = writeStyleDefaultToConfig(d, "none", "project");
+    expect(result).toEqual({
+      ok: true,
+      writtenScope: "project",
+      writtenValue: "none",
+      effective: { value: "none", source: "project" },
+    });
+    expect(JSON.parse(readFileSync(project, "utf8"))).toMatchObject({
+      defaultMode: "extend",
+      cycleKeybinding: true,
+      writingStyle: "none",
+    });
+    expect(getActiveStyle()).toBe("clear");
+    expect(getEffectiveStyleSelectionSource()).toBe("override");
+  });
+
+  it("clears project style and falls back to global, with absent clear as a no-op", () => {
+    const d = freshDir();
+    const { global, project } = setStylePaths(d);
+    writeJson(global, { writingStyle: "clear" });
+    writeJson(project, { writingStyle: "none" });
+    applyStyleFromConfig(d);
+    expect(resolveActiveStylePlan()).toMatchObject({ source: "none", selectionSource: "project" });
+
+    const cleared = writeStyleDefaultToConfig(d, DEFAULT_OFF, "project");
+    expect(cleared).toMatchObject({ ok: true, writtenValue: undefined });
+    expect(resolveActiveStylePlan()).toMatchObject({ name: "clear", source: "bundled", selectionSource: "global" });
+
+    rmSync(project);
+    const noop = writeStyleDefaultToConfig(d, DEFAULT_OFF, "project");
+    expect(noop).toMatchObject({ ok: true, noop: true });
+    expect(existsSync(project)).toBe(false);
+  });
+
+  it("rejects project-only custom styles for global writes before touching disk", () => {
+    const d = freshDir();
+    const { global, project } = setStylePaths(d);
+    writeRaw(join(dirname(project), "team.md"), "TEAM");
+    writeJson(project, { customStyles: { team: "team.md" } });
+
+    const result = writeStyleDefaultToConfig(d, "team", "global");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/unknown writing style.*global/);
+    expect(existsSync(global)).toBe(false);
+  });
+
+  it("warns and skips reserved custom names while control-like scalar values remain unknown", () => {
+    const d = freshDir();
+    const { global } = setStylePaths(d);
+    writeRaw(join(d, "team.md"), "TEAM");
+    writeJson(global, {
+      customStyles: { none: "team.md", off: "team.md", default: "team.md", team: "team.md" },
+      writingStyle: "off",
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    applyStyleFromConfig(d);
+    expect(resolveActiveStylePlan()).toMatchObject({ source: "unset", selectionSource: "unset" });
+    expect(warn.mock.calls.some(([message]) => String(message).includes('writingStyle "off"'))).toBe(true);
+    expect(warn.mock.calls.filter(([message]) => String(message).includes("reserved")).length).toBe(3);
+  });
+
+  it("reports raw style scopes and effective durable provenance", () => {
+    const d = freshDir();
+    const { global, project } = setStylePaths(d);
+    writeJson(global, { writingStyle: "clear" });
+    writeJson(project, { writingStyle: "none" });
+    expect(readStyleDefaultSources(d)).toEqual({ global: "clear", project: "none" });
+    expect(effectiveStyleDefaultSource(d)).toEqual({ value: "none", source: "project" });
+  });
+
+  it.each(["reload", "startup"] as const)("preserves style override on %s", (reason) => {
+    const d = freshDir();
+    const { global } = setStylePaths(d);
+    writeJson(global, { writingStyle: "clear" });
+    setActiveStyle("expressive");
+    applySessionStart(reason, d);
+    expect(getActiveStyle()).toBe("expressive");
+    expect(getEffectiveStyleSelectionSource()).toBe("override");
+  });
+
+  it.each(["new", "resume", "fork"] as const)("clears style override on %s", (reason) => {
+    const d = freshDir();
+    const { global } = setStylePaths(d);
+    writeJson(global, { writingStyle: "clear" });
+    setActiveStyle("expressive");
+    applySessionStart(reason, d);
+    expect(getActiveStyle()).toBeUndefined();
+    expect(getEffectiveStyleSelectionSource()).toBe("global");
   });
 });
 

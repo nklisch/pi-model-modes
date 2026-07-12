@@ -35,7 +35,7 @@ import {
   setFragmentRootForTesting,
 } from "../src/fragments.js";
 import { makeContext, makeEvent, makeModel, makePi, makeUi } from "./harness.js";
-import { resetStyleForTesting, setStyleSelection } from "../src/style.js";
+import { configureStyleDefaults, resetStyleForTesting } from "../src/style.js";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { RecordedCall } from "./harness.js";
 
@@ -325,8 +325,9 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
     const root = mkdtempSync(join(tmpdir(), "inspect-style-"));
     try {
       writeFileSync(join(root, "team.md"), "TEAM", "utf8");
-      setStyleSelection({
+      configureStyleDefaults({
         selection: "team",
+        source: "project",
         registry: new Map([
           ["team", { rawRel: "team.md", configDir: root, scope: "project" }],
         ]),

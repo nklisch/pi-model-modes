@@ -21,7 +21,11 @@ import {
   setFragmentRootForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
-import { resetStyleForTesting, setStyleSelection } from "../src/style.js";
+import {
+  configureStyleDefaults,
+  resetStyleForTesting,
+  setActiveStyle,
+} from "../src/style.js";
 import { makeContext, makeEvent, makeModel } from "./harness.js";
 
 let tmp: string | undefined;
@@ -43,12 +47,14 @@ function fixture(): { root: string; stylePath: string } {
   mkdirSync(join(root, "modifiers"), { recursive: true });
   const stylePath = write(root, "styles/team.md", "STYLE ONE");
   setFragmentRootForTesting(root);
-  setStyleSelection({
-    selection: "team",
+  configureStyleDefaults({
+    selection: undefined,
+    source: "unset",
     registry: new Map([
       ["team", { rawRel: "styles/team.md", configDir: root, scope: "project" }],
     ]),
   });
+  setActiveStyle("team");
   return { root, stylePath };
 }
 

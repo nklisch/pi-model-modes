@@ -7,14 +7,21 @@ import { loadFragment } from "./fragments.js";
 /** No-style sentinel for the cache-key contribution. */
 export const NO_STYLE_SIGNATURE = "";
 
+/** Names owned by the command grammar rather than by style fragments. */
+export const RESERVED_STYLE_NAMES = new Set(["none", "off", "default"]);
+
 export interface CustomStyleEntry {
   rawRel: string;
   configDir: string;
   scope: "global" | "project";
 }
 
-export interface StyleSelection {
+export type StyleSelectionSource = "override" | "project" | "global" | "unset";
+export type StyleDefaultSource = "project" | "global" | "unset";
+
+export interface StyleConfigState {
   selection: string | undefined;
+  source: StyleDefaultSource;
   registry: ReadonlyMap<string, CustomStyleEntry>;
 }
 
@@ -25,16 +32,29 @@ export type StyleSource =
   | "none"
   | "unset";
 
+export interface AvailableStyle {
+  name: string;
+  fragmentSource: Exclude<StyleSource, "none" | "unset">;
+}
+
 export interface StylePlan {
   name: string | undefined;
+  /** @deprecated Use fragmentSource; retained for existing inspect consumers. */
   source: StyleSource;
+  fragmentSource: StyleSource;
+  selectionSource: StyleSelectionSource;
   content: string;
   signature: string;
 }
 
 const STYLE_NAME_RE = /^[a-z][a-z0-9-]*$/;
 const BUNDLED_STYLE_ROOT = fileURLToPath(new URL("../prompts/styles/", import.meta.url));
-let styleSelection: StyleSelection | undefined;
+
+// Two independent tiers: a session override over a durable config default.
+let activeSelection: string | undefined;
+let defaultSelection: string | undefined;
+let defaultSource: StyleDefaultSource = "unset";
+let registry = new Map<string, CustomStyleEntry>();
 
 export function isValidStyleName(name: string): boolean {
   return STYLE_NAME_RE.test(name);
@@ -90,52 +110,146 @@ export function discoverBundledStyles(): string[] {
     .sort();
 }
 
-export function setStyleSelection(selection: StyleSelection | undefined): void {
-  styleSelection = selection;
+function bundledStyleNames(): string[] {
+  return discoverBundledStyles().map((path) => basename(path, ".md"));
 }
 
-export function noStylePlan(source: "none" | "unset"): StylePlan {
+function cloneRegistry(source: ReadonlyMap<string, CustomStyleEntry>): Map<string, CustomStyleEntry> {
+  return new Map(
+    [...source.entries()].map(([name, entry]) => [name, { ...entry }]),
+  );
+}
+
+function resolveSelection(
+  selection: string,
+  styles: ReadonlyMap<string, CustomStyleEntry>,
+): void {
+  if (selection === "none") return;
+  if (RESERVED_STYLE_NAMES.has(selection)) {
+    throw new Error(`style "${selection}" is a command control token, not a selectable style`);
+  }
+  const custom = styles.get(selection);
+  if (custom) {
+    // Validate the path and load the fragment before changing a tier. This is
+    // the same validate-before-assign rule used by the mode resolver.
+    loadFragment(resolveCustomStylePath(custom.rawRel, custom.configDir));
+    return;
+  }
+  if (bundledStyleNames().includes(selection)) {
+    return;
+  }
+  throw new Error(`style "${selection}" has no bundled or custom fragment`);
+}
+
+/** Replace only the durable default and custom registry; preserve override. */
+export function configureStyleDefaults(state: StyleConfigState): void {
+  const nextRegistry = cloneRegistry(state.registry);
+  if (state.selection !== undefined) {
+    resolveSelection(state.selection, nextRegistry);
+  }
+  defaultSelection = state.selection;
+  defaultSource = state.selection === undefined ? "unset" : state.source;
+  registry = nextRegistry;
+}
+
+/** Set the ephemeral session override after fully validating the selection. */
+export function setActiveStyle(name: string): void {
+  if (typeof name !== "string" || name.length === 0) {
+    throw new Error("style name must be a non-empty string");
+  }
+  resolveSelection(name, registry);
+  activeSelection = name;
+}
+
+/** Clear only the ephemeral override; the configured default remains intact. */
+export function clearActiveStyle(): void {
+  activeSelection = undefined;
+}
+
+export function getActiveStyle(): string | undefined {
+  return activeSelection;
+}
+
+export function getDefaultStyle(): string | undefined {
+  return defaultSelection;
+}
+
+export function getEffectiveStyleSelectionSource(): StyleSelectionSource {
+  if (activeSelection !== undefined) return "override";
+  if (defaultSelection !== undefined) return defaultSource;
+  return "unset";
+}
+
+/**
+ * List actual selectable fragments in stable name order. Custom registrations
+ * are inserted after bundled discovery and therefore replace bundled entries
+ * with the same name without changing the catalog's deterministic ordering.
+ */
+export function listAvailableStyles(): readonly AvailableStyle[] {
+  const byName = new Map<string, AvailableStyle>();
+  for (const name of bundledStyleNames()) {
+    if (!RESERVED_STYLE_NAMES.has(name)) {
+      byName.set(name, { name, fragmentSource: "bundled" });
+    }
+  }
+  for (const [name, entry] of registry) {
+    if (isValidStyleName(name) && !RESERVED_STYLE_NAMES.has(name)) {
+      byName.set(name, {
+        name,
+        fragmentSource: entry.scope === "global" ? "custom-global" : "custom-project",
+      });
+    }
+  }
+  return [...byName.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+}
+
+function plan(
+  name: string | undefined,
+  fragmentSource: StyleSource,
+  selectionSource: StyleSelectionSource,
+  content: string,
+): StylePlan {
   return {
-    name: undefined,
-    source,
-    content: "",
-    signature: NO_STYLE_SIGNATURE,
+    name,
+    source: fragmentSource,
+    fragmentSource,
+    selectionSource,
+    content,
+    signature: content === "" ? NO_STYLE_SIGNATURE : sha256(content),
   };
 }
 
-export function resolveActiveStylePlan(): StylePlan {
-  const state = styleSelection;
-  if (state === undefined || state.selection === undefined) return noStylePlan("unset");
-  if (state.selection === "none") return noStylePlan("none");
+export function noStylePlan(
+  source: "none" | "unset",
+  selectionSource: StyleSelectionSource = source === "none" ? "override" : "unset",
+): StylePlan {
+  return plan(undefined, source, selectionSource, "");
+}
 
-  const custom = state.registry.get(state.selection);
+export function resolveActiveStylePlan(): StylePlan {
+  const selection = activeSelection ?? defaultSelection;
+  const selectionSource = getEffectiveStyleSelectionSource();
+  if (selection === undefined) return noStylePlan("unset", selectionSource);
+  if (selection === "none") return noStylePlan("none", selectionSource);
+
+  const custom = registry.get(selection);
   if (custom) {
-    const path = resolveCustomStylePath(custom.rawRel, custom.configDir);
-    const content = loadFragment(path);
-    return {
-      name: state.selection,
-      source: custom.scope === "global" ? "custom-global" : "custom-project",
-      content,
-      signature: sha256(content),
-    };
+    const content = loadFragment(resolveCustomStylePath(custom.rawRel, custom.configDir));
+    const source: StyleSource = custom.scope === "global" ? "custom-global" : "custom-project";
+    return plan(selection, source, selectionSource, content);
   }
 
   const bundled = discoverBundledStyles().find(
-    (path) => basename(path, ".md") === state.selection,
+    (path) => basename(path, ".md") === selection,
   );
-  if (bundled) {
-    const content = loadFragment(bundled);
-    return {
-      name: state.selection,
-      source: "bundled",
-      content,
-      signature: sha256(content),
-    };
-  }
-  throw new Error(`style "${state.selection}" has no bundled or custom fragment`);
+  if (bundled) return plan(selection, "bundled", selectionSource, loadFragment(bundled));
+  throw new Error(`style "${selection}" has no bundled or custom fragment`);
 }
 
 /** TEST-ONLY: return style state to its load-time default. */
 export function resetStyleForTesting(): void {
-  styleSelection = undefined;
+  activeSelection = undefined;
+  defaultSelection = undefined;
+  defaultSource = "unset";
+  registry = new Map();
 }

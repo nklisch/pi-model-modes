@@ -2,11 +2,13 @@ import { readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync } from "
 import { homedir } from "node:os";
 import { join, dirname, basename } from "node:path";
 import { setDefaultMode, clearDefaultMode, clearActiveMode } from "./resolver.js";
+import { clearActiveStyle } from "./style.js";
 import {
+  configureStyleDefaults,
   discoverBundledStyles,
   isValidStyleName,
+  RESERVED_STYLE_NAMES,
   resolveCustomStylePath,
-  setStyleSelection,
   type CustomStyleEntry,
 } from "./style.js";
 
@@ -148,6 +150,8 @@ function readStyleScope(path: string): StyleConfigScope {
       for (const [name, value] of Object.entries(raw.customStyles)) {
         if (!isValidStyleName(name)) {
           console.warn(`pi-model-modes: invalid custom style name "${name}" in "${path}" — ignoring`);
+        } else if (RESERVED_STYLE_NAMES.has(name)) {
+          console.warn(`pi-model-modes: custom style name "${name}" is reserved — ignoring`);
         } else if (typeof value !== "string") {
           console.warn(`pi-model-modes: custom style "${name}" in "${path}" must map to a string path — ignoring`);
         } else {
@@ -190,26 +194,39 @@ export function applyStyleFromConfig(cwd: string): void {
     addScope(scopes.global, "global");
     addScope(scopes.project, "project");
 
+    // Scalar precedence is resolved independently from the registry. A
+    // malformed/unknown project value masks the global value and degrades to
+    // unset rather than accidentally reviving a lower-priority selection.
     const selection = scopes.project.writingStyle ?? scopes.global.writingStyle;
+    const selectionSource: "project" | "global" | "unset" =
+      scopes.project.writingStyle !== undefined
+        ? "project"
+        : scopes.global.writingStyle !== undefined
+          ? "global"
+          : "unset";
     const bundledNames = new Set(
       discoverBundledStyles().map((path) => basename(path, ".md")),
     );
+    let validSelection = selection;
     if (
-      selection !== undefined &&
-      selection !== "none" &&
-      !registry.has(selection) &&
-      !bundledNames.has(selection)
+      validSelection !== undefined &&
+      validSelection !== "none" &&
+      (!registry.has(validSelection) && !bundledNames.has(validSelection))
     ) {
-      console.warn(`pi-model-modes: unknown writingStyle "${selection}" — ignoring`);
-      setStyleSelection({ selection: undefined, registry });
-      return;
+      console.warn(`pi-model-modes: unknown writingStyle "${validSelection}" — ignoring`);
+      validSelection = undefined;
     }
-    setStyleSelection({ selection, registry });
+    configureStyleDefaults({
+      selection: validSelection,
+      source: validSelection === undefined ? "unset" : selectionSource,
+      registry,
+    });
   } catch (cause) {
     // Config startup is deliberately tolerant even if package/style discovery
-    // encounters an unexpected I/O failure.
+    // encounters an unexpected I/O failure. Preserve no stale default, while
+    // configureStyleDefaults still preserves any active override.
     console.warn(`pi-model-modes: could not apply writing style — ignoring (${(cause as Error).message})`);
-    setStyleSelection(undefined);
+    configureStyleDefaults({ selection: undefined, source: "unset", registry: new Map() });
   }
 }
 
@@ -278,6 +295,7 @@ export type SessionStartReason =
 export function applySessionStart(reason: SessionStartReason, cwd: string): void {
   if (reason === "new" || reason === "resume" || reason === "fork") {
     clearActiveMode();
+    clearActiveStyle();
   }
   applyDefaultFromConfig(cwd);
   applyStyleFromConfig(cwd);
@@ -397,27 +415,65 @@ function readObjectForWrite(path: string): Record<string, unknown> {
  * NEVER touches the EPHEMERAL override tier — the precedence invariant
  * (override > default > unset) is preserved exactly.
  */
+interface ScalarWriteOk {
+  path: string;
+  scope: DefaultScope;
+  value: string | undefined;
+  noop?: true;
+}
+interface ScalarWriteErr {
+  path: string;
+  error: string;
+}
+
+/** Shared strict, sibling-preserving, atomic scalar-key writer. */
+function writeScalarConfigKey(
+  path: string,
+  key: string,
+  value: string | typeof DEFAULT_OFF,
+  scope: DefaultScope,
+): ScalarWriteOk | ScalarWriteErr {
+  let loaded: Record<string, unknown>;
+  try {
+    loaded = readObjectForWrite(path);
+  } catch (cause) {
+    return { path, error: (cause as Error).message };
+  }
+
+  const cleared = value === DEFAULT_OFF;
+  if (cleared && !Object.prototype.hasOwnProperty.call(loaded, key)) {
+    return { path, scope, value: undefined, noop: true };
+  }
+
+  const next: Record<string, unknown> = { ...loaded };
+  if (cleared) delete next[key];
+  else next[key] = value;
+
+  const tmpPath = `${path}.tmp`;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(tmpPath, `${JSON.stringify(next, null, 2)}\n`);
+    renameSync(tmpPath, path);
+  } catch (cause) {
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // Best-effort cleanup; preserve the original write failure.
+    }
+    return { path, error: (cause as Error).message };
+  }
+  return { path, scope, value: cleared ? undefined : value };
+}
+
 export function writeDefaultToConfig(
   cwd: string,
   value: DefaultValue,
   scope: DefaultScope,
 ): WriteDefaultResult {
   const path = scope === "global" ? globalConfigPath() : projectConfigPath(cwd);
-
-  let loaded: Record<string, unknown>;
-  try {
-    loaded = readObjectForWrite(path);
-  } catch (cause) {
-    return { ok: false, path, error: (cause as Error).message };
-  }
-
-  const cleared = value === DEFAULT_OFF;
-  const hasDefaultMode = Object.prototype.hasOwnProperty.call(loaded, "defaultMode");
-
-  // Clear-when-empty is a no-op, not a write of `{}`. This preserves the
-  // explicit contract from the feature design and avoids surprising file/dir
-  // creation when the user asks to clear something that was never set.
-  if (cleared && !hasDefaultMode) {
+  const written = writeScalarConfigKey(path, "defaultMode", value, scope);
+  if ("error" in written) return { ok: false, path, error: written.error };
+  if (written.noop) {
     return {
       ok: true,
       noop: true,
@@ -426,40 +482,11 @@ export function writeDefaultToConfig(
       effective: effectiveDefaultSource(cwd),
     };
   }
-
-  // Mutate in memory — siblings (cycleKeybinding, future keys) preserved.
-  const next: Record<string, unknown> = { ...loaded };
-  if (cleared) {
-    delete next.defaultMode;
-  } else {
-    next.defaultMode = value;
-  }
-
-  const text = `${JSON.stringify(next, null, 2)}\n`;
-  const tmpPath = `${path}.tmp`;
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(tmpPath, text);
-    renameSync(tmpPath, path);
-  } catch (cause) {
-    // Best-effort cleanup of the tmp file on a failed write/rename. If the
-    // tmp doesn't exist (writeFileSync threw before creating it) the unlink
-    // is a no-op; either way we surface the original fs error, not the cleanup.
-    try {
-      unlinkSync(tmpPath);
-    } catch {
-      // intentional — best-effort
-    }
-    return { ok: false, path, error: (cause as Error).message };
-  }
-
-  // Reconcile via the live merge — picks up global/project precedence.
   applyDefaultFromConfig(cwd);
-
   return {
     ok: true,
     writtenScope: scope,
-    writtenValue: cleared ? undefined : value,
+    writtenValue: written.value,
     effective: effectiveDefaultSource(cwd),
   };
 }
@@ -489,6 +516,116 @@ export function effectiveDefaultSource(cwd: string): {
  * file is surfaced as the string `"(unreadable)"` rather than crashing the
  * panel — matches the reader's tolerant contract.
  */
+export type StyleDefaultSource = "global" | "project" | "unset";
+
+export interface WriteStyleDefaultOk {
+  ok: true;
+  noop?: true;
+  writtenScope: DefaultScope;
+  writtenValue: string | undefined;
+  effective: { value: string | undefined; source: StyleDefaultSource };
+}
+
+export interface WriteStyleDefaultErr {
+  ok: false;
+  path: string;
+  error: string;
+}
+
+export type WriteStyleDefaultResult = WriteStyleDefaultOk | WriteStyleDefaultErr;
+
+export function effectiveStyleDefaultSource(cwd: string): {
+  value: string | undefined;
+  source: StyleDefaultSource;
+} {
+  const scopes = readStyleConfigScopes(cwd);
+  if (scopes.project.writingStyle !== undefined) {
+    return { value: scopes.project.writingStyle, source: "project" };
+  }
+  if (scopes.global.writingStyle !== undefined) {
+    return { value: scopes.global.writingStyle, source: "global" };
+  }
+  return { value: undefined, source: "unset" };
+}
+
+export function readStyleDefaultSources(cwd: string): {
+  global: string | undefined | "(unreadable)";
+  project: string | undefined | "(unreadable)";
+} {
+  const safe = (path: string): string | undefined | "(unreadable)" => {
+    try {
+      const raw = readObjectForWrite(path);
+      return typeof raw.writingStyle === "string" || raw.writingStyle === undefined
+        ? raw.writingStyle
+        : undefined;
+    } catch {
+      return "(unreadable)";
+    }
+  };
+  return { global: safe(globalConfigPath()), project: safe(projectConfigPath(cwd)) };
+}
+
+function validStyleNamesForWrite(cwd: string, scope: DefaultScope): Set<string> {
+  const names = new Set(discoverBundledStyles().map((path) => basename(path, ".md")));
+  const scopes = readStyleConfigScopes(cwd);
+  const add = (entries: Record<string, string>, source: "global" | "project", configDir: string): void => {
+    for (const [name, rawRel] of Object.entries(entries)) {
+      try {
+        resolveCustomStylePath(rawRel, configDir);
+        if (scope === "project" || source === "global") names.add(name);
+      } catch {
+        // Invalid registrations are ignored by config reconciliation too.
+      }
+    }
+  };
+  add(scopes.global.customStyles, "global", scopes.global.configDir);
+  if (scope === "project") add(scopes.project.customStyles, "project", scopes.project.configDir);
+  return names;
+}
+
+/**
+ * Persist `writingStyle` while keeping mode/config siblings untouched. The
+ * global path intentionally validates only global registrations: a project-
+ * local custom fragment must not become a global default that is unusable in
+ * another checkout.
+ */
+export function writeStyleDefaultToConfig(
+  cwd: string,
+  value: string | typeof DEFAULT_OFF,
+  scope: DefaultScope,
+): WriteStyleDefaultResult {
+  const path = scope === "global" ? globalConfigPath() : projectConfigPath(cwd);
+  if (value !== DEFAULT_OFF && value !== "none") {
+    const valid = validStyleNamesForWrite(cwd, scope);
+    if (!valid.has(value)) {
+      return {
+        ok: false,
+        path,
+        error: `unknown writing style "${value}" for ${scope} config scope`,
+      };
+    }
+  }
+
+  const written = writeScalarConfigKey(path, "writingStyle", value, scope);
+  if ("error" in written) return { ok: false, path, error: written.error };
+  if (written.noop) {
+    return {
+      ok: true,
+      noop: true,
+      writtenScope: scope,
+      writtenValue: undefined,
+      effective: effectiveStyleDefaultSource(cwd),
+    };
+  }
+  applyStyleFromConfig(cwd);
+  return {
+    ok: true,
+    writtenScope: scope,
+    writtenValue: written.value,
+    effective: effectiveStyleDefaultSource(cwd),
+  };
+}
+
 export function readDefaultSources(cwd: string): {
   global: string | undefined | "(unreadable)";
   project: string | undefined | "(unreadable)";

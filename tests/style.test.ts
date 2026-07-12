@@ -10,11 +10,16 @@ import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   discoverBundledStyles,
+  getActiveStyle,
+  getDefaultStyle,
+  getEffectiveStyleSelectionSource,
   isValidStyleName,
+  listAvailableStyles,
+  configureStyleDefaults,
   resetStyleForTesting,
   resolveActiveStylePlan,
   resolveCustomStylePath,
-  setStyleSelection,
+  setActiveStyle,
 } from "../src/style.js";
 import { resetFragmentsForTesting } from "../src/fragments.js";
 
@@ -99,9 +104,9 @@ describe("style catalog and resolution", () => {
 
   it("returns unset, explicit none, and bundled plans", () => {
     expect(resolveActiveStylePlan()).toMatchObject({ source: "unset", content: "", signature: "" });
-    setStyleSelection({ selection: "none", registry: new Map() });
+    setActiveStyle("none");
     expect(resolveActiveStylePlan()).toMatchObject({ source: "none", content: "", signature: "" });
-    setStyleSelection({ selection: "clear", registry: new Map() });
+    setActiveStyle("clear");
     const bundled = resolveActiveStylePlan();
     expect(bundled.name).toBe("clear");
     expect(bundled.source).toBe("bundled");
@@ -112,12 +117,14 @@ describe("style catalog and resolution", () => {
   it("resolves a global custom style with its defining source", () => {
     const root = freshDir();
     write(root, "team.md", "GLOBAL TEAM");
-    setStyleSelection({
-      selection: "team",
+    configureStyleDefaults({
+      selection: undefined,
+      source: "unset",
       registry: new Map([
         ["team", { rawRel: "team.md", configDir: root, scope: "global" }],
       ]),
     });
+    setActiveStyle("team");
 
     expect(resolveActiveStylePlan()).toMatchObject({
       name: "team",
@@ -126,15 +133,61 @@ describe("style catalog and resolution", () => {
     });
   });
 
+  it("supports override/default precedence and preserves a valid override on failure", () => {
+    const root = freshDir();
+    write(root, "team.md", "TEAM");
+    configureStyleDefaults({
+      selection: "clear",
+      source: "global",
+      registry: new Map([["team", { rawRel: "team.md", configDir: root, scope: "global" }]]),
+    });
+    expect(getDefaultStyle()).toBe("clear");
+    expect(getEffectiveStyleSelectionSource()).toBe("global");
+    setActiveStyle("team");
+    expect(resolveActiveStylePlan()).toMatchObject({ name: "team", selectionSource: "override" });
+    expect(() => setActiveStyle("unknown")).toThrow(/has no bundled/);
+    expect(resolveActiveStylePlan()).toMatchObject({ name: "team", selectionSource: "override" });
+    // Configure refresh replaces the durable tier but intentionally preserves
+    // the same-session override.
+    configureStyleDefaults({ selection: "none", source: "project", registry: new Map() });
+    expect(getActiveStyle()).toBe("team");
+    expect(getEffectiveStyleSelectionSource()).toBe("override");
+    expect(() => resolveActiveStylePlan()).toThrow(/has no bundled/);
+  });
+
+  it("lists deterministic bundled/custom provenance and excludes control names", () => {
+    const root = freshDir();
+    write(root, "clear.md", "CUSTOM CLEAR");
+    write(root, "team.md", "TEAM");
+    configureStyleDefaults({
+      selection: undefined,
+      source: "unset",
+      registry: new Map([
+        ["clear", { rawRel: "clear.md", configDir: root, scope: "project" }],
+        ["team", { rawRel: "team.md", configDir: root, scope: "global" }],
+        ["off", { rawRel: "team.md", configDir: root, scope: "project" }],
+      ]),
+    });
+    expect(listAvailableStyles()).toEqual([
+      { name: "clear", fragmentSource: "custom-project" },
+      { name: "compact", fragmentSource: "bundled" },
+      { name: "explanatory", fragmentSource: "bundled" },
+      { name: "expressive", fragmentSource: "bundled" },
+      { name: "team", fragmentSource: "custom-global" },
+    ]);
+  });
+
   it("custom registration wins on a bundled-name collision and vanished files throw", () => {
     const root = freshDir();
     const path = write(root, "clear.md", "CUSTOM CLEAR");
-    setStyleSelection({
-      selection: "clear",
+    configureStyleDefaults({
+      selection: undefined,
+      source: "unset",
       registry: new Map([
         ["clear", { rawRel: "clear.md", configDir: root, scope: "project" }],
       ]),
     });
+    setActiveStyle("clear");
     expect(resolveActiveStylePlan()).toMatchObject({
       name: "clear",
       source: "custom-project",
