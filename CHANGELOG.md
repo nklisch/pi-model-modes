@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.1 — 2026-07-12
+
+### Features
+
+- Added the public `/style` command family with TUI autocomplete, two-tier session-over-project/global durable selection, explicit `none` masking, and durable config writes.
+- Added style selection and fragment provenance to `/mode:inspect`.
+
+### Documentation
+
+- Updated the README, SPEC, ARCHITECTURE, and reusable pattern citations for the completed style system.
+
+### Internal
+
+- Expanded regression coverage for catalog defensive copying, `none` selection provenance, command/autocomplete behavior, durable configuration, and graceful degradation.
+
 ## v0.3.0 — 2026-07-12
 
 ### Features
