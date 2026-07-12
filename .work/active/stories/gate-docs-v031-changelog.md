@@ -39,3 +39,5 @@ Prepend a concise v0.3.1 entry during release-deploy's changelog phase; preserve
 - Changelog audit: the new v0.3.1 heading is immediately below `# Changelog`,
   and the existing v0.3.0 entry remains intact below it.
 - Transitioned to `stage: review` after the in-place documentation update.
+- Review polish: added the two new v0.3.1 reusable patterns to the Documentation
+  section so the entry matches the pattern-catalog precedent from v0.3.0.

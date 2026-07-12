@@ -10,6 +10,7 @@
 ### Documentation
 
 - Updated the README, SPEC, ARCHITECTURE, and reusable pattern citations for the completed style system.
+- Added reusable patterns for content-derived cache signatures and validate-before-commit state changes.
 
 ### Internal
 
