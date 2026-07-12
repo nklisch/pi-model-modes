@@ -1,10 +1,22 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-07-12
 
 ### Features
 
-- Added optional global/project writing styles with four bundled prose postures, secure custom Markdown registration, deterministic cache invalidation, and `/mode:inspect` visibility.
+- Added optional global/project writing styles with four bundled prose postures: `clear`, `compact`, `explanatory`, and `expressive`.
+- Added secure named custom Markdown styles with project-over-global configuration, explicit `none` masking, path containment, and live content-hash invalidation.
+- Added effective writing-style visibility to `/mode:inspect`.
+
+### Documentation
+
+- Documented writing-style configuration, composition order, cache behavior, and custom-file security boundaries.
+- Added reusable patterns for tolerant config validation and defensive cloning at module boundaries.
+
+### Internal
+
+- Expanded style/config/cache/inspect coverage, including graceful degradation, precedence, malformed input, and full prompt ordering.
+- Removed a dead cache re-export, refreshed stale pattern citations, and fixed temporary-directory cleanup in inspect tests.
 
 ## v0.2.0 — 2026-06-22
 
