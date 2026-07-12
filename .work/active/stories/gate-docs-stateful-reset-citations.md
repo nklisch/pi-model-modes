@@ -1,7 +1,7 @@
 ---
 id: gate-docs-stateful-reset-citations
 kind: story
-stage: review
+stage: done
 tags: [documentation]
 parent: null
 depends_on: []
@@ -34,3 +34,15 @@ Replace stale config state/reset line references with current locations.
 
 - Citation audit: `grep -nE '^let (globalPathOverride|projectPathOverride)|^export function (setConfigPathsForTesting|resetConfigForTesting)' src/config.ts` matches the cited locations.
 - Transitioned to `stage: review` after the source citation was refreshed.
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+**Nits**: none remaining
+
+**Notes**: Standard-weight GLM-5.2 independent review verified the item against
+its quoted gate criterion and current source. Integrated evidence: 28 test files,
+469 tests passed; TypeScript typecheck and diff-check passed.
