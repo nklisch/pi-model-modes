@@ -10,6 +10,7 @@ import {
   RESERVED_STYLE_NAMES,
   resolveCustomStylePath,
   type CustomStyleEntry,
+  type StyleDefaultSource,
 } from "./style.js";
 
 /**
@@ -516,8 +517,6 @@ export function effectiveDefaultSource(cwd: string): {
  * file is surfaced as the string `"(unreadable)"` rather than crashing the
  * panel — matches the reader's tolerant contract.
  */
-export type StyleDefaultSource = "global" | "project" | "unset";
-
 export interface WriteStyleDefaultOk {
   ok: true;
   noop?: true;

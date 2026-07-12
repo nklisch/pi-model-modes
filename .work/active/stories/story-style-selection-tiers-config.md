@@ -1,7 +1,7 @@
 ---
 id: story-style-selection-tiers-config
 kind: story
-stage: implementing
+stage: review
 tags: []
 parent: feature-style-command-family
 depends_on: []
@@ -80,6 +80,25 @@ See `feature-style-command-family` Units 1–2, Testing, and Risks.
   required no exploratory fanout.
 - Review weight: standard (source: default), preserved for the review stage.
 - No deviations or blockers remain for the dependent command/UI story.
+
+## Correction notes (2026-07-12)
+
+- Resolved the standard review blocker with positive config coverage proving a
+  valid globally registered custom style can be written as the global durable
+  default, while preserving the registration and resolving the resulting
+  `custom-global` plan.
+- Applied safe owned-surface cleanup: `StyleDefaultSource` now has one source
+  of truth in `src/style.ts`, and `noStylePlan` requires explicit selection
+  provenance so future callers cannot silently label `none` as an override.
+- Deliberately deferred removal of the temporary `StylePlan.source`
+  compatibility projection: its consumers are in the dependent command/
+  inspect story, which is outside this correction's owned surface.
+
+## Correction evidence (2026-07-12)
+
+- `npm test` — 25 files, 428 tests passed.
+- `npm run typecheck` — passed.
+- `git diff --check` — passed.
 
 ## Review findings (2026-07-12)
 

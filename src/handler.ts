@@ -47,7 +47,7 @@ function resolveStyleGracefully(warn: boolean): StylePlan {
         `pi-model-modes: style unresolvable — degrading to no-style (${message})`,
       );
     }
-    return noStylePlan("unset");
+    return noStylePlan("unset", "unset");
   }
 }
 

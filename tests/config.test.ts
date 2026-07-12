@@ -872,6 +872,32 @@ describe("style durable defaults + lifecycle", () => {
     expect(existsSync(global)).toBe(false);
   });
 
+  it("accepts a globally registered custom style as a global default", () => {
+    const d = freshDir();
+    const { global } = setStylePaths(d);
+    writeRaw(join(dirname(global), "team.md"), "TEAM");
+    writeJson(global, { customStyles: { team: "team.md" } });
+
+    const result = writeStyleDefaultToConfig(d, "team", "global");
+
+    expect(result).toEqual({
+      ok: true,
+      writtenScope: "global",
+      writtenValue: "team",
+      effective: { value: "team", source: "global" },
+    });
+    expect(JSON.parse(readFileSync(global, "utf8"))).toMatchObject({
+      writingStyle: "team",
+      customStyles: { team: "team.md" },
+    });
+    expect(resolveActiveStylePlan()).toMatchObject({
+      name: "team",
+      source: "custom-global",
+      selectionSource: "global",
+      content: "TEAM",
+    });
+  });
+
   it("warns and skips reserved custom names while control-like scalar values remain unknown", () => {
     const d = freshDir();
     const { global } = setStylePaths(d);

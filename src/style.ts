@@ -221,7 +221,7 @@ function plan(
 
 export function noStylePlan(
   source: "none" | "unset",
-  selectionSource: StyleSelectionSource = source === "none" ? "override" : "unset",
+  selectionSource: StyleSelectionSource,
 ): StylePlan {
   return plan(undefined, source, selectionSource, "");
 }
