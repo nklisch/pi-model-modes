@@ -1,7 +1,7 @@
 ---
 id: gate-tests-writing-style-none-seeding
 kind: story
-stage: review
+stage: done
 tags: [testing]
 parent: null
 depends_on: []
@@ -37,3 +37,19 @@ Configure global `clear` and project `none`, call `applyStyleFromConfig`, and as
 - Verification: `npx vitest --run tests/config.test.ts` (52 passed).
 - Discrepancies from design: none.
 - Adjacent issues parked: none.
+
+---
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+
+**Notes**:
+- Mode: substrate. Lane: Fast — test-only story at `standard` weight with green evidence and no escalation signal.
+- Verification re-run: `npm test` → 415/415 passed (25 files); `npm run typecheck` → clean. Matches implementor's recorded `tests/config.test.ts` (52 passed).
+- Specific check: the test sets global `clear` and project `none`, runs `applyStyleFromConfig`, then asserts `resolveActiveStylePlan()` is `{ source: "none", content: "", signature: "" }`. Confirmed against `src/config.ts` (`selection = project.writingStyle ?? global.writingStyle` → `"none"`) and `src/style.ts` (`selection === "none"` → `noStylePlan("none")`). The assertion pins the explicit-mask contract end-to-end through the seeding path, not just a resolver branch.
+- Test integrity: real config files + real merge; no gaming.
+- Item advanced `review → done`. Body retained — release-bound to v0.3.0; not archived.
