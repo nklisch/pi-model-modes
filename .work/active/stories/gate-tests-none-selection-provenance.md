@@ -1,7 +1,7 @@
 ---
 id: gate-tests-none-selection-provenance
 kind: story
-stage: review
+stage: done
 tags: [testing]
 parent: null
 depends_on: []
@@ -43,3 +43,15 @@ Assert `fragmentSource: none`, empty content/signature, and the correct `selecti
 
 - `npm test -- tests/style.test.ts` — 1 file, 19 tests passed.
 - Transitioned to `stage: review` after bounded verification.
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+**Nits**: none remaining
+
+**Notes**: Standard-weight GLM-5.2 independent review verified the item against
+its quoted gate criterion and current source. Integrated evidence: 28 test files,
+469 tests passed; TypeScript typecheck and diff-check passed.
