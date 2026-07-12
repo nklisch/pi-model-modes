@@ -29,7 +29,7 @@ try {
 
 ### `/mode` listing
 
-**File**: `src/commands.ts:441`
+**File**: `src/commands.ts:422`
 
 ```ts
 try {
@@ -41,7 +41,7 @@ try {
 
 ### `/mode:inspect --prompt`
 
-**Files**: `src/commands.ts:586`, `src/commands.ts:614`
+**Files**: `src/commands.ts:564`, `src/commands.ts:601`
 
 ```ts
 if (modeError !== undefined) {
