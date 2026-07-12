@@ -1,7 +1,7 @@
 ---
 id: gate-cruft-no-mode-signature-comment
 kind: story
-stage: review
+stage: done
 tags: [cleanup]
 parent: null
 depends_on: []
@@ -36,3 +36,18 @@ Replace the development-time transition prose with a current-truth one-line cont
 - Verification: `npm run typecheck` (passed).
 - Discrepancies from design: none.
 - Adjacent issues parked: none.
+
+---
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+
+**Notes**:
+- Mode: substrate. Lane: Fast — comment-only cleanup at `standard` weight with green evidence and no escalation signal.
+- Verification re-run: `npm test` → 415/415 passed (25 files); `npm run typecheck` → clean. Matches implementor's recorded `npm run typecheck`.
+- Specific check: behavior-preserving. The 3-line development-time transition comment (`epic-mode-composition will replace …`) is replaced with a single current-truth contract line (`Canonical empty no-mode sentinel, distinct from every non-empty composed signature.`). No code semantics changed — `NO_MODE_SIGNATURE = ""` is unchanged, and the new comment matches how `src/cache.ts` actually treats the sentinel (the canonical no-mode signature, not a transition placeholder). Diff is doc-only.
+- Item advanced `review → done`. Body retained — release-bound to v0.3.0; not archived.
