@@ -1,7 +1,7 @@
 ---
 id: gate-cruft-no-style-signature-reexport
 kind: story
-stage: implementing
+stage: review
 tags: [cleanup]
 parent: null
 depends_on: []
@@ -32,3 +32,12 @@ The import is used internally, but no source, test, or extension imports the re-
 
 ## Removal
 Delete only the re-export. Keep the local import used by cache component normalization.
+
+## Implementation notes
+- Execution capability: inline single-owner cleanup; one unused export removal with no behavior change.
+- review_weight: standard (project default)
+- Files changed: `src/cache.ts`
+- Tests added: none.
+- Verification: `npm run typecheck` (passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.

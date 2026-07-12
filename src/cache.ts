@@ -1,8 +1,6 @@
 import { createHash } from "node:crypto";
 import { NO_STYLE_SIGNATURE } from "./style.js";
 
-export { NO_STYLE_SIGNATURE } from "./style.js";
-
 /**
  * Cache key + per-turn result cache + change-signal ring buffer.
  *
