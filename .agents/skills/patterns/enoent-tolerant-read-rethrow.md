@@ -14,7 +14,7 @@ permission errors and other I/O failures are not.
 
 ### Tolerant config read
 
-**File**: `src/config.ts:71`
+**File**: `src/config.ts:74`
 
 ```ts
 try {

@@ -1,7 +1,7 @@
 ---
 id: gate-docs-enoent-config-citation
 kind: story
-stage: implementing
+stage: review
 tags: [documentation]
 parent: null
 depends_on: []
@@ -22,3 +22,13 @@ pattern-skill-staleness
 
 ## Required edit
 Replace the stale `src/config.ts:71` citation with the current reader location.
+
+## Implementation notes
+
+- Re-resolved `readConfigFile` at `src/config.ts:74` before editing.
+- Updated the config-reader citation in place; no code behavior changed.
+
+## Verification
+
+- Citation audit: `grep -nE '^function readConfigFile' src/config.ts` matches line `74`.
+- Transitioned to `stage: review` after the source citation was refreshed.
