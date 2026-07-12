@@ -31,4 +31,8 @@ updated: 2026-07-12
 
 - **gate-patterns** (2026-07-12) — 2 patterns extracted; 2 in-bundle inconsistencies tracked (2 out-of-bundle observations rejected)
 
-All configured gates ran. Gate-produced items must reach `stage: done` before shipping.
+All configured gates ran. Gate-produced items still bound to v0.3.1 must reach `stage: done` before shipping.
+
+## Deferred gate findings
+
+The release keeps Critical/High test gaps and High-confidence documentation drift bound. Medium and Low findings are explicitly deferred and unbound: 7 complementary test gaps, 2 cleanup opportunities, 1 architecture-tree completeness update, 2 pattern inconsistencies, 3 security hardening ideas, 4 low test ideas, and 2 low cleanup ideas. They remain tracked in active/backlog for later prioritization and do not represent known failing behavior in v0.3.1.
