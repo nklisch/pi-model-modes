@@ -14,13 +14,18 @@ import {
 } from "./resolver.js";
 import { listPresetNames, getPreset, loadPresets, NONE_PRESET } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
-import { resolveActiveStylePlan, type StyleSource } from "./style.js";
+import {
+  resolveActiveStylePlan,
+  type StyleSelectionSource,
+  type StyleSource,
+} from "./style.js";
 import {
   MODE_DEFAULT_ARG,
   MODE_DEFAULT_GLOBAL_FLAG,
   MODE_OFF_ARG,
 } from "./autocomplete.js";
 import { assembleForInspect, getLastBaseSystemPrompt } from "./handler.js";
+import { parseScalarDefaultArgs } from "./command-parse-utils.js";
 import {
   writeDefaultToConfig,
   readDefaultSources,
@@ -146,17 +151,30 @@ export function formatFencedBlock(content: string): string {
  *  reports the gap rather than emitting an empty fenced block. */
 export interface StyleInspectInfo {
   name: string | undefined;
-  source: StyleSource;
+  fragmentSource: StyleSource;
+  selectionSource: StyleSelectionSource;
   error: string | undefined;
+}
+
+function styleSelectionLabel(source: StyleSelectionSource): string {
+  if (source === "project") return "project default";
+  if (source === "global") return "global default";
+  return source;
+}
+
+function styleFragmentLabel(source: StyleSource): string {
+  if (source === "bundled") return "bundled";
+  if (source === "custom-global") return "custom, global";
+  if (source === "custom-project") return "custom, project";
+  return source;
 }
 
 function formatStyleLine(info: StyleInspectInfo | undefined): string {
   if (info?.error) return `Style: (unresolvable — ${info.error})`;
-  if (info === undefined || info.source === "unset") return "Style: (unset)";
-  if (info.source === "none") return "Style: none (explicit)";
-  if (info.source === "bundled") return `Style: ${info.name} (bundled)`;
-  if (info.source === "custom-global") return `Style: ${info.name} (custom, global)`;
-  return `Style: ${info.name} (custom, project)`;
+  if (info === undefined || info.fragmentSource === "unset") return "Style: (unset)";
+  const selection = styleSelectionLabel(info.selectionSource);
+  if (info.fragmentSource === "none") return `Style: none (${selection})`;
+  return `Style: ${info.name} (${selection}; ${styleFragmentLabel(info.fragmentSource)})`;
 }
 
 export function renderModeInspect(
@@ -250,52 +268,12 @@ export type DefaultSubcommand =
  *   downstream in the command layer via `getPreset`.
  */
 export function parseModeDefaultArgs(args: string): DefaultSubcommand {
-  const tokens = (args ?? "").trim().split(/\s+/).filter((t) => t.length > 0);
-  let scope: DefaultScope = "project";
-  let scopeSeenCount = 0;
-  const positionals: string[] = [];
-
-  for (const token of tokens) {
-    if (token === MODE_DEFAULT_GLOBAL_FLAG) {
-      scope = "global";
-      scopeSeenCount += 1;
-      if (scopeSeenCount > 1) {
-        return { kind: "error", message: `unexpected repeated flag "${token}"` };
-      }
-      continue;
-    }
-    // Reject anything else that looks like a flag (starts with `-`).
-    if (token.startsWith("-")) {
-      return {
-        kind: "error",
-        message: `unknown /mode default flag "${token}" (only ${MODE_DEFAULT_GLOBAL_FLAG} is supported)`,
-      };
-    }
-    positionals.push(token);
-  }
-
-  if (scopeSeenCount > 0 && positionals.length === 0) {
-    return {
-      kind: "error",
-      message: `"${MODE_DEFAULT_GLOBAL_FLAG}" given but no <preset>|none|off followed`,
-    };
-  }
-
-  if (positionals.length === 0) {
-    return { kind: "display" };
-  }
-  if (positionals.length > 1) {
-    return {
-      kind: "error",
-      message: `unexpected extra tokens after "${positionals[0]}" — usage: /mode default [--global] <preset|none|off> [--global]`,
-    };
-  }
-
-  const action = positionals[0];
-  if (action === DEFAULT_OFF) {
-    return { kind: "clear", scope };
-  }
-  return { kind: "set", value: action, scope };
+  return parseScalarDefaultArgs(args, {
+    command: "/mode default",
+    actionLabel: "<preset>|none|off",
+    globalFlag: MODE_DEFAULT_GLOBAL_FLAG,
+    clearToken: DEFAULT_OFF,
+  });
 }
 
 /**
@@ -591,11 +569,17 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
       let styleInfo: StyleInspectInfo;
       try {
         const style = resolveActiveStylePlan();
-        styleInfo = { name: style.name, source: style.source, error: undefined };
+        styleInfo = {
+          name: style.name,
+          fragmentSource: style.fragmentSource,
+          selectionSource: style.selectionSource,
+          error: undefined,
+        };
       } catch (err) {
         styleInfo = {
           name: undefined,
-          source: "unset",
+          fragmentSource: "unset",
+          selectionSource: "unset",
           error: (err as Error).message,
         };
       }
@@ -619,9 +603,10 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
           try {
             assembledPrompt = assembleForInspect(ctx.model, base);
           } catch (err) {
-            const msg = (err as Error).message;
-            modeError = modeError ?? msg;
-            assembledPrompt = `(could not assemble — ${msg})`;
+            // Assembly can fail on either mode or style resolution. Each status
+            // line already owns its provenance/error; do not mislabel a style
+            // failure as an unresolvable mode.
+            assembledPrompt = `(could not assemble — ${(err as Error).message})`;
           }
         }
       }

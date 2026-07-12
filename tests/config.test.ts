@@ -251,7 +251,7 @@ describe("style config scopes + seeding", () => {
     applyStyleFromConfig("/unused");
     expect(resolveActiveStylePlan()).toMatchObject({
       name: "team",
-      source: "custom-project",
+      fragmentSource: "custom-project",
       content: "PROJECT",
     });
   });
@@ -267,7 +267,7 @@ describe("style config scopes + seeding", () => {
     applyStyleFromConfig("/unused");
 
     expect(resolveActiveStylePlan()).toMatchObject({
-      source: "none",
+      fragmentSource: "none",
       content: "",
       signature: "",
     });
@@ -286,7 +286,7 @@ describe("style config scopes + seeding", () => {
     expect(() => applyStyleFromConfig("/unused")).not.toThrow();
     expect(resolveActiveStylePlan()).toMatchObject({
       name: "valid",
-      source: "custom-global",
+      fragmentSource: "custom-global",
       content: "VALID",
     });
     expect(warn).toHaveBeenCalled();
@@ -498,7 +498,7 @@ describe("applySessionStart — ephemeral override clearing", () => {
       setConfigPathsForTesting({ global, project: join(d, "missing.json") });
       resetStyleForTesting();
       applySessionStart(reason, "/unused");
-      expect(resolveActiveStylePlan()).toMatchObject({ name: "clear", source: "bundled" });
+      expect(resolveActiveStylePlan()).toMatchObject({ name: "clear", fragmentSource: "bundled" });
     },
   );
 
@@ -848,11 +848,11 @@ describe("style durable defaults + lifecycle", () => {
     writeJson(global, { writingStyle: "clear" });
     writeJson(project, { writingStyle: "none" });
     applyStyleFromConfig(d);
-    expect(resolveActiveStylePlan()).toMatchObject({ source: "none", selectionSource: "project" });
+    expect(resolveActiveStylePlan()).toMatchObject({ fragmentSource: "none", selectionSource: "project" });
 
     const cleared = writeStyleDefaultToConfig(d, DEFAULT_OFF, "project");
     expect(cleared).toMatchObject({ ok: true, writtenValue: undefined });
-    expect(resolveActiveStylePlan()).toMatchObject({ name: "clear", source: "bundled", selectionSource: "global" });
+    expect(resolveActiveStylePlan()).toMatchObject({ name: "clear", fragmentSource: "bundled", selectionSource: "global" });
 
     rmSync(project);
     const noop = writeStyleDefaultToConfig(d, DEFAULT_OFF, "project");
@@ -892,7 +892,7 @@ describe("style durable defaults + lifecycle", () => {
     });
     expect(resolveActiveStylePlan()).toMatchObject({
       name: "team",
-      source: "custom-global",
+      fragmentSource: "custom-global",
       selectionSource: "global",
       content: "TEAM",
     });
@@ -908,7 +908,7 @@ describe("style durable defaults + lifecycle", () => {
     });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     applyStyleFromConfig(d);
-    expect(resolveActiveStylePlan()).toMatchObject({ source: "unset", selectionSource: "unset" });
+    expect(resolveActiveStylePlan()).toMatchObject({ fragmentSource: "unset", selectionSource: "unset" });
     expect(warn.mock.calls.some(([message]) => String(message).includes('writingStyle "off"'))).toBe(true);
     expect(warn.mock.calls.filter(([message]) => String(message).includes("reserved")).length).toBe(3);
   });

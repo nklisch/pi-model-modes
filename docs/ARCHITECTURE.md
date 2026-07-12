@@ -9,12 +9,12 @@ pi-model-modes/
 ├─ package.json              pi-package manifest: pi { extensions } + files allowlist
 │                            (prompts/ is loaded by the plugin at runtime, package-relative)
 ├─ extensions/
-│   └─ index.ts              default export: registers handler, /mode, session_start,
-│                            optional global cycle keybindings
+│   └─ index.ts              default export: registers handler, /mode, /style,
+│                            session_start providers, optional global cycle keybindings
 ├─ src/
 │   ├─ handler.ts            before_agent_start entry — orchestrates the transform
 │   ├─ resolver.ts           mode resolution: two tiers (override > default), effective = override ?? default ?? unset
-│   ├─ style.ts              orthogonal writing-style registry, secure custom-path resolution, and content signatures
+│   ├─ style.ts              two-tier writing-style selection, catalog, secure custom paths, and content signatures
 │   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds mode + style and writes the default tier;
 │   │                        global cycleKeybinding opt-in for factory-load wiring
 │   ├─ assemble.ts           fragment splice + clean-base insertion policy
@@ -24,7 +24,10 @@ pi-model-modes/
 │   ├─ identity.ts           deriveIdentityLine(model) → "You are {name} from {provider}."
 │   ├─ provider-names.ts     provider id → display name map
 │   ├─ commands.ts           /mode, /mode default, /mode off, /mode:inspect [--prompt]
+│   ├─ command-parse-utils.ts shared pure scalar-default grammar and prefix filter
+│   ├─ style-command.ts      /style session/default command, panels, and notifications
 │   ├─ autocomplete.ts       three-stage /mode + /mode default autocomplete provider
+│   ├─ style-autocomplete.ts live three-stage /style autocomplete provider
 │   ├─ footer.ts             footer status formatter + cycle-hint signal
 │   └─ keybinding.ts         cycle keybinding helper, registered only when globally opted in
 ├─ prompts/
@@ -66,8 +69,11 @@ pi-model-modes/
 ```
 
 `extensions/index.ts` is the single registration surface. It wires the
-handler, the commands, the `session_start` config-seed, and the optional
-global cycle keybindings to pi's `ExtensionAPI`. The cycle path is gated by
+handler, the `/mode`, `/mode:inspect`, and `/style` commands, the `session_start`
+config seed, separate layered TUI autocomplete providers, and the optional
+global cycle keybindings to pi's `ExtensionAPI`. The autocomplete seams delegate
+all nonmatching, aborted, failed, completion-application, and file-completion
+paths to the provider beneath them. The cycle path is gated by
 the global `cycleKeybinding` flag; when that flag is `true`, the factory
 registers both cycle shortcuts and enables the footer cycle hint. Missing,
 `false`, and non-boolean values leave both off, preserving the no-default
@@ -77,6 +83,15 @@ semantic pi theme tokens in the runtime seam, so Catppuccin themes control the
 colors without key-prefix assumptions from any status republisher. Everything
 else is plain modules with no pi coupling except through typed interfaces —
 which keeps the logic unit-testable without spinning up pi.
+
+**Two-tier style state.** `style.ts` independently holds a session override over
+a project/global durable default plus the merged custom-fragment registry.
+Selection provenance and fragment provenance remain separate. `style-command.ts`
+mutates those tiers through validated domain/config APIs; it never touches mode
+or footer state. Config writes reconcile through `applyStyleFromConfig`, so an
+active override stays in force. New/resume/fork clears it; startup/reload keeps
+it. Styles affect conversational communication only—not code/comments/docs,
+tools, autonomy, scope, or problem-solving strategy.
 
 **Two-tier mode state.** `resolver.ts` holds the effective selection as two
 distinct tiers: an ephemeral OVERRIDE (`/mode`, set via `setActiveMode` /
@@ -112,7 +127,7 @@ keybindings register before cwd is known and are global in pi.
                 │                                                  │
                 │  1. resolve active mode and writing style        │
                 │     mode: override > config default > unset      │
-                │     style: project config > global > unset       │
+                │     style: override > project > global > unset    │
                 │  2. compute cache key                            │
                 │     = hash(model.name, model.id, model.provider, │
                 │            mode.signature, style.signature,      │

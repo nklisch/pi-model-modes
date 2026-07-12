@@ -13,6 +13,7 @@ import {
   type PresetRegistry,
 } from "./presets.js";
 import { formatModeSummary } from "./commands.js";
+import { filterAutocompleteItems } from "./command-parse-utils.js";
 
 /** The literal `off` argument to `/mode` -- clears the override (NOT a preset). */
 export const MODE_OFF_ARG = "off";
@@ -84,11 +85,7 @@ export function filterModeArgItems(
   items: AutocompleteItem[],
   token: string,
 ): AutocompleteItem[] {
-  if (token === "") {
-    return items;
-  }
-  const lower = token.toLowerCase();
-  return items.filter((item) => item.value.toLowerCase().startsWith(lower));
+  return filterAutocompleteItems(items, token);
 }
 
 /**

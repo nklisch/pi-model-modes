@@ -39,8 +39,6 @@ export interface AvailableStyle {
 
 export interface StylePlan {
   name: string | undefined;
-  /** @deprecated Use fragmentSource; retained for existing inspect consumers. */
-  source: StyleSource;
   fragmentSource: StyleSource;
   selectionSource: StyleSelectionSource;
   content: string;
@@ -211,7 +209,6 @@ function plan(
 ): StylePlan {
   return {
     name,
-    source: fragmentSource,
     fragmentSource,
     selectionSource,
     content,

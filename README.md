@@ -112,24 +112,37 @@ session start; command-time writes validate before touching disk.
 
 ### Writing styles
 
-An optional writing style controls user-facing prose independently of the active
-mode. Select one of the bundled styles (`clear`, `compact`, `explanatory`, or
-`expressive`) with `writingStyle`:
+An optional writing style controls conversational communication independently
+of the active mode. Bundled styles are `clear`, `compact`, `explanatory`, and
+`expressive`.
+
+| Command | Effect |
+|---|---|
+| `/style` | Show the effective selection, selection tier, fragment provenance, and style catalog. Display-only — triggers no turn. |
+| `/style <name>` | Set a temporary session override. |
+| `/style none` | Explicitly suppress style injection for this session, masking any configured default. |
+| `/style off` | Clear the session override and reveal the project/global default or unset state. |
+| `/style default` | Show global, project, and effective durable style defaults. Display-only — triggers no turn. |
+| `/style default <name|none>` | Set the project default; `none` durably masks a global style. |
+| `/style default <name|none> --global` | Set the global default; `--global` may appear before or after the value. |
+| `/style default off [--global]` | Delete `writingStyle` from the selected scope; clearing project scope may reveal the global default. |
+
+For example:
+
+```text
+/style expressive                 # temporary experiment
+/style default clear              # persistent project default
+/style default --global compact   # persistent global default
+/style none                       # temporarily mask either default
+/style off                        # reveal the configured default
+/style default off                # clear project default; reveal global
+```
+
+The same durable selection can be edited directly in config:
 
 ```json
 {
   "defaultMode": "flow",
-  "writingStyle": "clear"
-}
-```
-
-Register custom styles by name with `customStyles`. Paths must be relative
-`.md` files contained within the directory of the config file that defines
-them; absolute paths, `..` escapes, and symlinks escaping that directory are
-rejected. Global and project maps merge per key, with project entries winning:
-
-```json
-{
   "writingStyle": "team-voice",
   "customStyles": {
     "team-voice": "styles/team-voice.md"
@@ -137,17 +150,18 @@ rejected. Global and project maps merge per key, with project entries winning:
 }
 ```
 
-A project can mask a global style without selecting another style:
+Custom paths must be relative `.md` files contained within the defining config
+directory; absolute paths, escapes, and escaping symlinks are rejected. Global
+and project maps merge per key, with project entries winning. Custom style
+names cannot be `none`, `off`, or `default` because those tokens belong to the
+command grammar.
 
-```json
-{ "writingStyle": "none" }
-```
-
-Styles inject even when no mode is active, after identity and before any mode
-fragments. They govern prose communication only, not code comments,
-documentation creation, implementation scope, or tool use. Selection is
-config-only in this release; `/mode:inspect` reports the effective style and its
-source.
+Styles inject even when no mode is active, after identity and before mode
+fragments. They affect only conversational communication with the user. They do
+not control code or code comments, authored project documentation, tool use,
+autonomy, edit scope, or problem-solving/implementation strategy.
+`/mode:inspect` reports selection provenance separately from bundled/custom
+fragment provenance.
 
 **Mode precedence:** session override (`/mode`) > config default > unset.
 The override is ephemeral (in-memory, not written to disk): a genuinely new
@@ -236,7 +250,8 @@ The hard contract (invariants, cache key, resolution precedence) is documented i
 
 The registration surface is a single factory in
 [`extensions/index.ts`](extensions/index.ts) — the `before_agent_start` handler,
-`/mode` + `/mode:inspect` commands, and a `session_start` config-seed. All logic
+`/mode`, `/mode:inspect`, and `/style` commands, plus `session_start` config and
+TUI autocomplete handlers. All logic
 lives in plain modules under `src/` with no pi coupling except through typed
 interfaces, which keeps it unit-testable without spinning up pi (tests under
 `tests/`).

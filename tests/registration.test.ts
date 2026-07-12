@@ -6,6 +6,8 @@ import { join } from "node:path";
 import factory from "../extensions/index.js";
 import { handleBeforeAgentStart } from "../src/handler.js";
 import { MODE_COMMAND, MODE_INSPECT_COMMAND } from "../src/commands.js";
+import { STYLE_COMMAND } from "../src/style-command.js";
+import { resetStyleForTesting } from "../src/style.js";
 import {
   MODE_FOOTER_KEY,
   refreshModeFooter,
@@ -69,6 +71,7 @@ describe("factory registration wiring", () => {
     resetConfigForTesting();
     resetFooterForTesting();
     resetResolverForTesting();
+    resetStyleForTesting();
     setMissingConfig();
   });
 
@@ -78,6 +81,7 @@ describe("factory registration wiring", () => {
     resetConfigForTesting();
     resetFooterForTesting();
     resetResolverForTesting();
+    resetStyleForTesting();
     vi.restoreAllMocks();
   });
 
@@ -113,12 +117,13 @@ describe("factory registration wiring", () => {
     const registrations = calls.filter(
       (c) => c.method === "on" && c.args[0] === "session_start",
     );
-    expect(registrations).toHaveLength(2);
-    expect(typeof registrations[0].args[1]).toBe("function");
-    expect(typeof registrations[1].args[1]).toBe("function");
+    expect(registrations).toHaveLength(3);
+    for (const registration of registrations) {
+      expect(typeof registration.args[1]).toBe("function");
+    }
   });
 
-  it("registers the /mode + /mode:inspect commands and nothing unexpected", () => {
+  it("registers the /mode + /mode:inspect + /style commands and nothing unexpected", () => {
     const { pi, calls } = makePi();
     factory(pi);
 
@@ -126,11 +131,11 @@ describe("factory registration wiring", () => {
       .filter((c) => c.method === "registerCommand")
       .map((c) => c.args[0])
       .sort();
-    expect(commands).toEqual([MODE_COMMAND, MODE_INSPECT_COMMAND].sort());
+    expect(commands).toEqual([MODE_COMMAND, MODE_INSPECT_COMMAND, STYLE_COMMAND].sort());
 
     // The only `on` registrations are two before_agent_start handlers
-    // (transform + footer refresh) and two session_start handlers
-    // (autocomplete + config seed/footer refresh).
+    // (transform + footer refresh) and three session_start handlers
+    // (mode autocomplete + style autocomplete + config seed/footer refresh).
     const events = calls
       .filter((c) => c.method === "on")
       .map((c) => c.args[0])
@@ -140,9 +145,10 @@ describe("factory registration wiring", () => {
       "before_agent_start",
       "session_start",
       "session_start",
+      "session_start",
     ]);
 
-    // Nothing beyond the `on` registrations and the two commands (no automatic
+    // Nothing beyond the `on` registrations and the three commands (no automatic
     // shortcuts, tools, flags, renderers, providers, no emit at registration).
     const unexpected = calls.filter(
       (c) =>

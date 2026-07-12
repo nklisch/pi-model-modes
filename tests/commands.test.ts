@@ -35,7 +35,7 @@ import {
   setFragmentRootForTesting,
 } from "../src/fragments.js";
 import { makeContext, makeEvent, makeModel, makePi, makeUi } from "./harness.js";
-import { configureStyleDefaults, resetStyleForTesting } from "../src/style.js";
+import { configureStyleDefaults, resetStyleForTesting, setActiveStyle } from "../src/style.js";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { RecordedCall } from "./harness.js";
 
@@ -235,12 +235,12 @@ describe("renderModeInspect — render core", () => {
   });
 
   it.each([
-    [{ name: undefined, source: "unset", error: undefined } as const, "Style: (unset)"],
-    [{ name: undefined, source: "none", error: undefined } as const, "Style: none (explicit)"],
-    [{ name: "clear", source: "bundled", error: undefined } as const, "Style: clear (bundled)"],
-    [{ name: "team", source: "custom-global", error: undefined } as const, "Style: team (custom, global)"],
-    [{ name: "team", source: "custom-project", error: undefined } as const, "Style: team (custom, project)"],
-    [{ name: undefined, source: "unset", error: "vanished" } as const, "Style: (unresolvable — vanished)"],
+    [{ name: undefined, fragmentSource: "unset", selectionSource: "unset", error: undefined } as const, "Style: (unset)"],
+    [{ name: undefined, fragmentSource: "none", selectionSource: "override", error: undefined } as const, "Style: none (override)"],
+    [{ name: "clear", fragmentSource: "bundled", selectionSource: "override", error: undefined } as const, "Style: clear (override; bundled)"],
+    [{ name: "team", fragmentSource: "custom-global", selectionSource: "project", error: undefined } as const, "Style: team (project default; custom, global)"],
+    [{ name: "team", fragmentSource: "custom-project", selectionSource: "global", error: undefined } as const, "Style: team (global default; custom, project)"],
+    [{ name: undefined, fragmentSource: "unset", selectionSource: "unset", error: "vanished" } as const, "Style: (unresolvable — vanished)"],
   ])("renders style inspect state as %s", (styleInfo, expected) => {
     const out = renderModeInspect(getChangeSignal(), undefined, undefined, undefined, styleInfo);
     expect(out).toContain(expected);
@@ -321,6 +321,28 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
     expect(typeof options.handler).toBe("function");
   });
 
+  it("the handler reports a command-selected bundled style as an override", async () => {
+    const { pi, calls } = makePi();
+    registerModeInspectCommand(pi);
+    const command = calls.find((c) => c.method === "registerCommand")!;
+    const options = command.args[1] as {
+      handler: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
+    };
+    try {
+      setActiveStyle("clear");
+      await options.handler(
+        "",
+        makeContext({ model: makeModel({ name: "GLM-5.2", provider: "zai" }) }) as ExtensionCommandContext,
+      );
+      const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
+      expect((send.args[0] as { content: string }).content).toContain(
+        "Style: clear (override; bundled)",
+      );
+    } finally {
+      resetStyleForTesting();
+    }
+  });
+
   it("the handler resolves and renders a custom project style", async () => {
     const root = mkdtempSync(join(tmpdir(), "inspect-style-"));
     try {
@@ -348,7 +370,7 @@ describe("registerModeInspectCommand — registration + emission seam", () => {
 
       const send = calls.find((c: RecordedCall) => c.method === "sendMessage")!;
       const message = send.args[0] as { content: string };
-      expect(message.content).toContain("Style: team (custom, project)");
+      expect(message.content).toContain("Style: team (project default; custom, project)");
     } finally {
       resetStyleForTesting();
       rmSync(root, { recursive: true, force: true });

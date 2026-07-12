@@ -10,15 +10,17 @@ pi-model-modes is a pi extension package (`pi-package`), installed via
 
 - A `before_agent_start` handler that transforms pi's assembled system
   prompt per turn.
-- A `/mode` command family for interactive mode selection.
+- A `/mode` command family for interactive mode selection and a separate
+  `/style` family for conversational writing-style selection/defaults.
 - No mode-cycle keybinding is registered by default. A global
   `cycleKeybinding: true` config opt-in registers the cycle shortcuts and
   enables the footer cycle hint; the flag defaults to `false`.
 - A styled footer status under the plugin-owned `pi-model-modes` key. Its
   visible value is `mode: <glyph> <summary>` (for example `mode: ◆ create`),
   with color supplied by the active pi theme at render time.
-- A `session_start` handler that seeds the default mode and optional writing
-  style from plugin-owned config (`pi-model-modes.json`, global + project merged).
+- `session_start` handlers that seed mode/style defaults from plugin-owned
+  config (`pi-model-modes.json`, global + project merged) and layer live TUI
+  autocomplete providers for both command grammars.
 
 No subprocess is spawned. No pi internals are monkey-patched. The plugin
 operates entirely through the public `ExtensionAPI`.
@@ -179,9 +181,10 @@ Assembly order within the splice is fixed and deterministic:
 
 ## Writing styles
 
-One optional writing style controls user-facing prose across every mode. It is
-selected with `writingStyle` in global or project `pi-model-modes.json`; project
-selection wins, and `"none"` explicitly masks a global selection. The bundled
+One optional writing style controls conversational communication across every
+mode. Its effective selection is an ephemeral `/style` session override over a
+durable `writingStyle` config default. Project config wins over global config,
+and `"none"` at either tier explicitly suppresses style injection. The bundled
 styles are `clear`, `compact`, `explanatory`, and `expressive`.
 
 `customStyles` maps validated names to relative `.md` paths. Maps merge per key
@@ -192,9 +195,35 @@ symlinks are rejected. Containment is checked at session seed and again before
 each read. A custom registration wins over a bundled style of the same name.
 
 A style injects even when mode is unset. It appears after identity and before
-mode fragments. Style text governs user-facing prose only; it does not govern
-code comments, documentation creation, edit scope, or tool policy. With no
-style selected, no style bytes are injected.
+mode fragments. Style text governs conversational communication only. It does
+not govern code or code comments, authored project documentation, tool use,
+autonomy, edit scope, or problem-solving/implementation strategy. With no style
+selected, no style bytes are injected.
+
+The `/style` command family is orthogonal to `/mode`:
+
+- `/style` emits a display-only effective-status and catalog panel with separate
+  selection provenance (`override`, `project`, `global`, `unset`) and fragment
+  provenance (`bundled`, `custom-global`, `custom-project`, `none`, `unset`).
+- `/style <name>` sets a validated ephemeral override; `/style none` explicitly
+  suppresses injection; `/style off` clears only the override and reveals the
+  durable fallback.
+- `/style default` emits a display-only global/project/effective durable panel.
+- `/style default [--global] <name|none|off> [--global]` writes project scope by
+  default or global scope with one position-flexible `--global`. `none` is a
+  persisted suppression value; `off` deletes `writingStyle` in that scope.
+- Durable writes preserve sibling config keys, refuse malformed targets, use an
+  atomic two-space-JSON write, and immediately reconcile style defaults without
+  clearing an active override. Global writes cannot select project-only custom
+  registrations.
+- TUI autocomplete resolves the live catalog for top-level names, durable
+  actions, and `--global`; non-style, aborted, failed, and non-TUI paths remain
+  delegated to pi's existing completion provider.
+
+`/mode:inspect` renders the effective style as both axes, for example
+`Style: clear (override; bundled)` or
+`Style: team (project default; custom, global)`. New/resume/fork session starts
+clear the style override; startup/reload preserve it while reseeding defaults.
 
 Fragments are cached in module scope keyed by file mtime: a `statSync` runs
 each access and the file is re-read only when its `mtimeMs` changes, so a fragment

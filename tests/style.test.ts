@@ -103,13 +103,13 @@ describe("style catalog and resolution", () => {
   });
 
   it("returns unset, explicit none, and bundled plans", () => {
-    expect(resolveActiveStylePlan()).toMatchObject({ source: "unset", content: "", signature: "" });
+    expect(resolveActiveStylePlan()).toMatchObject({ fragmentSource: "unset", content: "", signature: "" });
     setActiveStyle("none");
-    expect(resolveActiveStylePlan()).toMatchObject({ source: "none", content: "", signature: "" });
+    expect(resolveActiveStylePlan()).toMatchObject({ fragmentSource: "none", content: "", signature: "" });
     setActiveStyle("clear");
     const bundled = resolveActiveStylePlan();
     expect(bundled.name).toBe("clear");
-    expect(bundled.source).toBe("bundled");
+    expect(bundled.fragmentSource).toBe("bundled");
     expect(bundled.content.length).toBeGreaterThan(0);
     expect(bundled.signature).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -128,7 +128,7 @@ describe("style catalog and resolution", () => {
 
     expect(resolveActiveStylePlan()).toMatchObject({
       name: "team",
-      source: "custom-global",
+      fragmentSource: "custom-global",
       content: "GLOBAL TEAM",
     });
   });
@@ -190,7 +190,7 @@ describe("style catalog and resolution", () => {
     setActiveStyle("clear");
     expect(resolveActiveStylePlan()).toMatchObject({
       name: "clear",
-      source: "custom-project",
+      fragmentSource: "custom-project",
       content: "CUSTOM CLEAR",
     });
     rmSync(path);
