@@ -15,6 +15,7 @@ import {
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
 import type { ResolvedMode } from "../src/presets.js";
+import { resetStyleForTesting } from "../src/style.js";
 import { makeContext, makeEvent, makeModel } from "./harness.js";
 
 /** Count non-overlapping occurrences of `needle` in `haystack`. */
@@ -36,7 +37,10 @@ describe("handleBeforeAgentStart — Invariant 1 (no mutation + no cached-output
   const identity = deriveIdentityLine(model);
   const assemble = (base: string) => `${identity}\n${base}`;
 
-  beforeEach(() => resetCacheForTesting());
+  beforeEach(() => {
+    resetCacheForTesting();
+    resetStyleForTesting();
+  });
 
   it("does not mutate the input event (Object.freeze catches any mutation as a thrown TypeError)", () => {
     const e = makeEvent("line1\nline2\n<project_context>...</project_context>");
@@ -137,6 +141,7 @@ describe("Invariant 1 — full form (mode set: exactly one identity + one copy o
     resetResolverForTesting();
     resetFragmentsForTesting();
     resetPresetsForTesting();
+    resetStyleForTesting();
     buildFixture();
     setActiveMode(FIXTURE_MODE);
   });

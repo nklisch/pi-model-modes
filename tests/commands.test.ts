@@ -53,7 +53,7 @@ describe("renderModeInspect — render core", () => {
     handleBeforeAgentStart(makeEvent(systemPrompt), makeContext({ model }));
   }
 
-  it("renders the canonical 4-line shape after a model switch", () => {
+  it("renders the canonical panel shape after a model switch", () => {
     const glm45 = makeModel({ id: "glm-4.5", name: "GLM-4.5", provider: "zai" });
     const glm46 = makeModel({ id: "glm-4.6", name: "GLM-4.6", provider: "zai" });
     runTurn("base prompt", glm45); // turn 1 — initial
@@ -65,12 +65,13 @@ describe("renderModeInspect — render core", () => {
     const out = renderModeInspect(snap, glm46, undefined);
     const lines = out.split("\n");
     expect(lines[0]).toBe("Mode: unset");
-    expect(lines[1]).toBe("Identity: You are GLM-4.6 from Zhipu AI.");
-    expect(lines[2]).toBe(
+    expect(lines[1]).toBe("Style: (unset)");
+    expect(lines[2]).toBe("Identity: You are GLM-4.6 from Zhipu AI.");
+    expect(lines[3]).toBe(
       "Effective prompt last changed: this turn — reason: model switched",
     );
-    expect(lines[3]).toBe("  (zai/glm-4.5 (GLM-4.5) → zai/glm-4.6 (GLM-4.6))");
-    expect(lines[4]).toBe(`Cache key: ${snap.currentKey!.slice(0, 4)}...${snap.currentKey!.slice(-4)}`);
+    expect(lines[4]).toBe("  (zai/glm-4.5 (GLM-4.5) → zai/glm-4.6 (GLM-4.6))");
+    expect(lines[5]).toBe(`Cache key: ${snap.currentKey!.slice(0, 4)}...${snap.currentKey!.slice(-4)}`);
   });
 
   it("renders the initial population with NO parenthetical and no `undefined →`", () => {
@@ -129,6 +130,7 @@ describe("renderModeInspect — render core", () => {
           modelId: { from: undefined, to: "m" },
           modelProvider: { from: undefined, to: "p" },
           modeSignature: { from: undefined, to: "" },
+          styleSignature: { from: undefined, to: "" },
           baseHash: { from: undefined, to: "h" },
         },
       };
@@ -196,6 +198,7 @@ describe("renderModeInspect — render core", () => {
       modelId: "glm-4.6",
       modelProvider: "zai",
       modeSignature: "",
+      styleSignature: "",
       baseSystemPrompt: "base",
     };
     const k1 = computeCacheKey(base);
@@ -230,6 +233,39 @@ describe("renderModeInspect — render core", () => {
     );
   });
 
+  it.each([
+    [{ name: undefined, source: "unset", error: undefined } as const, "Style: (unset)"],
+    [{ name: undefined, source: "none", error: undefined } as const, "Style: none (explicit)"],
+    [{ name: "clear", source: "bundled", error: undefined } as const, "Style: clear (bundled)"],
+    [{ name: "team", source: "custom-global", error: undefined } as const, "Style: team (custom, global)"],
+    [{ name: "team", source: "custom-project", error: undefined } as const, "Style: team (custom, project)"],
+    [{ name: undefined, source: "unset", error: "vanished" } as const, "Style: (unresolvable — vanished)"],
+  ])("renders style inspect state as %s", (styleInfo, expected) => {
+    const out = renderModeInspect(getChangeSignal(), undefined, undefined, undefined, styleInfo);
+    expect(out).toContain(expected);
+  });
+
+  it("renders a style-switched reason with style signature detail", () => {
+    const base: CacheKeyInputs = {
+      modelName: "GLM",
+      modelId: "glm",
+      modelProvider: "zai",
+      modeSignature: "",
+      styleSignature: "",
+      baseSystemPrompt: "base",
+    };
+    const firstKey = computeCacheKey(base);
+    getCachedResult(firstKey);
+    setCachedResult(firstKey, "one", base);
+    const next = { ...base, styleSignature: "a".repeat(64) };
+    const nextKey = computeCacheKey(next);
+    getCachedResult(nextKey);
+    setCachedResult(nextKey, "two", next);
+    const out = renderModeInspect(getChangeSignal(), undefined, undefined);
+    expect(out).toContain("reason: style switched");
+    expect(out).toContain("(style unset → aaaa...aaaa)");
+  });
+
   it("renders `Mode: (unresolvable — …)` when modeError is set", () => {
     const model = makeModel({ name: "GLM-4.6", provider: "zai" });
     const snap = { currentTurn: 1, currentKey: "abcdef", entries: [], lastEntry: undefined };
@@ -255,6 +291,7 @@ describe("renderModeInspect — render core", () => {
         modelId: { from: "glm-4.6", to: "glm-4.6" },
         modelProvider: { from: "zai", to: "zai" },
         modeSignature: { from, to },
+        styleSignature: { from: "", to: "" },
         baseHash: { from: "h", to: "h" },
       },
     };
@@ -344,6 +381,7 @@ describe("renderModeInspect — `--prompt` append block", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       "HELLO-BASE",
     );
     expect(out).toContain("System prompt:");
@@ -354,6 +392,7 @@ describe("renderModeInspect — `--prompt` append block", () => {
     const bare = renderModeInspect(getChangeSignal(), undefined, undefined);
     const withUndefined = renderModeInspect(
       getChangeSignal(),
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -369,6 +408,7 @@ describe("renderModeInspect — `--prompt` append block", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       "prompt with ``` fence",
     );
     expect(out).toContain("````\nprompt with ``` fence\n````");
@@ -377,6 +417,7 @@ describe("renderModeInspect — `--prompt` append block", () => {
   it("places a blank line between the bare panel and the prompt block", () => {
     const out = renderModeInspect(
       getChangeSignal(),
+      undefined,
       undefined,
       undefined,
       undefined,

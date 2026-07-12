@@ -10,6 +10,7 @@ import {
 } from "../src/footer.js";
 import { CYCLE_BACKWARD_KEY, CYCLE_FORWARD_KEY } from "../src/keybinding.js";
 import { resetResolverForTesting } from "../src/resolver.js";
+import { resetStyleForTesting } from "../src/style.js";
 import { makeContext, makeEvent, makeModel, makeUi } from "./harness.js";
 
 describe("handleBeforeAgentStart — Invariant 3 evolved (identity-prepended, remainder byte-identical, never undefined)", () => {
@@ -20,6 +21,7 @@ describe("handleBeforeAgentStart — Invariant 3 evolved (identity-prepended, re
     resetCacheForTesting(); // module-scope cache state isolates per case
     resetResolverForTesting();
     resetFooterForTesting();
+    resetStyleForTesting();
   });
 
   const fixtures: Record<string, string> = {

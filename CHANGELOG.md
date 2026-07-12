@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Added optional global/project writing styles with four bundled prose postures, secure custom Markdown registration, deterministic cache invalidation, and `/mode:inspect` visibility.
+
 ## v0.2.0 — 2026-06-22
 
 ### Features

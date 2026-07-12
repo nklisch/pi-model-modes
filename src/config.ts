@@ -1,21 +1,29 @@
 import { readFileSync, writeFileSync, renameSync, mkdirSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { setDefaultMode, clearDefaultMode, clearActiveMode } from "./resolver.js";
+import {
+  discoverBundledStyles,
+  isValidStyleName,
+  resolveCustomStylePath,
+  setStyleSelection,
+  type CustomStyleEntry,
+} from "./style.js";
 
 /**
  * Plugin-owned configuration — the durable, file-backed source for the
  * DEFAULT mode tier (precedence override > default > unset).
  *
  * Config is plugin-owned, NOT pi's closed `Settings` (which has no plugin
- * namespace). Two files are read and shallow-merged, project over global:
+ * namespace). Two files are read project-over-global; scalar keys shallow-
+ * merge while `customStyles` merges per name:
  *   - global:  `~/.pi/agent/pi-model-modes.json`
  *   - project: `<cwd>/.pi/pi-model-modes.json`
  *
  * Tolerant by design — a missing file is `{}`; a malformed file warns and is
  * treated as `{}`. Loading config never throws, so `session_start` seeding
- * can never crash the session. Shape is `{ defaultMode?, cycleKeybinding? }`,
- * extensible.
+ * can never crash the session. Shape is `{ defaultMode?, cycleKeybinding?,
+ * writingStyle?, customStyles? }`, extensible.
  *
  * Pure module (Node builtins + the resolver's default-tier setter only). The
  * two absolute paths are overridable via a test seam so tests never touch the
@@ -28,6 +36,14 @@ import { setDefaultMode, clearDefaultMode, clearActiveMode } from "./resolver.js
 export interface PluginConfig {
   defaultMode?: string;
   cycleKeybinding?: boolean;
+  writingStyle?: string;
+  customStyles?: Record<string, string>;
+}
+
+export interface StyleConfigScope {
+  configDir: string;
+  writingStyle: string | undefined;
+  customStyles: Record<string, string>;
 }
 
 // --- config file paths (override via the test seam) --------------------------
@@ -93,14 +109,108 @@ function readCycleKeybindingFlag(config: PluginConfig, path: string): boolean {
 
 /**
  * Load the merged plugin config: global `~/.pi/agent/pi-model-modes.json`
- * shallow-merged with project `<cwd>/.pi/pi-model-modes.json`, PROJECT WINS.
+ * merged with project `<cwd>/.pi/pi-model-modes.json`, PROJECT WINS. Scalars
+ * shallow-merge; `customStyles` merges per key.
  * Each file is read tolerantly (missing → `{}`, malformed → warn + `{}`), so
  * this never throws.
  */
 export function loadPluginConfig(cwd: string): PluginConfig {
   const global = readConfigFile(globalConfigPath());
   const project = readConfigFile(projectConfigPath(cwd));
-  return { ...global, ...project };
+  const customStyles = {
+    ...(isRecord(global.customStyles) ? global.customStyles : {}),
+    ...(isRecord(project.customStyles) ? project.customStyles : {}),
+  } as Record<string, string>;
+  const merged: PluginConfig = { ...global, ...project };
+  if (global.customStyles !== undefined || project.customStyles !== undefined) {
+    merged.customStyles = customStyles;
+  }
+  return merged;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readStyleScope(path: string): StyleConfigScope {
+  const raw = readConfigFile(path) as Record<string, unknown>;
+  let writingStyle: string | undefined;
+  if (raw.writingStyle !== undefined) {
+    if (typeof raw.writingStyle === "string") writingStyle = raw.writingStyle;
+    else console.warn(`pi-model-modes: config "${path}" writingStyle must be a string — ignoring`);
+  }
+
+  const customStyles: Record<string, string> = {};
+  if (raw.customStyles !== undefined) {
+    if (!isRecord(raw.customStyles)) {
+      console.warn(`pi-model-modes: config "${path}" customStyles must be an object — ignoring`);
+    } else {
+      for (const [name, value] of Object.entries(raw.customStyles)) {
+        if (!isValidStyleName(name)) {
+          console.warn(`pi-model-modes: invalid custom style name "${name}" in "${path}" — ignoring`);
+        } else if (typeof value !== "string") {
+          console.warn(`pi-model-modes: custom style "${name}" in "${path}" must map to a string path — ignoring`);
+        } else {
+          customStyles[name] = value;
+        }
+      }
+    }
+  }
+  return { configDir: dirname(path), writingStyle, customStyles };
+}
+
+/** Read and shape-validate style data from each defining config scope. */
+export function readStyleConfigScopes(cwd: string): {
+  global: StyleConfigScope;
+  project: StyleConfigScope;
+} {
+  return {
+    global: readStyleScope(globalConfigPath()),
+    project: readStyleScope(projectConfigPath(cwd)),
+  };
+}
+
+/** Seed the orthogonal writing-style state. Invalid entries degrade independently. */
+export function applyStyleFromConfig(cwd: string): void {
+  try {
+    const scopes = readStyleConfigScopes(cwd);
+    const registry = new Map<string, CustomStyleEntry>();
+    const addScope = (scope: StyleConfigScope, source: "global" | "project"): void => {
+      for (const [name, rawRel] of Object.entries(scope.customStyles)) {
+        try {
+          resolveCustomStylePath(rawRel, scope.configDir);
+          registry.set(name, { rawRel, configDir: scope.configDir, scope: source });
+        } catch (cause) {
+          console.warn(
+            `pi-model-modes: invalid custom style "${name}" in ${source} config — ignoring (${(cause as Error).message})`,
+          );
+        }
+      }
+    };
+    addScope(scopes.global, "global");
+    addScope(scopes.project, "project");
+
+    const selection = scopes.project.writingStyle ?? scopes.global.writingStyle;
+    const bundledNames = new Set(
+      discoverBundledStyles().map((path) => basename(path, ".md")),
+    );
+    if (
+      selection !== undefined &&
+      selection !== "none" &&
+      !registry.has(selection) &&
+      !bundledNames.has(selection)
+    ) {
+      console.warn(`pi-model-modes: unknown writingStyle "${selection}" — ignoring`);
+      setStyleSelection({ selection: undefined, registry });
+      return;
+    }
+    setStyleSelection({ selection, registry });
+  } catch (cause) {
+    // Config startup is deliberately tolerant even if package/style discovery
+    // encounters an unexpected I/O failure.
+    console.warn(`pi-model-modes: could not apply writing style — ignoring (${(cause as Error).message})`);
+    setStyleSelection(undefined);
+  }
 }
 
 /**
@@ -170,6 +280,7 @@ export function applySessionStart(reason: SessionStartReason, cwd: string): void
     clearActiveMode();
   }
   applyDefaultFromConfig(cwd);
+  applyStyleFromConfig(cwd);
 }
 
 // ===========================================================================
@@ -259,7 +370,7 @@ function readObjectForWrite(path: string): Record<string, unknown> {
 /**
  * Write the durable default mode to the chosen scope's config file, then
  * reconcile the resolver's default tier via the LIVE merge path
- * (`applyDefaultFromConfig` — reloads + shallow-merges BOTH files). The merge
+ * (`applyDefaultFromConfig` — reloads + merges BOTH files). The merge
  * matters: clearing a project default while a global default exists must
  * fall back to the global value, not to `unset` (Opus blocker).
  *

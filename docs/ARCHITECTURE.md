@@ -14,7 +14,8 @@ pi-model-modes/
 ├─ src/
 │   ├─ handler.ts            before_agent_start entry — orchestrates the transform
 │   ├─ resolver.ts           mode resolution: two tiers (override > default), effective = override ?? default ?? unset
-│   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds + writes the default tier;
+│   ├─ style.ts              orthogonal writing-style registry, secure custom-path resolution, and content signatures
+│   ├─ config.ts             plugin-owned config (pi-model-modes.json, global+project merge) → seeds mode + style and writes the default tier;
 │   │                        global cycleKeybinding opt-in for factory-load wiring
 │   ├─ assemble.ts           fragment splice + clean-base insertion policy
 │   ├─ cache.ts              cache key, lastKey/lastResult, change signal
@@ -33,8 +34,9 @@ pi-model-modes/
 │   │   ├─ agency/   autonomous, collaborative, surgical, partner
 │   │   ├─ quality/  architect, pragmatic, minimal
 │   │   └─ scope/    unrestricted, adjacent, narrow
-│   └─ modifiers/   bold, tdd, debug, flow, muse, readonly, methodical,
-│                   director, speak-plain, context-pacing, playful
+│   ├─ modifiers/   bold, tdd, debug, flow, muse, readonly, methodical,
+│   │                director, speak-plain, context-pacing, playful
+│   └─ styles/      clear, compact, explanatory, expressive
 ├─ presets.json              named bundles (e.g. "flow", "refactor", "create")
 └─ tests/
     ├─ assemble.test.ts
@@ -108,16 +110,19 @@ keybindings register before cwd is known and are global in pi.
                 ┌──────────────────────────────────────────────────┐
                 │  handler (src/handler.ts)                        │
                 │                                                  │
-                │  1. resolve active mode                          │
-                │     override > config default > unset            │
+                │  1. resolve active mode and writing style        │
+                │     mode: override > config default > unset      │
+                │     style: project config > global > unset       │
                 │  2. compute cache key                            │
                 │     = hash(model.id, model.provider,             │
-                │            mode.signature, hash(e.systemPrompt)) │
+                │            mode.signature, style.signature,      │
+                │            hash(e.systemPrompt))                 │
                 │  3. key === lastKey ?  ─────── yes ──▶ return lastResult
                 │  4. derive identity line from ctx.model          │
                 │     (runs every MISS, regardless of mode)        │
                 │  5. load fragments (module-scope cache)          │
-                │  6. splice: identity + base + axes + modifiers   │
+                │  6. splice: identity + style + base + axes       │
+                │           + modifiers                            │
                 │           + e.systemPrompt                       │
                 │     (no mode → only [identity line] +            │
                 │      e.systemPrompt; no base/axis/modifier        │
@@ -140,8 +145,8 @@ the per-turn cost negligible.
 
 ## Fragment library
 
-Fragments are plain markdown, one concern each. Three layers mirror the
-composition model:
+Fragments are plain markdown, one concern each. Mode fragments mirror the
+composition model, while styles form an orthogonal prose layer:
 
 - **base/** — voice overlays, not skeletons. They do not restate pi's
   tools/context; they shift register and emphasis. A `base.json` manifest
@@ -152,6 +157,10 @@ composition model:
   file per axis is selected.
 - **modifiers/** — one file per modifier, zero or more selected, applied
   in the order the preset or command declares.
+- **styles/** — bundled user-facing prose postures. Custom styles live beside
+  the config that registers them. Relative `.md` paths are realpath-contained
+  and validated both at session seed and every turn, closing symlink-swap
+  TOCTOU escapes.
 
 `src/fragments.ts` caches trimmed content in a module-scope
 `Map<path, { mtimeMs, content }>` and re-reads a file only when its `mtimeMs`
@@ -167,7 +176,7 @@ Two caches, distinct in purpose:
 
 | Cache | Scope | Key | Invalidation |
 |-------|-------|-----|--------------|
-| **Per-turn result cache** | one entry | `hash(model, mode, piBase)` | any input changes |
+| **Per-turn result cache** | one entry | `hash(model, mode, style, piBase)` | any input changes |
 | **Fragment file cache** | one entry per file | file path | stat/mtime — a fragment edit re-reads on the next turn |
 
 The per-turn cache is the one that enforces SPEC Invariant 2. Its existence
@@ -195,7 +204,7 @@ would double-inject identity/mode fragments if used as the base.
 |------------------|-------------|-----|
 | Clean-base handling | `assemble.ts` | the MISS splice always sources from `e.systemPrompt`, never from `lastResult` |
 | Cache stability | `assemble.ts` + `cache.ts` | no dynamic text; ordered concatenation only; key covers all inputs |
-| No-op when unset | `handler.ts` | identity always prepended; mode-unset injects NO mode fragments (identity still injects) |
+| No-op when unset | `handler.ts` | identity always prepended; mode+style unset preserves the legacy single-newline bytes |
 
 ## Key design properties
 

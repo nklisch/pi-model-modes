@@ -83,8 +83,8 @@ the preset list, and enables the footer cycle hint.
 
 A durable default mode can be set either with `/mode default …` or by editing a
 plugin-owned config file directly (separate from pi's closed `settings.json`,
-which has no plugin namespace). Two files are read and shallow-merged,
-**project over global**:
+which has no plugin namespace). Two files are read **project over global**;
+scalar keys shallow-merge, while `customStyles` merges per name:
 
 - global:  `~/.pi/agent/pi-model-modes.json`
 - project: `<cwd>/.pi/pi-model-modes.json`
@@ -110,7 +110,46 @@ indentation, and refuse to overwrite malformed/non-object JSON files. An invalid
 `defaultMode` (unknown preset / missing fragment) warns and is skipped during
 session start; command-time writes validate before touching disk.
 
-**Precedence:** session override (`/mode`) > config default > unset.
+### Writing styles
+
+An optional writing style controls user-facing prose independently of the active
+mode. Select one of the bundled styles (`clear`, `compact`, `explanatory`, or
+`expressive`) with `writingStyle`:
+
+```json
+{
+  "defaultMode": "flow",
+  "writingStyle": "clear"
+}
+```
+
+Register custom styles by name with `customStyles`. Paths must be relative
+`.md` files contained within the directory of the config file that defines
+them; absolute paths, `..` escapes, and symlinks escaping that directory are
+rejected. Global and project maps merge per key, with project entries winning:
+
+```json
+{
+  "writingStyle": "team-voice",
+  "customStyles": {
+    "team-voice": "styles/team-voice.md"
+  }
+}
+```
+
+A project can mask a global style without selecting another style:
+
+```json
+{ "writingStyle": "none" }
+```
+
+Styles inject even when no mode is active, after identity and before any mode
+fragments. They govern prose communication only, not code comments,
+documentation creation, implementation scope, or tool use. Selection is
+config-only in this release; `/mode:inspect` reports the effective style and its
+source.
+
+**Mode precedence:** session override (`/mode`) > config default > unset.
 The override is ephemeral (in-memory, not written to disk): a genuinely new
 session (`/new`, `/resume`, `/fork`) restarts from the config default, while a
 same-session `/reload` or `startup` keeps any active override. Changing the
@@ -166,15 +205,16 @@ Fragment files are cached by mtime, so editing one takes effect on the next turn
   with a custom `SYSTEM.md` / `--system-prompt`. It never overrides or removes
   the user's base content.
 - **Assembly is deterministic.** Within the splice, order is fixed: identity →
-  base voice → agency → quality → scope → modifiers (in preset-declared order) →
+  optional writing style → base voice → agency → quality → scope → modifiers
+  (in preset-declared order) →
   pi's assembled base.
 - **Cache-stable.** The handler computes a cache key each turn over
-  `model.id` + `model.provider` + the mode signature + a hash of pi's base, and
+  `model.id` + `model.provider` + the mode signature + the style signature + a hash of pi's base, and
   only re-assembles on a miss. There are no timestamps, counters, or
   nondeterministic values in the assembled output, so consecutive no-change
   turns produce byte-identical prompts.
-- **No-op when unset.** With no mode selected, only the identity line is
-  prepended; no axis or modifier fragments are injected.
+- **No-op when unset.** With no mode or style selected, only the identity line
+  is prepended; the legacy bytes after it are unchanged.
 - **Modes are advisory for spawned subagents.** Mode fragments splice into the
   *main session's* system prompt. When you spawn a subagent (e.g. via pi's
   `subagent` tool), the agent's own definition file (its `*.md` under

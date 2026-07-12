@@ -4,6 +4,7 @@ import type { ModePlan } from "./resolver.js";
  * Splice the effective system prompt in the SPEC's fixed order:
  *
  *   [identity line]
+ *   [writing style]                                         // optional
  *   [base overlay] [agency] [quality] [scope] [modifiers]   // = plan.fragments, in order
  *   [pi's baseSystemPrompt]
  *
@@ -25,9 +26,11 @@ export function assembleSystemPrompt(
   identity: string,
   plan: ModePlan,
   baseSystemPrompt: string,
+  styleFragment?: string,
 ): string {
   const parts: string[] = [];
   if (identity.length > 0) parts.push(identity);
+  if (styleFragment !== undefined && styleFragment.length > 0) parts.push(styleFragment);
   for (const fragment of plan.fragments) {
     // Drop empty fragment content too (a whitespace-only fragment file trims to
     // "" in the loader) — consistent with identity/base, so no stray blank lines.

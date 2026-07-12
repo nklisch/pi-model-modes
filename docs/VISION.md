@@ -27,6 +27,8 @@ and a selectable working mode, composed into the system prompt every turn.
 - **Composable modes.** A mode is one **base** voice + one value from each
   of three orthogonal axes (**agency** × **quality** × **scope**) + zero or
   more **modifiers**. Presets bundle common combinations into a single name.
+- **Orthogonal writing styles.** One optional style controls user-facing prose
+  across every mode, separating communication posture from task posture.
 - **Transform, not replace.** Modes modify pi's assembled system prompt
   rather than discarding it — tools, skills, and `<project_context>` survive
   for free.

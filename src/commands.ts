@@ -14,6 +14,7 @@ import {
 } from "./resolver.js";
 import { listPresetNames, getPreset, loadPresets, NONE_PRESET } from "./presets.js";
 import type { ResolvedMode } from "./presets.js";
+import { resolveActiveStylePlan, type StyleSource } from "./style.js";
 import {
   MODE_DEFAULT_ARG,
   MODE_DEFAULT_GLOBAL_FLAG,
@@ -63,6 +64,7 @@ const REASON_LABEL: Record<ChangeReason, string> = {
   initial: "initial",
   "model-switched": "model switched",
   "mode-switched": "mode switched",
+  "style-switched": "style switched",
   "base-changed": "base changed",
 };
 
@@ -90,6 +92,15 @@ function formatChangeDetail(entry: ChangeSignalEntry): string {
       const from = entry.detail.modeSignature.from ? shortHex(entry.detail.modeSignature.from) : "unset";
       const to = entry.detail.modeSignature.to ? shortHex(entry.detail.modeSignature.to) : "unset";
       return `(${from} → ${to})`;
+    }
+    case "style-switched": {
+      const from = entry.detail.styleSignature.from
+        ? shortHex(entry.detail.styleSignature.from)
+        : "unset";
+      const to = entry.detail.styleSignature.to
+        ? shortHex(entry.detail.styleSignature.to)
+        : "unset";
+      return `(style ${from} → ${to})`;
     }
     case "base-changed": {
       const from = entry.detail.baseHash.from ? shortHex(entry.detail.baseHash.from) : "?";
@@ -133,11 +144,27 @@ export function formatFencedBlock(content: string): string {
  *  unchanged. The `"(no turn has run yet — …)"` sentinel is passed by the
  *  command layer when the base-prompt memo is empty so the panel honestly
  *  reports the gap rather than emitting an empty fenced block. */
+export interface StyleInspectInfo {
+  name: string | undefined;
+  source: StyleSource;
+  error: string | undefined;
+}
+
+function formatStyleLine(info: StyleInspectInfo | undefined): string {
+  if (info?.error) return `Style: (unresolvable — ${info.error})`;
+  if (info === undefined || info.source === "unset") return "Style: (unset)";
+  if (info.source === "none") return "Style: none (explicit)";
+  if (info.source === "bundled") return `Style: ${info.name} (bundled)`;
+  if (info.source === "custom-global") return `Style: ${info.name} (custom, global)`;
+  return `Style: ${info.name} (custom, project)`;
+}
+
 export function renderModeInspect(
   snapshot: ChangeSignalSnapshot,
   model: Model<any> | undefined,
   mode: ResolvedMode | undefined,
   modeError?: string,
+  styleInfo?: StyleInspectInfo,
   assembledPrompt?: string,
 ): string {
   const identity = model ? deriveIdentityLine(model) : "(no model)";
@@ -147,6 +174,7 @@ export function renderModeInspect(
     : formatModeSummary(mode);
   const lines = [
     `Mode: ${modeLine}`,
+    formatStyleLine(styleInfo),
     `Identity: ${identity}`,
     formatLastChanged(snapshot),
     `Cache key: ${cacheKey}`,
@@ -560,6 +588,18 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
         modeError = (err as Error).message;
       }
 
+      let styleInfo: StyleInspectInfo;
+      try {
+        const style = resolveActiveStylePlan();
+        styleInfo = { name: style.name, source: style.source, error: undefined };
+      } catch (err) {
+        styleInfo = {
+          name: undefined,
+          source: "unset",
+          error: (err as Error).message,
+        };
+      }
+
       // The --prompt branch: re-run the SAME splice the handler uses, against
       // the most recent pi base prompt the handler observed. If no turn has run
       // yet the memo is empty — emit an honest sentinel rather than an empty
@@ -591,6 +631,7 @@ export function registerModeInspectCommand(pi: ExtensionAPI): void {
         ctx.model,
         mode,
         modeError,
+        styleInfo,
         assembledPrompt,
       );
       pi.sendMessage({

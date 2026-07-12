@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { NO_STYLE_SIGNATURE } from "./style.js";
+
+export { NO_STYLE_SIGNATURE } from "./style.js";
 
 /**
  * Cache key + per-turn result cache + change-signal ring buffer.
@@ -6,7 +9,7 @@ import { createHash } from "node:crypto";
  * This is the foundation module for the identity-injection epic. It owns three
  * co-located concerns that share `lastKey` state and fire on the same event
  * (key replacement):
- *   1. The cache key — `sha256(modelName | modelId | modelProvider | modeSignature | sha256(baseSystemPrompt))`
+ *   1. The cache key — `sha256(modelName | modelId | modelProvider | modeSignature | styleSignature | sha256(baseSystemPrompt))`
  *      via a length-delimited canonical encoding.
  *   2. The per-turn result cache — module-scope `lastKey`/`lastResult` with a
  *      hit/miss decision the handler consults each turn.
@@ -26,7 +29,7 @@ import { createHash } from "node:crypto";
  *  replaces the caller's use of this with the real composed signature. */
 export const NO_MODE_SIGNATURE = "";
 
-/** The five inputs to the cache key. `baseSystemPrompt` is pi's
+/** The six inputs to the cache key. `baseSystemPrompt` is pi's
  *  fully-assembled `e.systemPrompt` for the turn. */
 export interface CacheKeyInputs {
   /** Human-facing model name used in the identity line. */
@@ -34,16 +37,18 @@ export interface CacheKeyInputs {
   modelId: string;
   modelProvider: string;
   modeSignature: string;
+  styleSignature: string;
   baseSystemPrompt: string;
 }
 
 /** Reason a cache key changed. Priority on simultaneous change is
- *  `model-switched` > `mode-switched` > `base-changed` (most-deliberate
+ *  `model-switched` > `mode-switched` > `style-switched` > `base-changed` (most-deliberate
  *  user action first). `initial` is the first-ever population. */
 export type ChangeReason =
   | "initial"
   | "model-switched"
   | "mode-switched"
+  | "style-switched"
   | "base-changed";
 
 /** One entry in the change-signal ring. `detail` carries structured
@@ -60,6 +65,7 @@ export interface ChangeSignalEntry {
     modelId: { from: string | undefined; to: string };
     modelProvider: { from: string | undefined; to: string };
     modeSignature: { from: string | undefined; to: string };
+    styleSignature: { from: string | undefined; to: string };
     baseHash: { from: string | undefined; to: string };
   };
 }
@@ -81,6 +87,7 @@ interface KeyComponents {
   modelId: string;
   modelProvider: string;
   modeSignature: string;
+  styleSignature: string;
   baseHash: string;
 }
 
@@ -104,13 +111,14 @@ function componentsOf(inputs: CacheKeyInputs): KeyComponents {
     modelId: inputs.modelId,
     modelProvider: inputs.modelProvider,
     modeSignature: inputs.modeSignature,
+    styleSignature: inputs.styleSignature ?? NO_STYLE_SIGNATURE,
     baseHash: sha256Hex(inputs.baseSystemPrompt),
   };
 }
 
 /**
  * Length-delimited canonical encoding: `<byteLen>:<field>` joined by `|` over
- * `[modelName, modelId, modelProvider, modeSignature, baseHash]`. The byte-length
+ * `[modelName, modelId, modelProvider, modeSignature, styleSignature, baseHash]`. The byte-length
  * prefix (not char-length) nullifies cross-field ambiguity — so
  * `modelId="ab",provider="c"` and `modelId="a",provider="bc"` cannot collide.
  * Deterministic: same components always produce the same canonical string.
@@ -122,13 +130,14 @@ function encodeComponents(c: KeyComponents): string {
     enc(c.modelId),
     enc(c.modelProvider),
     enc(c.modeSignature),
+    enc(c.styleSignature),
     enc(c.baseHash),
   ].join("|");
 }
 
 /**
  * Classify why the key changed. Priority: `initial` > `model-switched` >
- * `mode-switched` > `base-changed`. Only called when `key !== lastKey`, so
+ * `mode-switched` > `style-switched` > `base-changed`. Only called when `key !== lastKey`, so
  * when `prev` is defined, ≥1 component is guaranteed to differ.
  */
 function classifyReason(
@@ -144,6 +153,7 @@ function classifyReason(
     return "model-switched";
   }
   if (prev.modeSignature !== curr.modeSignature) return "mode-switched";
+  if (prev.styleSignature !== curr.styleSignature) return "style-switched";
   return "base-changed";
 }
 
@@ -151,7 +161,7 @@ function classifyReason(
 
 /**
  * Pure: SHA-256 hex digest of a length-delimited canonical encoding of the
- * four inputs. Deterministic — same inputs always produce the same 64-char
+ * six inputs. Deterministic — same inputs always produce the same 64-char
  * lowercase hex key. No module state consulted.
  */
 export function computeCacheKey(inputs: CacheKeyInputs): string {
@@ -204,6 +214,7 @@ export function setCachedResult(
       modelId: { from: prevComponents?.modelId, to: curr.modelId },
       modelProvider: { from: prevComponents?.modelProvider, to: curr.modelProvider },
       modeSignature: { from: prevComponents?.modeSignature, to: curr.modeSignature },
+      styleSignature: { from: prevComponents?.styleSignature, to: curr.styleSignature },
       baseHash: { from: prevComponents?.baseHash, to: curr.baseHash },
     },
   };

@@ -17,8 +17,8 @@ pi-model-modes is a pi extension package (`pi-package`), installed via
 - A styled footer status under the plugin-owned `pi-model-modes` key. Its
   visible value is `mode: <glyph> <summary>` (for example `mode: ◆ create`),
   with color supplied by the active pi theme at render time.
-- A `session_start` handler that seeds the default mode from plugin-owned
-  config (`pi-model-modes.json`, global + project merged).
+- A `session_start` handler that seeds the default mode and optional writing
+  style from plugin-owned config (`pi-model-modes.json`, global + project merged).
 
 No subprocess is spawned. No pi internals are monkey-patched. The plugin
 operates entirely through the public `ExtensionAPI`.
@@ -83,17 +83,13 @@ Forbidden in assembled output, unconditionally:
 
 ### 3. No-op when unset
 
-With no mode selected (no `/mode`, no config default),
-the handler prepends the identity line and injects NO mode fragments.
-Baseline pi behavior is preserved for mode — no axis or modifier fragments,
-same tools, same skills, same context, same caching. Identity is purely
-additive: prepended as the first line, it never overrides or removes the
-user's content, and applies even with a custom `SYSTEM.md` /
-`--system-prompt`.
+With no mode and no writing style selected, the handler prepends the identity
+line and injects no optional fragments. The remainder stays byte-identical to
+pi's assembled base, including the legacy single-newline join. Identity is
+purely additive and applies even with a custom `SYSTEM.md` / `--system-prompt`.
 
-**Test:** with mode unset, the handler's return has the identity line as its
-first byte and no mode fragments; the remainder is byte-identical to pi's
-assembled base.
+**Test:** with both optional layers unset, the handler's return is exactly the
+identity line, one newline, and pi's assembled base.
 
 ## Cache key and the change signal
 
@@ -105,7 +101,8 @@ key = hash(
   model.name,                // human-facing name used in the identity line
   model.id,
   model.provider,
-  mode.signature,            // "base:chill|agency:autonomous|quality:architect|scope:adjacent|mod:flow"
+  mode.signature,            // composed mode content hash, or empty when unset
+  style.signature,           // selected style content hash, or empty when unset/none
   hash(e.systemPrompt)       // pi's base for this turn
 )
 ```
@@ -171,6 +168,7 @@ Assembly order within the splice is fixed and deterministic:
 
 ```
 [identity line]
+[writing style]             // when selected; orthogonal to mode
 [base voice overlay]        // if a non-pi base is selected
 [agency fragment]
 [quality fragment]
@@ -178,6 +176,25 @@ Assembly order within the splice is fixed and deterministic:
 [modifier fragments]        // in preset-declared order, or CLI order
 ... pi's assembled e.systemPrompt (tools / guidelines / context / skills / date / cwd) ...
 ```
+
+## Writing styles
+
+One optional writing style controls user-facing prose across every mode. It is
+selected with `writingStyle` in global or project `pi-model-modes.json`; project
+selection wins, and `"none"` explicitly masks a global selection. The bundled
+styles are `clear`, `compact`, `explanatory`, and `expressive`.
+
+`customStyles` maps validated names to relative `.md` paths. Maps merge per key
+(project wins), while selection remains scalar. Each path resolves relative to
+the config file that defines it and must remain within that directory after
+`realpath`; absolute paths, escapes, non-Markdown paths, non-files, and escaping
+symlinks are rejected. Containment is checked at session seed and again before
+each read. A custom registration wins over a bundled style of the same name.
+
+A style injects even when mode is unset. It appears after identity and before
+mode fragments. Style text governs user-facing prose only; it does not govern
+code comments, documentation creation, edit scope, or tool policy. With no
+style selected, no style bytes are injected.
 
 Fragments are cached in module scope keyed by file mtime: a `statSync` runs
 each access and the file is re-read only when its `mtimeMs` changes, so a fragment

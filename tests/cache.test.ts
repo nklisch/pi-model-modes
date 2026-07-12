@@ -25,6 +25,7 @@ const BASE_INPUTS: CacheKeyInputs = {
   modelId: "claude-sonnet-4-6",
   modelProvider: "anthropic",
   modeSignature: NO_MODE_SIGNATURE,
+  styleSignature: "",
   baseSystemPrompt: "You are an expert coding assistant.",
 };
 
@@ -46,6 +47,7 @@ describe("computeCacheKey — purity + determinism", () => {
   it("is unaffected by construction order of the inputs object (pure over values, not reference)", () => {
     const reordered: CacheKeyInputs = {
       modeSignature: BASE_INPUTS.modeSignature,
+      styleSignature: BASE_INPUTS.styleSignature,
       baseSystemPrompt: BASE_INPUTS.baseSystemPrompt,
       modelProvider: BASE_INPUTS.modelProvider,
       modelId: BASE_INPUTS.modelId,
@@ -96,6 +98,12 @@ describe("computeCacheKey — change-detection (term necessity; codex-required)"
     expect(a).not.toBe(b);
   });
 
+  it("style-change: different styleSignature produces a different key", () => {
+    const a = computeCacheKey({ ...BASE_INPUTS, styleSignature: "style-a" });
+    const b = computeCacheKey({ ...BASE_INPUTS, styleSignature: "style-b" });
+    expect(a).not.toBe(b);
+  });
+
   it("length-delimited encoding nullifies cross-field ambiguity", () => {
     // A naive concatenation would collide these two. The byte-length prefix
     // makes ("ab","c",sig,base) ≠ ("a","bc",sig,base).
@@ -106,6 +114,7 @@ describe("computeCacheKey — change-detection (term necessity; codex-required)"
       modelId: "ab",
       modelProvider: "c",
       modeSignature: sig,
+      styleSignature: "",
       baseSystemPrompt: base,
     });
     const b = computeCacheKey({
@@ -113,6 +122,7 @@ describe("computeCacheKey — change-detection (term necessity; codex-required)"
       modelId: "a",
       modelProvider: "bc",
       modeSignature: sig,
+      styleSignature: "",
       baseSystemPrompt: base,
     });
     expect(a).not.toBe(b);
@@ -168,6 +178,7 @@ describe("change signal — reason classification (codex-required)", () => {
     expect(last?.detail.modelId.from).toBeUndefined();
     expect(last?.detail.modelProvider.from).toBeUndefined();
     expect(last?.detail.modeSignature.from).toBeUndefined();
+    expect(last?.detail.styleSignature.from).toBeUndefined();
     expect(last?.detail.baseHash.from).toBeUndefined();
   });
 
@@ -236,6 +247,36 @@ describe("change signal — reason classification (codex-required)", () => {
       from: "base:chill|agency:autonomous",
       to: "base:focus|agency:default",
     });
+  });
+
+  it("styleSignature change records style-switched with detail", () => {
+    const i1 = { ...BASE_INPUTS, styleSignature: "style-a" };
+    const k1 = computeCacheKey(i1);
+    getCachedResult(k1);
+    setCachedResult(k1, "A", i1);
+
+    const i2 = { ...BASE_INPUTS, styleSignature: "style-b" };
+    const k2 = computeCacheKey(i2);
+    getCachedResult(k2);
+    setCachedResult(k2, "B", i2);
+
+    expect(getChangeSignal().lastEntry?.reason).toBe("style-switched");
+    expect(getChangeSignal().lastEntry?.detail.styleSignature).toEqual({
+      from: "style-a",
+      to: "style-b",
+    });
+  });
+
+  it("mode change wins when mode and style change together", () => {
+    const i1 = { ...BASE_INPUTS, modeSignature: "mode-a", styleSignature: "style-a" };
+    const k1 = computeCacheKey(i1);
+    getCachedResult(k1);
+    setCachedResult(k1, "A", i1);
+    const i2 = { ...BASE_INPUTS, modeSignature: "mode-b", styleSignature: "style-b" };
+    const k2 = computeCacheKey(i2);
+    getCachedResult(k2);
+    setCachedResult(k2, "B", i2);
+    expect(getChangeSignal().lastEntry?.reason).toBe("mode-switched");
   });
 
   it("base change (same model+mode) records reason base-changed with baseHash detail", () => {

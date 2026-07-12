@@ -7,6 +7,8 @@ import {
   loadGlobalPluginConfig,
   applyDefaultFromConfig,
   applySessionStart,
+  applyStyleFromConfig,
+  readStyleConfigScopes,
   setConfigPathsForTesting,
   resetConfigForTesting,
   writeDefaultToConfig,
@@ -27,6 +29,7 @@ import {
   resetFragmentsForTesting,
 } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
+import { resetStyleForTesting, resolveActiveStylePlan } from "../src/style.js";
 
 /**
  * Tests for `src/config.ts` — the plugin-owned config loader + default-tier
@@ -76,6 +79,7 @@ beforeEach(() => {
   resetConfigForTesting();
   resetFragmentsForTesting();
   resetPresetsForTesting();
+  resetStyleForTesting();
 });
 
 afterEach(() => {
@@ -88,6 +92,7 @@ afterEach(() => {
   resetConfigForTesting();
   resetFragmentsForTesting();
   resetPresetsForTesting();
+  resetStyleForTesting();
   vi.restoreAllMocks();
 });
 
@@ -119,6 +124,29 @@ describe("loadPluginConfig — merge + tolerance", () => {
     writeJson(project, { defaultMode: "flow" });
     setConfigPathsForTesting({ global, project });
     expect(loadPluginConfig("/unused")).toEqual({ defaultMode: "flow" });
+  });
+
+  it("per-key merges customStyles while project scalar values still win", () => {
+    const d = freshDir();
+    const global = join(d, "global.json");
+    const project = join(d, "project.json");
+    writeJson(global, {
+      writingStyle: "clear",
+      customStyles: { shared: "global.md", global: "global.md" },
+    });
+    writeJson(project, {
+      writingStyle: "none",
+      customStyles: { shared: "project.md", project: "project.md" },
+    });
+    setConfigPathsForTesting({ global, project });
+    expect(loadPluginConfig("/unused")).toEqual({
+      writingStyle: "none",
+      customStyles: {
+        shared: "project.md",
+        global: "global.md",
+        project: "project.md",
+      },
+    });
   });
 
   it("both files missing → {}", () => {
@@ -153,6 +181,57 @@ describe("loadPluginConfig — merge + tolerance", () => {
       project: join(d, "missing-project.json"),
     });
     expect(loadPluginConfig("/unused")).toEqual({});
+    expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("style config scopes + seeding", () => {
+  it("reads each scope with its defining config directory", () => {
+    const d = freshDir();
+    const global = join(d, "g", "config.json");
+    const project = join(d, "p", "config.json");
+    writeJson(global, { writingStyle: "clear" });
+    writeJson(project, { customStyles: { team: "styles/team.md" } });
+    setConfigPathsForTesting({ global, project });
+    expect(readStyleConfigScopes("/unused")).toEqual({
+      global: { configDir: dirname(global), writingStyle: "clear", customStyles: {} },
+      project: {
+        configDir: dirname(project),
+        writingStyle: undefined,
+        customStyles: { team: "styles/team.md" },
+      },
+    });
+  });
+
+  it("seeds valid merged custom styles with project winning a collision", () => {
+    const d = freshDir();
+    const global = join(d, "global", "config.json");
+    const project = join(d, "project", "config.json");
+    writeRaw(join(dirname(global), "global.md"), "GLOBAL");
+    writeRaw(join(dirname(project), "project.md"), "PROJECT");
+    writeJson(global, { customStyles: { team: "global.md" }, writingStyle: "team" });
+    writeJson(project, { customStyles: { team: "project.md" } });
+    setConfigPathsForTesting({ global, project });
+    applyStyleFromConfig("/unused");
+    expect(resolveActiveStylePlan()).toMatchObject({
+      name: "team",
+      source: "custom-project",
+      content: "PROJECT",
+    });
+  });
+
+  it("drops bad entries, preserves siblings, and degrades an unknown selection", () => {
+    const d = freshDir();
+    const global = join(d, "config.json");
+    writeRaw(join(d, "valid.md"), "VALID");
+    writeJson(global, {
+      writingStyle: "unknown",
+      customStyles: { valid: "valid.md", bad: "../escape.md", "Bad Name": "valid.md" },
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    setConfigPathsForTesting({ global, project: join(d, "missing.json") });
+    expect(() => applyStyleFromConfig("/unused")).not.toThrow();
+    expect(resolveActiveStylePlan()).toMatchObject({ source: "unset", content: "" });
     expect(warn).toHaveBeenCalled();
   });
 });
@@ -350,6 +429,19 @@ describe("applySessionStart — ephemeral override clearing", () => {
       // A reload / initial startup keeps the active override.
       expect(getActiveMode()).toEqual(override);
       expect(getEffectiveModeSource()).toBe("override");
+    },
+  );
+
+  it.each(["startup", "reload", "new", "resume", "fork"] as const)(
+    "seeds writing style on every session-start reason (%s)",
+    (reason) => {
+      const d = freshDir();
+      const global = join(d, "global.json");
+      writeJson(global, { writingStyle: "clear" });
+      setConfigPathsForTesting({ global, project: join(d, "missing.json") });
+      resetStyleForTesting();
+      applySessionStart(reason, "/unused");
+      expect(resolveActiveStylePlan()).toMatchObject({ name: "clear", source: "bundled" });
     },
   );
 

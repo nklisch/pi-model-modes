@@ -1,7 +1,7 @@
 ---
 id: feature-configurable-writing-styles
 kind: feature
-stage: implementing
+stage: review
 tags: [security, tests, docs]
 parent: null
 depends_on: []
@@ -913,3 +913,13 @@ this is one feature, not a multi-feature arc.
 - `/agile-workflow:implement-orchestrator feature-configurable-writing-styles`
   to drive the feature as one cohesive implementation with verification at each
   unit boundary.
+
+## Implementation notes
+
+- Execution capability: inline host implementation; the feature was cohesive around one per-turn pipeline, and direct reads fully established the integration surface without delegation.
+- Review weight: `standard` (project default, confirmed by caller).
+- Files changed: `prompts/styles/{clear,compact,explanatory,expressive}.md`; `src/{style,config,cache,assemble,handler,commands}.ts`; `tests/{style,handler-style,config,cache,commands,handler-mode,cache-stability,noop,clean-base}.test.ts`; `docs/{SPEC,ARCHITECTURE,VISION}.md`; `README.md`; `CHANGELOG.md`.
+- Tests added: style-name/catalog/resolver/path-containment and symlink cases; config scope/merge/seeding cases; cache style-key/reason/priority cases; handler ordering, byte-compatibility, graceful-degrade, inspect parity, and content/touch invalidation cases; inspect style-state and change-detail cases.
+- Verification: focused style/config/cache/handler/inspect suite passed (166 tests); final full suite passed (408 tests); `tsc --noEmit` passed.
+- Discrepancies from design: none.
+- Adjacent issues parked: none.

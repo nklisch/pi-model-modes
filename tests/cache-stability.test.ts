@@ -6,6 +6,7 @@ import { MODE_FOOTER_KEY, refreshModeFooter, resetFooterForTesting } from "../sr
 import { resetResolverForTesting, setActiveMode } from "../src/resolver.js";
 import { resetFragmentsForTesting } from "../src/fragments.js";
 import { resetPresetsForTesting } from "../src/presets.js";
+import { resetStyleForTesting } from "../src/style.js";
 import { makeContext, makeEvent, makeModel, makeUi } from "./harness.js";
 
 /**
@@ -41,6 +42,7 @@ describe("cache stability — SPEC Invariant 2 (byte-identical across no-change 
     resetFooterForTesting();
     resetFragmentsForTesting();
     resetPresetsForTesting();
+    resetStyleForTesting();
   });
 
   it("returns byte-identical systemPrompt across N no-change turns (HIT path)", () => {
