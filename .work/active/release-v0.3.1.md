@@ -25,4 +25,6 @@ updated: 2026-07-12
 
 - **gate-tests** (2026-07-12) — 13 coverage gaps (Critical=1, High=1, Medium=7, Low=4; tautological=0)
 
-Pending configured gates: cruft, docs, patterns.
+- **gate-cruft** (2026-07-12) — 4 findings (High=0, Medium=2, Low=2)
+
+Pending configured gates: docs, patterns.
