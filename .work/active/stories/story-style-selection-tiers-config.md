@@ -1,7 +1,7 @@
 ---
 id: story-style-selection-tiers-config
 kind: story
-stage: review
+stage: implementing
 tags: []
 parent: feature-style-command-family
 depends_on: []
@@ -80,3 +80,23 @@ See `feature-style-command-family` Units 1–2, Testing, and Risks.
   required no exploratory fanout.
 - Review weight: standard (source: default), preserved for the review stage.
 - No deviations or blockers remain for the dependent command/UI story.
+
+## Review findings (2026-07-12)
+
+**Verdict**: Request changes
+
+**Blocking correction**:
+- Add positive coverage proving a globally registered custom style can be
+  written as the global default. Existing tests cover rejection of a
+  project-only custom style but not acceptance of a valid global registration.
+
+**Safe adjacent cleanup accepted from review**:
+- Make `noStylePlan` selection provenance explicit rather than defaulting
+  `none` to `override` for future callers.
+- Keep `StyleDefaultSource` in one module and filter reserved names consistently
+  during write validation.
+- Remove temporary compatibility/source result aliases where the parent design
+  already requires the dependent command story to migrate consumers.
+
+**Review context**: standard weight; cross-model GLM 5.2 deep review over commit
+`4852ade`; integrated verification was green (427 tests and typecheck).
