@@ -203,6 +203,33 @@ describe("style config scopes + seeding", () => {
     });
   });
 
+  it("drops malformed style field shapes while preserving valid siblings", () => {
+    const d = freshDir();
+    const global = join(d, "global", "config.json");
+    const project = join(d, "project", "config.json");
+    writeJson(global, { writingStyle: 42, customStyles: [] });
+    writeJson(project, {
+      writingStyle: "clear",
+      customStyles: { valid: "valid.md", bad: 7 },
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    setConfigPathsForTesting({ global, project });
+
+    expect(readStyleConfigScopes("/unused")).toEqual({
+      global: {
+        configDir: dirname(global),
+        writingStyle: undefined,
+        customStyles: {},
+      },
+      project: {
+        configDir: dirname(project),
+        writingStyle: "clear",
+        customStyles: { valid: "valid.md" },
+      },
+    });
+    expect(warn).toHaveBeenCalledTimes(3);
+  });
+
   it("seeds valid merged custom styles with project winning a collision", () => {
     const d = freshDir();
     const global = join(d, "global", "config.json");

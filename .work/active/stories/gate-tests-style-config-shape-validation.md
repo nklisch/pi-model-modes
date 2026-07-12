@@ -1,7 +1,7 @@
 ---
 id: gate-tests-style-config-shape-validation
 kind: story
-stage: implementing
+stage: review
 tags: [testing]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ Feed malformed `writingStyle` and `customStyles` field shapes, then assert inval
 
 ## Test location
 `tests/config.test.ts`
+
+## Implementation notes
+- Execution capability: inline single-owner test addition; narrow malformed-input partition coverage.
+- review_weight: standard (project default)
+- Files changed: `tests/config.test.ts`
+- Tests added: malformed writing-style scalar, custom-style map, and custom-style value validation with valid sibling retention.
+- Verification: `npx vitest --run tests/config.test.ts` (51 passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.
