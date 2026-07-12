@@ -1,7 +1,7 @@
 ---
 id: gate-docs-resolver-degrade-citations
 kind: story
-stage: review
+stage: done
 tags: [documentation]
 parent: null
 depends_on: []
@@ -34,3 +34,15 @@ Replace stale command line references with current listing, inspect-resolution, 
 
 - Citation audit: `nl -ba src/commands.ts | sed -n '416,427p;558,568p;595,604p'` confirms all three cited statements.
 - Transitioned to `stage: review` after the source citations were refreshed.
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+**Nits**: none remaining
+
+**Notes**: Standard-weight GLM-5.2 independent review verified the item against
+its quoted gate criterion and current source. Integrated evidence: 28 test files,
+469 tests passed; TypeScript typecheck and diff-check passed.
