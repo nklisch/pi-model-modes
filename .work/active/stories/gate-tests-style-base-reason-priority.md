@@ -1,7 +1,7 @@
 ---
 id: gate-tests-style-base-reason-priority
 kind: story
-stage: implementing
+stage: review
 tags: [testing]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ Change only style signature and base prompt in one transition and assert the rec
 
 ## Test location
 `tests/cache.test.ts`
+
+## Implementation notes
+- Execution capability: inline single-owner test addition; narrow cache classification coverage.
+- review_weight: standard (project default)
+- Files changed: `tests/cache.test.ts`
+- Tests added: simultaneous style-signature and base-prompt change reason priority.
+- Verification: `npx vitest --run tests/cache.test.ts` (35 passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.

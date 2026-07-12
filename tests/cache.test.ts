@@ -279,6 +279,28 @@ describe("change signal — reason classification (codex-required)", () => {
     expect(getChangeSignal().lastEntry?.reason).toBe("mode-switched");
   });
 
+  it("style change wins when style and base change together", () => {
+    const i1 = {
+      ...BASE_INPUTS,
+      styleSignature: "style-a",
+      baseSystemPrompt: "base A",
+    };
+    const k1 = computeCacheKey(i1);
+    getCachedResult(k1);
+    setCachedResult(k1, "A", i1);
+
+    const i2 = {
+      ...BASE_INPUTS,
+      styleSignature: "style-b",
+      baseSystemPrompt: "base B",
+    };
+    const k2 = computeCacheKey(i2);
+    getCachedResult(k2);
+    setCachedResult(k2, "B", i2);
+
+    expect(getChangeSignal().lastEntry?.reason).toBe("style-switched");
+  });
+
   it("base change (same model+mode) records reason base-changed with baseHash detail", () => {
     const i1 = { ...BASE_INPUTS, baseSystemPrompt: "base A" };
     const k1 = computeCacheKey(i1);
