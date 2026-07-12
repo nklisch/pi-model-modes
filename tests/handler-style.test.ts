@@ -106,6 +106,37 @@ describe("writing style handler integration", () => {
     );
   });
 
+  it("splices every populated fragment slot in the complete fixed order", () => {
+    const { root } = fixture();
+    write(root, "base/overlay.md", "BASE OVERLAY");
+    write(root, "modifiers/tdd.md", "MODIFIER");
+    writeFileSync(
+      join(root, "base.json"),
+      JSON.stringify({ overlays: ["base/overlay.md"] }),
+      "utf8",
+    );
+    setActiveMode({
+      base: "overlay",
+      agency: "autonomous",
+      quality: "pragmatic",
+      scope: "adjacent",
+      modifiers: ["tdd"],
+    });
+
+    const result = handleBeforeAgentStart(makeEvent(base), makeContext({ model }));
+
+    expect(result.systemPrompt).toBe([
+      deriveIdentityLine(model),
+      "STYLE ONE",
+      "BASE OVERLAY",
+      "AGENCY",
+      "QUALITY",
+      "SCOPE",
+      "MODIFIER",
+      base,
+    ].join("\n\n"));
+  });
+
   it("degrades a vanished custom style to no-style and warns once", () => {
     const { stylePath } = fixture();
     rmSync(stylePath);

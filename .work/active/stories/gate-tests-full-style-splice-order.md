@@ -1,7 +1,7 @@
 ---
 id: gate-tests-full-style-splice-order
 kind: story
-stage: implementing
+stage: review
 tags: [testing]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ Populate all fragment slots with sentinels and assert the exact fully composed p
 
 ## Test location
 `tests/handler-style.test.ts`
+
+## Implementation notes
+- Execution capability: inline single-owner integration test; deterministic ordering coverage.
+- review_weight: standard (project default)
+- Files changed: `tests/handler-style.test.ts`
+- Tests added: exact identity/style/base-overlay/axes/modifier/pi-base splice order with every slot populated.
+- Verification: `npx vitest --run tests/handler-style.test.ts` (7 passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.
