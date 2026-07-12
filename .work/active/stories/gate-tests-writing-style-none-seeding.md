@@ -1,7 +1,7 @@
 ---
 id: gate-tests-writing-style-none-seeding
 kind: story
-stage: drafting
+stage: implementing
 tags: [testing]
 parent: null
 depends_on: []

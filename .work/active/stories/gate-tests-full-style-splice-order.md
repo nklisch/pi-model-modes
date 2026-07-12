@@ -1,7 +1,7 @@
 ---
 id: gate-tests-full-style-splice-order
 kind: story
-stage: drafting
+stage: implementing
 tags: [testing]
 parent: null
 depends_on: []

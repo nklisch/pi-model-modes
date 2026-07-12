@@ -1,7 +1,7 @@
 ---
 id: gate-tests-style-base-reason-priority
 kind: story
-stage: drafting
+stage: implementing
 tags: [testing]
 parent: null
 depends_on: []

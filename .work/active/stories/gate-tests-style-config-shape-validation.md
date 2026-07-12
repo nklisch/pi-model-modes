@@ -1,7 +1,7 @@
 ---
 id: gate-tests-style-config-shape-validation
 kind: story
-stage: drafting
+stage: implementing
 tags: [testing]
 parent: null
 depends_on: []

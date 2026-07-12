@@ -1,7 +1,7 @@
 ---
 id: gate-tests-custom-global-source-resolution
 kind: story
-stage: drafting
+stage: implementing
 tags: [testing]
 parent: null
 depends_on: []

@@ -1,7 +1,7 @@
 ---
 id: gate-docs-cache-key-model-name
 kind: story
-stage: drafting
+stage: implementing
 tags: [documentation]
 parent: null
 depends_on: []
