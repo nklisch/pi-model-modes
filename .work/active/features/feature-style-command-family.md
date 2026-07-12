@@ -1,7 +1,7 @@
 ---
 id: feature-style-command-family
 kind: feature
-stage: review
+stage: done
 tags: []
 parent: null
 depends_on: []
@@ -547,3 +547,17 @@ parent review: 28 test files, 465 tests passed; `npm run typecheck` passed;
 `git diff --check` passed. Worker capability was raised/high due the public
 command/config and prompt-state surface. Review weight remained standard
 (default source).
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+**Nits**: none
+
+**Notes**: Standard-weight cross-model deep aggregate review by Kimi K2.7 after
+both child review loops converged. The review confirmed complete command,
+configuration, autocomplete, inspect, lifecycle, cache/noninterference, and
+documentation contracts. Final evidence: 28 test files, 465 tests passed;
+TypeScript typecheck and diff-check passed. No foundation-doc drift remains.
