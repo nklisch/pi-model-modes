@@ -177,6 +177,34 @@ describe("style catalog and resolution", () => {
     ]);
   });
 
+  it("returns a defensive catalog snapshot", () => {
+    const root = freshDir();
+    write(root, "team.md", "TEAM");
+    configureStyleDefaults({
+      selection: undefined,
+      source: "unset",
+      registry: new Map([
+        ["team", { rawRel: "team.md", configDir: root, scope: "global" }],
+      ]),
+    });
+
+    const returned = listAvailableStyles() as Array<{
+      name: string;
+      fragmentSource: string;
+    }>;
+    returned.pop();
+    returned[0]!.name = "corrupted";
+    returned.push({ name: "injected", fragmentSource: "bundled" });
+
+    expect(listAvailableStyles()).toEqual([
+      { name: "clear", fragmentSource: "bundled" },
+      { name: "compact", fragmentSource: "bundled" },
+      { name: "explanatory", fragmentSource: "bundled" },
+      { name: "expressive", fragmentSource: "bundled" },
+      { name: "team", fragmentSource: "custom-global" },
+    ]);
+  });
+
   it("custom registration wins on a bundled-name collision and vanished files throw", () => {
     const root = freshDir();
     const path = write(root, "clear.md", "CUSTOM CLEAR");
