@@ -25,4 +25,6 @@ updated: 2026-07-12
 
 - **gate-cruft** (2026-07-12) — 2 findings (High=0, Medium=1, Low=1)
 
-Pending: docs, patterns.
+- **gate-docs** (2026-07-12) — 2 findings (pattern-skill-staleness=1, foundation-doc-assertion=1)
+
+Pending: patterns.
