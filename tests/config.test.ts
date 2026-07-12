@@ -247,6 +247,23 @@ describe("style config scopes + seeding", () => {
     });
   });
 
+  it("seeds project none as an explicit mask over a global writing style", () => {
+    const d = freshDir();
+    const global = join(d, "global.json");
+    const project = join(d, "project.json");
+    writeJson(global, { writingStyle: "clear" });
+    writeJson(project, { writingStyle: "none" });
+    setConfigPathsForTesting({ global, project });
+
+    applyStyleFromConfig("/unused");
+
+    expect(resolveActiveStylePlan()).toMatchObject({
+      source: "none",
+      content: "",
+      signature: "",
+    });
+  });
+
   it("drops bad entries without poisoning a selected valid sibling", () => {
     const d = freshDir();
     const global = join(d, "config.json");

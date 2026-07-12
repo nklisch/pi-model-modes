@@ -1,7 +1,7 @@
 ---
 id: gate-tests-writing-style-none-seeding
 kind: story
-stage: implementing
+stage: review
 tags: [testing]
 parent: null
 depends_on: []
@@ -28,3 +28,12 @@ Configure global `clear` and project `none`, call `applyStyleFromConfig`, and as
 
 ## Test location
 `tests/config.test.ts`
+
+## Implementation notes
+- Execution capability: inline single-owner test addition; narrow, low-risk config-seeding coverage.
+- review_weight: standard (project default)
+- Files changed: `tests/config.test.ts`
+- Tests added: end-to-end project `none` masking a global bundled style selection.
+- Verification: `npx vitest --run tests/config.test.ts` (52 passed).
+- Discrepancies from design: none.
+- Adjacent issues parked: none.
