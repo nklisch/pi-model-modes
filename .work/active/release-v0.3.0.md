@@ -23,4 +23,6 @@ updated: 2026-07-12
 
 - **gate-tests** (2026-07-12) — 8 coverage gaps (Critical=0, High=1, Medium=3, Low=4; tautological=0)
 
-Pending: cruft, docs, patterns.
+- **gate-cruft** (2026-07-12) — 2 findings (High=0, Medium=1, Low=1)
+
+Pending: docs, patterns.
