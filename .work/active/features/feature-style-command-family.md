@@ -1,7 +1,7 @@
 ---
 id: feature-style-command-family
 kind: feature
-stage: implementing
+stage: review
 tags: []
 parent: null
 depends_on: []
@@ -528,3 +528,22 @@ No blocking architectural issue remained after these corrections.
   coding or problem-solving policy. Mitigation: preserve the boundary in the
   SPEC and acceptance tests/review; command work changes selection only, never
   fragment semantics or mode state.
+
+## Implementation summary (2026-07-12)
+
+Both child stories completed and passed their own standard-weight review loops:
+
+- `story-style-selection-tiers-config` delivered override/default state,
+  selection-vs-fragment provenance, deterministic catalog discovery, safe
+  session lifecycle, and strict scoped config persistence.
+- `story-style-command-ui-autocomplete` delivered `/style`, durable-default
+  management, live TUI autocomplete, inspect provenance, Pi factory wiring, and
+  rolling README/SPEC/ARCHITECTURE updates.
+
+Review corrections added positive global-custom write coverage and a style-only
+inspect regression. The implementation preserved mode/footer behavior and
+prompt/cache bytes for equivalent inputs. Final integrated verification before
+parent review: 28 test files, 465 tests passed; `npm run typecheck` passed;
+`git diff --check` passed. Worker capability was raised/high due the public
+command/config and prompt-state surface. Review weight remained standard
+(default source).
