@@ -5,7 +5,7 @@ stage: done
 tags: []
 parent: feature-style-command-family
 depends_on: []
-release_binding: null
+release_binding: v0.3.1
 gate_origin: null
 archived_atop: v0.3.0
 git_ref: 8d2431d
