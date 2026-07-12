@@ -1,7 +1,7 @@
 ---
 id: gate-docs-cache-key-model-name
 kind: story
-stage: review
+stage: done
 tags: [documentation]
 parent: null
 depends_on: []
@@ -37,3 +37,18 @@ Insert `model.name` as the first cache-key component in ARCHITECTURE and README,
 - Verification: `git diff --check -- docs/ARCHITECTURE.md README.md` plus direct `model.name` citation check (passed).
 - Discrepancies from design: none.
 - Adjacent issues parked: none.
+
+---
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none
+
+**Notes**:
+- Mode: substrate. Lane: Deep (fresh-context) — touches a foundation-doc assertion (`docs/ARCHITECTURE.md` cache-key formula + `README.md` cache-key summary). Re-derived the cache-key composition from current source rather than trusting the design.
+- Verification re-run: `npm test` → 415/415 passed (25 files); `npm run typecheck` → clean. Matches implementor's recorded `git diff --check` + `model.name` citation check.
+- Specific check: confirmed against `src/cache.ts` `encodeComponents` — the canonical key is `[modelName, modelId, modelProvider, modeSignature, styleSignature, baseHash]` joined by length-delimited `|`. The docs edit adds `model.name` as the FIRST component in both `docs/ARCHITECTURE.md:117` (the `hash(model.name, model.id, model.provider, …)` line) and `README.md:212` (the prose summary), matching the source order. `docs/SPEC.md:101` already listed `model.name` first, so the three docs are now mutually consistent. The item's cited code anchors (`src/cache.ts:54`, `:138`) drift slightly from current line numbers but the underlying claim (six components, `model.name` first) is correct.
+- Item advanced `review → done`. Body retained — release-bound to v0.3.0; not archived.
