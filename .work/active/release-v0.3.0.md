@@ -19,4 +19,8 @@ updated: 2026-07-12
 
 ## Gate runs
 
-Pending: security, tests, cruft, docs, patterns.
+- **gate-security** (2026-07-12) — 0 findings (Critical=0, High=0, Medium=0, Low=0)
+
+- **gate-tests** (2026-07-12) — 8 coverage gaps (Critical=0, High=1, Medium=3, Low=4; tautological=0)
+
+Pending: cruft, docs, patterns.
