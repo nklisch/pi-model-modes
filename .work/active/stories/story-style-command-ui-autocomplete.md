@@ -1,7 +1,7 @@
 ---
 id: story-style-command-ui-autocomplete
 kind: story
-stage: review
+stage: done
 tags: []
 parent: feature-style-command-family
 depends_on: [story-style-selection-tiers-config]
@@ -115,5 +115,21 @@ implementation itself was judged correct; only regression protection was missing
 ## Correction evidence
 
 - `npx vitest --run tests/commands.test.ts` — 73 tests passed.
+- Full `npm test` — 28 files, 465 tests passed.
 - `npm run typecheck` — passed.
 - `git diff --check` — passed.
+
+## Review (2026-07-12)
+
+**Verdict**: Approve
+
+**Blockers**: none
+**Important**: none remaining; the missing style-only inspect regression was
+added in `a604479` and passed focused cross-model re-review.
+**Nits**: autocomplete may re-offer the fully typed `default` token before the
+user enters the separating space; harmless and not worth grammar complexity.
+
+**Notes**: Standard-weight cross-model deep review plus targeted correction
+review. Independent integrated verification passed: 28 files, 465 tests, and
+TypeScript typecheck. All foundation-doc assertions were rolled forward and no
+stale config-only claim remains.
